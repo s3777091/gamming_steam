@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import { ArrowUpRight, X, type LucideIcon } from 'lucide-react-native';
 
 import { useBack } from '@/features/gamepad/hooks';
@@ -34,6 +35,7 @@ export function SidePanel({
   const panelWidth = Math.min(s(width), screenWidth * 0.68);
 
   return (
+    <FocusLayer>
     <View style={StyleSheet.absoluteFill}>
       <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, { opacity: enter }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Đóng" />
@@ -62,15 +64,16 @@ export function SidePanel({
             <X size={s(16)} color={colors.text2} />
           </Press>
         </View>
-        <ScrollView
+        <FocusScroll
           style={{ flex: 1 }}
           contentContainerStyle={[{ paddingHorizontal: s(16), paddingVertical: s(16), paddingBottom: s(24) + insets.bottom }, bodyStyle]}
           showsVerticalScrollIndicator={false}
         >
           {children}
-        </ScrollView>
+        </FocusScroll>
       </Animated.View>
     </View>
+    </FocusLayer>
   );
 }
 

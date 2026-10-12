@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View, ScrollView } from 'react-native';
+import { FocusScroll } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronRight, Info } from 'lucide-react-native';
 
@@ -83,7 +84,7 @@ function ShelfCard({ item, previewing, onPreview, onOpen }: {
 
   return (
     <View>
-      <Press onPress={onPreview} pressScale={0.98} accessibilityLabel={`Chọn ${item.name}`}>
+      <Press onPress={onPreview} onFocused={onPreview} autoFocus={previewing} focusRadius={s(12)} pressScale={0.98} accessibilityLabel={`Chọn ${item.name}`}>
         <Animated.View
           style={[
             styles.card,
@@ -150,6 +151,7 @@ function QuickDealTile({ item, previewing, onPreview }: { item: SteamStoreItem; 
   return (
     <Press
       onPress={onPreview}
+      onFocused={onPreview}
       pressScale={0.99}
       accessibilityLabel={`Chọn ${item.name}`}
       style={[styles.tile, { flex: 1, borderRadius: s(12), borderColor: previewing ? '#9ac5ff' : 'rgba(255,255,255,0.12)' }]}
@@ -202,7 +204,7 @@ export function StoreHome({ data, featured, preview, onPreview, onOpenGame, onOp
         <StorePreview key={preview.appId} item={preview} />
       </View>
 
-      <ScrollView
+      <FocusScroll
         ref={rail}
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -221,7 +223,7 @@ export function StoreHome({ data, featured, preview, onPreview, onOpenGame, onOp
           />
         ))}
         <View style={{ width: s(PREVIEW.w) }} />
-      </ScrollView>
+      </FocusScroll>
 
       <View style={{ marginTop: s(8), height: s(70), flexDirection: 'row', gap: s(10) }}>
         {promotion ? <PromotionTile promotion={promotion} onOpen={() => onOpenPromotion(promotion)} /> : null}

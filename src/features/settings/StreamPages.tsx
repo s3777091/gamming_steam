@@ -9,12 +9,9 @@ import { LOADING_THEMES, loadingPhotoUrl } from '@/lib/loading-themes';
 import { getLiveBorderEnabled, setLiveBorderEnabled } from '@/lib/stream-overlay-settings';
 import { PROFILE_META, REGION_META, type StreamSettings } from '@/lib/stream-settings';
 import {
-  CODEC_GUIDANCE,
   CODEC_OPTIONS,
-  FPS_GUIDANCE,
   frameRateChoice,
   friendlyError,
-  LATENCY_GUIDANCE,
   LATENCY_OPTIONS,
   measureNetwork,
   PROFILE_ORDER,
@@ -35,7 +32,6 @@ type PageProps = { draft: StreamSettingsDraft; settings: StreamSettings };
 export function QualityPage({ draft, settings }: PageProps) {
   const { s } = useUi();
   const copy = streamSettingsCopy(draft.deviceClass);
-  const guidance = copy.profileGuidance[settings.profile];
   return (
     <>
       <SettingsGroup title="Profile streaming">
@@ -75,12 +71,6 @@ export function QualityPage({ draft, settings }: PageProps) {
         })}
       </SettingsGroup>
 
-      <View style={[styles.guidance, { marginHorizontal: s(12), marginTop: s(12), padding: s(12), borderRadius: s(12), gap: s(8) }]}>
-        <T size={10.6} color="rgba(255,255,255,0.75)" leading={1.5}><T size={10.6} weight="semibold">Hợp với: </T>{guidance.bestFor}</T>
-        <T size={10.6} color="rgba(255,255,255,0.55)" leading={1.5}><T size={10.6} weight="semibold" color="rgba(255,255,255,0.75)">Đổi lại: </T>{guidance.tradeoff}</T>
-        <T size={10.6} color="rgba(255,255,255,0.45)" leading={1.5}>{guidance.bitrateDetail}</T>
-      </View>
-
       <SettingsGroup title="Cấu hình chuẩn">
         <ConfirmActionRow
           icon={RotateCcw}
@@ -101,20 +91,15 @@ export function VideoPage({ draft, settings }: PageProps) {
   return (
     <>
       <SettingsGroup title="Hình ảnh">
-        <ChoiceRow label="Độ phân giải" value={settings.resolution} options={copy.resolutionOptions} guidance={copy.resolutionGuidance[settings.resolution]} onChange={(value) => draft.update('resolution', value)} />
+        <ChoiceRow label="Độ phân giải" value={settings.resolution} options={copy.resolutionOptions} onChange={(value) => draft.update('resolution', value)} />
         <ChoiceRow
-          label="Tốc độ khung hình" value={fps} options={copy.fpsOptions} guidance={FPS_GUIDANCE[fps]}
+          label="Tốc độ khung hình" value={fps} options={copy.fpsOptions}
           onChange={(value) => draft.update('frame_rate', value === 'auto' ? null : Number(value) as StreamSettings['frame_rate'])}
         />
-        <ChoiceRow label="Codec" value={settings.codec} options={CODEC_OPTIONS} guidance={CODEC_GUIDANCE[settings.codec]} onChange={(value) => draft.update('codec', value)} />
+        <ChoiceRow label="Codec" value={settings.codec} options={CODEC_OPTIONS} onChange={(value) => draft.update('codec', value)} />
       </SettingsGroup>
 
-      <SettingsGroup
-        title="Bitrate"
-        footnote={settings.bitrate_mode === 'fixed'
-          ? 'Luôn chừa 20% băng thông; mức thực tế được giới hạn chống nghẽn: 720p 12 · 1080p 35 · 1440p 50 · 4K 80 Mbps.'
-          : undefined}
-      >
+      <SettingsGroup title="Bitrate">
         <ToggleRow
           label="Bitrate cố định"
           detail={settings.bitrate_mode === 'fixed' ? 'Giữ mức Mbps bạn đặt; mạng hụt sẽ gây giật.' : 'Tự hạ bitrate khi mạng yếu để phiên không bị ngắt.'}
@@ -138,7 +123,7 @@ export function LatencyPage({ draft, settings }: PageProps) {
   return (
     <>
       <SettingsGroup title="Độ trễ">
-        <ChoiceRow label="Chế độ xử lý" value={settings.latency_mode} options={LATENCY_OPTIONS} guidance={LATENCY_GUIDANCE[settings.latency_mode]} onChange={(value) => draft.update('latency_mode', value)} />
+        <ChoiceRow label="Chế độ xử lý" value={settings.latency_mode} options={LATENCY_OPTIONS} onChange={(value) => draft.update('latency_mode', value)} />
       </SettingsGroup>
       <SettingsGroup title="Độ mượt">
         <ToggleRow label="Frame pacing" detail="Dàn đều thời điểm hiện frame để chuyển động ít rung." checked={settings.frame_pacing} onChange={(checked) => draft.update('frame_pacing', checked)} />
@@ -186,12 +171,11 @@ export function NetworkPage({ draft, settings, notify }: PageProps & { notify: N
       <SettingsGroup title="Vị trí">
         <InfoRow
           label="Khu vực đang xem"
-          detail={streamSettingsCopy(draft.deviceClass).regionGuidance[settings.region]}
           value={<><T size={14}>{region.flag}</T><T size={12} color={colors.text2}>{region.label}</T></>}
         />
       </SettingsGroup>
 
-      <SettingsGroup title="Kiểm tra kết nối" footnote="Đo 6 lần tới máy chủ Jetsona rồi tải thử 512 KB. Kết quả được lưu kèm thiết bị này.">
+      <SettingsGroup title="Kiểm tra kết nối">
         <ActionRow
           icon={RadioTower}
           tone="accent"
@@ -243,7 +227,7 @@ export function OverlayPage({ draft, settings }: PageProps) {
         <ToggleRow label="Viền báo đang phát" detail="Viền xanh quanh màn hình khi có người đang xem cùng. Chỉ áp dụng trên thiết bị này." checked={border} onChange={(checked) => { setBorder(checked); void setLiveBorderEnabled(checked); }} />
       </SettingsGroup>
 
-      <SettingsGroup title="Màn hình chờ kết nối" footnote="Ảnh từ Unsplash, tự luân phiên trong lúc đang kết nối.">
+      <SettingsGroup title="Màn hình chờ kết nối">
         {LOADING_THEMES.map((theme) => {
           const active = settings.loading_theme === theme.id;
           return (
@@ -274,7 +258,6 @@ export function OverlayPage({ draft, settings }: PageProps) {
 }
 
 const styles = StyleSheet.create({
-  guidance: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.04)' },
   recommendation: {
     flexDirection: 'row',
     alignItems: 'center',

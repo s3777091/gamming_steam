@@ -7,7 +7,6 @@ import type {
   NativeDeviceDescription,
   NativeDisplayInfo,
   NativeInputDevice,
-  TouchAction,
 } from './JetsonaInput.types';
 
 declare class JetsonaInputNative extends NativeModule<JetsonaInputModuleEvents> {
@@ -16,7 +15,6 @@ declare class JetsonaInputNative extends NativeModule<JetsonaInputModuleEvents> 
   setCaptureMode(mode: CaptureMode): void;
   setPointerCapture(enabled: boolean): void;
   setImmersive(enabled: boolean): void;
-  injectTouch(action: TouchAction, x: number, y: number): void;
   rumble(deviceId: number, low: number, high: number, durationMs: number): void;
   stopRumble(deviceId: number): void;
   openBluetoothSettings(): void;

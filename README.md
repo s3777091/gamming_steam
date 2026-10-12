@@ -39,7 +39,7 @@ Xem giao diện không cần đăng nhập / máy tính: build với `EXPO_PUBLI
 | `src/features/library` | Kiểu dữ liệu + hook thư viện/Store/hồ sơ (cùng hình dạng với web) |
 | `src/features/settings` | Cài đặt: chất lượng stream, hình ảnh, độ trễ, mạng, thiết bị, tay cầm… |
 | `src/features/stream` | Phiên stream, loading vào game, nhập liệu vật lý, HUD, menu Guide |
-| `src/features/gamepad` | Con trỏ + điều hướng giao diện bằng tay cầm |
+| `src/features/gamepad` | Điều hướng giao diện bằng tay cầm kiểu PS5 (tiêu điểm nhảy từng nấc) |
 | `modules/jetsona-input` | Module Android (Kotlin): tay cầm/bàn phím/chuột, rung, ảnh chụp… |
 | `src/lib` | Logic dùng chung với web/jetson-phone (cài đặt stream, lease phiên, Moonlight…) |
 
@@ -74,14 +74,21 @@ chụp khi mở kênh, và một dây an toàn đọc **một lần** nếu PC c
 `modules/jetsona-input` bọc `Window.Callback` của Activity (không sửa MainActivity, nên
 `expo prebuild --clean` không làm mất):
 
-- **Ngoài stream** (`ui`): tay cầm điều khiển con trỏ trên giao diện — cần trái/D-pad
-  di chuyển, **A** bấm, cần phải cuộn, **B** quay lại, **LB/RB** đổi tab Games/Store.
+- **Ngoài stream** (`ui`): điều hướng kiểu PS5, không có con trỏ tự do — D-pad/cần trái
+  chuyển tiêu điểm từng nấc sang nút gần nhất (viền trắng), **A** bấm, cần phải cuộn,
+  **B** quay lại, **LB/RB** đổi tab Games/Store. Mọi `Press` tự đăng ký làm ô điều hướng;
+  lớp phủ bọc trong `FocusLayer`, ScrollView dùng `FocusScroll` để tự cuộn tới ô đang chọn.
 - **Trong stream** (`stream`): tay cầm, bàn phím và chuột vật lý gửi sang PC. Tay cầm đi
   qua kênh `controllers`/`controllerN` của moonlight-web (đúng định dạng client web),
   rung từ game được chuyển ngược về tay cầm. Chuột dùng pointer-capture (chuyển động
   tương đối). Phím Host (mặc định Ctrl phải) + phím = phím tắt của app.
-- **Nút Home/Guide của tay cầm** mở menu: tab game đang chạy, chụp ảnh, sao chép
-  clipboard hai chiều với PC, thiết bị, tải lại, thoát game.
+- **Nút Home/Guide của tay cầm** (hoặc **giữ Start + Select** ~0,6 giây) mở menu: tab game đang chạy, chụp ảnh, sao chép
+  clipboard hai chiều với PC, thiết bị, tải lại, thoát game. Một số tay cầm Bluetooth gửi
+  Home thành phím HOME của Android: hệ thống thoát ra màn hình chính trước khi app thấy
+  phím đó (không app nào chặn được), nên dùng tổ hợp Start + Select thay thế.
+- **Ảnh Steam** (steamstatic.com...) bị chặn ở Việt Nam nên `Img` tải qua proxy ảnh
+  (`lib/image-proxy.ts`, mặc định wsrv.nl; đổi bằng `EXPO_PUBLIC_IMAGE_PROXY_URL` hoặc
+  `extra.imageProxyUrl`, để rỗng để tắt) và tự thử lại URL gốc nếu proxy lỗi.
 - Danh sách thiết bị, Bluetooth, tai nghe cập nhật bằng **sự kiện** (InputDeviceListener,
   AudioDeviceCallback, broadcast Bluetooth).
 - *Cài đặt › Tay cầm* có bộ kiểm tra tín hiệu trực tiếp (nút, cần, cò) để thử từng tay cầm

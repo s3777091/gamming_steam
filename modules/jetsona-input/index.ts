@@ -7,7 +7,6 @@ import type {
   NativeDeviceDescription,
   NativeDisplayInfo,
   NativeInputDevice,
-  TouchAction,
 } from './src/JetsonaInput.types';
 
 export * from './src/JetsonaInput.types';
@@ -34,10 +33,6 @@ export function setPointerCapture(enabled: boolean): void {
 
 export function setImmersive(enabled: boolean): void {
   Native?.setImmersive(enabled);
-}
-
-export function injectTouch(action: TouchAction, x: number, y: number): void {
-  Native?.injectTouch(action, x, y);
 }
 
 export function rumble(deviceId: number, low: number, high: number, durationMs = 120): void {

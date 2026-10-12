@@ -64,8 +64,6 @@ export type NativeMouseEvent =
 
 export type CaptureMode = 'off' | 'ui' | 'stream';
 
-export type TouchAction = 'down' | 'move' | 'up' | 'cancel';
-
 export type JetsonaInputModuleEvents = {
   onDevicesChanged: (params: { devices: NativeInputDevice[] }) => void;
   onBluetoothChanged: (params: NativeBluetoothInfo) => void;

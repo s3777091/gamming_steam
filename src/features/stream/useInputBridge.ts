@@ -7,7 +7,7 @@
 //  - Bàn phím vật lý: keycode Android -> Windows virtual-key; phím Host (mặc
 //    định Ctrl phải) giữ + phím = phím tắt của app, không gửi sang PC.
 //  - Chuột vật lý: chuyển động tương đối (pointer capture), nút, cuộn.
-//  - Nút Home/Guide của tay cầm mở menu của app (chụp màn hình, sao chép, tab game).
+//  - Nút Home/Guide của tay cầm (hoặc giữ Start + Select) mở menu của app (chụp màn hình, sao chép, tab game).
 
 import { useEffect, useRef } from 'react';
 import {
@@ -17,6 +17,7 @@ import {
 
 import { useInputDevices, type LocalDevice } from '@/features/devices/useInputDevices';
 import { useCaptureMode } from '@/features/gamepad/captureMode';
+import { listenGuideCombo } from '@/features/gamepad/guideCombo';
 import { webCodeForKeyCode, vkForWebCode } from '@/features/settings/keycodes';
 import { applyDeadzone, type HostShortcutAction, type InputSettings } from '@/lib/input-settings';
 import type { NativeMoonlightClient } from '@/lib/moonlight-native';
@@ -134,7 +135,9 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
     const offButton = addListener('onGamepadButton', (event) => {
       if (event.button === 'guide' && event.down) onGuideRef.current();
     });
-    return () => { off(); offButton(); };
+    // Tay cầm gửi Home dưới dạng phím HOME của Android thì app không bắt được: giữ Start + Select thay thế.
+    const offCombo = listenGuideCombo(() => onGuideRef.current());
+    return () => { off(); offButton(); offCombo(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live]);
 

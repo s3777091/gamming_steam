@@ -42,7 +42,7 @@ export function useGuide(handler: () => void, enabled = true): void {
   }, [enabled]);
 }
 
-/** Tạm dừng con trỏ điều khiển UI trong lúc màn này đọc tín hiệu tay cầm thô. */
+/** Tạm dừng điều hướng UI bằng tay cầm trong lúc màn này đọc tín hiệu tay cầm thô. */
 export function useSuspendCursor(enabled = true): void {
   useEffect(() => {
     if (!enabled) return;

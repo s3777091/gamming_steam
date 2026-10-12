@@ -75,7 +75,6 @@ export function DevicesPage({ notify }: { notify: Notify }) {
     <>
       <SettingsGroup
         title="Đang kết nối"
-        footnote="Tay cầm, bàn phím, chuột và tai nghe đang nối với máy này, cập nhật ngay khi bạn cắm hoặc rút."
       >
         {sorted.length ? sorted.map((device) => <DeviceRow key={device.id} device={device} />) : (
           <T size={11.2} color="rgba(255,255,255,0.45)" style={{ paddingHorizontal: s(12), paddingVertical: s(16) }}>
@@ -86,7 +85,6 @@ export function DevicesPage({ notify }: { notify: Notify }) {
 
       <SettingsGroup
         title="Bluetooth"
-        footnote="Ghép đôi hay ngắt kết nối thiết bị vẫn làm trong cài đặt Bluetooth của hệ thống; ghép xong, tay cầm tự hiện ở danh sách trên."
       >
         <ActionRow
           icon={Bluetooth}
@@ -223,7 +221,7 @@ export function ControllerPage({ input }: { input: InputSettingsState }) {
   const pads = devices.filter((device) => device.kind === 'controller');
   const testing = useRef<number | null>(null);
 
-  // Trang này đọc tín hiệu tay cầm thô nên con trỏ UI phải đứng yên (nút B vẫn quay lại được).
+  // Trang này đọc tín hiệu tay cầm thô nên điều hướng UI bằng tay cầm phải đứng yên (nút B vẫn quay lại được).
   useSuspendCursor();
   useEffect(() => () => {
     if (testing.current != null) stopRumble(testing.current);
@@ -246,11 +244,11 @@ export function ControllerPage({ input }: { input: InputSettingsState }) {
         )}
       </SettingsGroup>
 
-      <SettingsGroup title="Kiểm tra tín hiệu" footnote="Dữ liệu đọc trực tiếp từ Android, cùng thứ được gửi sang PC khi chơi.">
+      <SettingsGroup title="Kiểm tra tín hiệu">
         <ControllerInspector />
       </SettingsGroup>
 
-      <SettingsGroup title="Bố cục nút" footnote="Tay cầm kiểu Nintendo đổi chỗ A/B và X/Y so với Xbox; chọn đúng để nút trên PC khớp với nút bạn bấm.">
+      <SettingsGroup title="Bố cục nút">
         <ChoiceRow
           label="Bố cục"
           value={settings.controllerLayout}
@@ -272,7 +270,7 @@ export function ControllerPage({ input }: { input: InputSettingsState }) {
         <ActionRow icon={Vibrate} label="Thử rung" detail={pads.some((pad) => pad.rumble) ? 'Rung tay cầm 0,4 giây' : 'Tay cầm này không báo hỗ trợ rung'} disabled={!pads.length} onPress={testRumble} />
       </SettingsGroup>
 
-      <SettingsGroup title="Vùng chết" footnote="Bỏ qua chuyển động rất nhỏ của cần gạt để nhân vật không tự trôi.">
+      <SettingsGroup title="Vùng chết">
         <SliderRow label="Cần trái" value={settings.leftDeadzone} min={0} max={0.5} step={0.01} format={(value) => `${Math.round(value * 100)}%`} onChange={(value) => update('leftDeadzone', value)} />
         <SliderRow label="Cần phải" value={settings.rightDeadzone} min={0} max={0.5} step={0.01} format={(value) => `${Math.round(value * 100)}%`} onChange={(value) => update('rightDeadzone', value)} />
         <SliderRow label="Cò" value={settings.triggerDeadzone} min={0} max={0.5} step={0.01} format={(value) => `${Math.round(value * 100)}%`} onChange={(value) => update('triggerDeadzone', value)} />
@@ -305,7 +303,7 @@ export function MousePage({ input }: { input: InputSettingsState }) {
     && settings.invertScroll === DEFAULT_INPUT_SETTINGS.invertScroll;
   return (
     <>
-      <SettingsGroup title="Con trỏ" footnote="Áp dụng cho chuột Bluetooth và cho thao tác chạm điều khiển PC, trước khi gửi sang máy tính.">
+      <SettingsGroup title="Con trỏ">
         <SliderRow label="Tốc độ con trỏ" value={settings.mouseSensitivity} min={0.25} max={2.5} step={0.05} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update('mouseSensitivity', value)} />
         <SliderRow label="Tốc độ cuộn" value={settings.scrollSensitivity} min={0.25} max={3} step={0.05} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => update('scrollSensitivity', value)} />
         <ToggleRow label="Đảo chiều cuộn" detail="Cuộn kiểu trackpad Mac: vuốt lên để trang đi lên." checked={settings.invertScroll} onChange={(value) => update('invertScroll', value)} />
@@ -434,7 +432,6 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
 
       <SettingsGroup
         title="Phím tắt trong lúc stream"
-        footnote={`Giữ ${hostLabel} rồi nhấn phím. Tắt máy luôn hỏi lại trước khi gửi lệnh tới Windows.`}
       >
         {shortcuts.map(([code, action]) => {
           const open = openCode === code;
@@ -496,7 +493,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
         )}
       </SettingsGroup>
 
-      <SettingsGroup title="Đổi phím gửi sang PC" footnote="Chỉ đổi mã phím gửi sang Windows, không chạy tác vụ Jetsona.">
+      <SettingsGroup title="Đổi phím gửi sang PC">
         {remaps.map(([source, target]) => (
           <View key={source} style={{ minHeight: s(50), flexDirection: 'row', alignItems: 'center', gap: s(8), paddingHorizontal: s(12), paddingVertical: s(8) }}>
             <Keycap>{keyCodeLabel(source)}</Keycap>
@@ -559,7 +556,7 @@ export function AudioPage({ input }: { input: InputSettingsState }) {
   const headsets = devices.filter((device) => device.kind === 'headset');
   return (
     <>
-      <SettingsGroup title="Âm thanh từ PC" footnote="Âm thanh stream đi qua đầu ra mà Android đang dùng: tai nghe Bluetooth hoặc có dây nếu đang nối, không thì loa máy.">
+      <SettingsGroup title="Âm thanh từ PC">
         <View style={{ minHeight: s(50), flexDirection: 'row', alignItems: 'center', gap: s(12), paddingHorizontal: s(12), paddingVertical: s(8) }}>
           <View style={[styles.deviceIcon, { width: s(32), height: s(32), borderRadius: s(8) }]}>
             <Headphones size={s(16)} color="rgba(255,255,255,0.8)" strokeWidth={1.8} />

@@ -55,8 +55,14 @@ export type PendingGameLaunch = {
 export const PENDING_GAME_LAUNCH_MAX_AGE_MS = 3 * 60_000;
 /** Launcher with no game process for this long: Steam is probably waiting on a dialog. */
 export const LAUNCH_REVEAL_AFTER_MS = 60_000;
-/** Game process alive but its window never took the foreground. */
-export const STARTING_REVEAL_AFTER_MS = 90_000;
+/**
+ * Game process alive but its window never took the foreground. Launcher riêng
+ * (Where Winds Meet, ...) đợi người chơi bấm "Enter Game" nên không bao giờ lên
+ * foreground như một game: đừng che nó quá lâu.
+ */
+export const STARTING_REVEAL_AFTER_MS = 25_000;
+/** Loading screen đã che chừng này mà chưa tan thì hiện nút "Xem màn hình máy tính". */
+export const COVER_SKIP_AFTER_MS = 7_000;
 
 const TERMINAL_PHASES: ReadonlySet<GameSessionPhase> = new Set(['ended', 'cancelled', 'failed']);
 

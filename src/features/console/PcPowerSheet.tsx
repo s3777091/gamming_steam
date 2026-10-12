@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { FocusLayer } from '@/features/gamepad/focus';
 import { Check, Monitor, Power, X } from 'lucide-react-native';
 
 import { useBack } from '@/features/gamepad/hooks';
@@ -79,6 +80,7 @@ export function PcPowerSheet({ onClose, onReady }: { onClose: () => void; onRead
         : 'Máy ở nhà có thể đang tắt hoặc đang ngủ. Bật máy để mở thư viện và chơi game.';
 
   return (
+    <FocusLayer>
     <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', zIndex: 70 }]}>
       <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.74)' }]} onPress={onClose} />
       <View style={[styles.card, { width: Math.min(s(400), width - s(48)), borderRadius: s(22), padding: s(22) }]}>
@@ -101,6 +103,7 @@ export function PcPowerSheet({ onClose, onReady }: { onClose: () => void; onRead
         </View>
       </View>
     </View>
+    </FocusLayer>
   );
 }
 

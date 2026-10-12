@@ -47,7 +47,7 @@ import expo.modules.kotlin.modules.ModuleDefinition
  *
  * Ba chế độ bắt (`setCaptureMode`):
  *  - off    : không đụng gì, Android xử lý như bình thường.
- *  - ui     : tay cầm bị bắt để điều khiển con trỏ trong giao diện; bàn phím và
+ *  - ui     : tay cầm bị bắt để điều hướng giao diện (D-pad/A/B); bàn phím và
  *             chuột đi thẳng xuống React Native (gõ chữ vào ô tìm kiếm).
  *  - stream : tay cầm, bàn phím và chuột vật lý đều bị bắt và gửi sang PC.
  */
@@ -68,7 +68,6 @@ class JetsonaInputModule : Module(), InputSink {
 
   private var lastHoverX = Float.NaN
   private var lastHoverY = Float.NaN
-  private var touchDownTime = 0L
 
   private val devicesDirty = Runnable { emitDevices() }
 
@@ -135,8 +134,6 @@ class JetsonaInputModule : Module(), InputSink {
     Function("setPointerCapture") { enabled: Boolean -> setPointerCapture(enabled) }
 
     Function("setImmersive") { enabled: Boolean -> runOnUi { applyImmersive(it, enabled) } }
-
-    Function("injectTouch") { action: String, x: Double, y: Double -> injectTouch(action, x.toFloat(), y.toFloat()) }
 
     Function("rumble") { deviceId: Int, low: Double, high: Double, durationMs: Int ->
       rumble(deviceId, low.toFloat(), high.toFloat(), durationMs)
@@ -463,6 +460,16 @@ class JetsonaInputModule : Module(), InputSink {
 
     if (captureMode == MODE_OFF) return false
 
+    // Nút Home/Guide: nhiều tay cầm báo KEYCODE_HOME thay vì KEYCODE_BUTTON_MODE.
+    // Hệ thống thường nuốt HOME trước khi tới app; khi nó còn tới được thì giữ lại
+    // để mở menu của app thay vì để Android thoát ra màn hình chính.
+    if (keyCode == KeyEvent.KEYCODE_HOME && isGamepadSource(source)) {
+      if (event.repeatCount == 0) {
+        sendEvent("onGamepadButton", mapOf("deviceId" to event.deviceId, "button" to "guide", "down" to down))
+      }
+      return true
+    }
+
     // 1) Tay cầm
     if (isGamepadSource(source) && isGamepadKey(keyCode)) {
       val pad = pad(event.deviceId)
@@ -665,27 +672,6 @@ class JetsonaInputModule : Module(), InputSink {
       } else {
         captureView?.releasePointerCapture()
         pointerCaptured = false
-      }
-    }
-  }
-
-  // ---- chạm giả cho con trỏ điều khiển UI bằng tay cầm ----
-
-  private fun injectTouch(action: String, x: Float, y: Float) {
-    runOnUi { activity ->
-      val now = SystemClock.uptimeMillis()
-      val motionAction = when (action) {
-        "down" -> { touchDownTime = now; MotionEvent.ACTION_DOWN }
-        "move" -> MotionEvent.ACTION_MOVE
-        "cancel" -> MotionEvent.ACTION_CANCEL
-        else -> MotionEvent.ACTION_UP
-      }
-      val event = MotionEvent.obtain(if (touchDownTime == 0L) now else touchDownTime, now, motionAction, x, y, 0)
-      event.source = InputDevice.SOURCE_TOUCHSCREEN
-      try {
-        activity.window.decorView.dispatchTouchEvent(event)
-      } finally {
-        event.recycle()
       }
     }
   }

@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Check, Monitor, RefreshCw } from 'lucide-react-native';
+import { Monitor, RefreshCw } from 'lucide-react-native';
 
 import type { PendingGameLaunch } from '@/lib/game-launch';
 import { getLoadingTheme, loadingPhotoUrl, type LoadingThemeId } from '@/lib/loading-themes';
@@ -17,48 +17,32 @@ import { T } from '@/ui/Text';
 
 type LoadingPhase = 'connecting' | 'waiting' | 'live' | 'error';
 
-function Heading({ launch, highlights }: { launch: PendingGameLaunch; highlights: string[] }) {
+function Heading({ launch }: { launch: PendingGameLaunch }) {
   const { s, width } = useUi();
   const [logoFailed, setLogoFailed] = useState(false);
   const logoUrl = launch.logoUrl && !logoFailed ? launch.logoUrl : null;
   return (
-    <View style={{ gap: s(12) }}>
-      <T size={10} weight="semibold" color="rgba(255,255,255,0.5)" tracking={0.22}>ĐANG VÀO GAME</T>
+    <View style={{ gap: s(8) }}>
+      <T size={9} weight="semibold" color="rgba(255,255,255,0.52)" tracking={0.24}>ĐANG VÀO GAME</T>
       {logoUrl ? (
         <Img
           source={{ uri: logoUrl }}
           accessibilityLabel={launch.title}
-          style={{ width: Math.min(s(416), width * 0.5), height: s(96) }}
+          style={{ width: Math.min(s(350), width * 0.45), height: s(76) }}
           contentFit="contain"
           contentPosition="left"
           transition={0}
           onError={() => setLogoFailed(true)}
         />
       ) : (
-        <T size={34} weight="bold" tracking={-0.02} numberOfLines={2} style={{ maxWidth: width * 0.7 }}>{launch.title}</T>
+        <T size={31} weight="bold" tracking={-0.025} numberOfLines={2} style={{ maxWidth: width * 0.58 }}>{launch.title}</T>
       )}
-      {highlights.length ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(6) }}>
-          {highlights.map((line) => (
-            <View
-              key={line}
-              style={{
-                flexDirection: 'row', alignItems: 'center', gap: s(6), paddingHorizontal: s(10), paddingVertical: s(4), borderRadius: s(14),
-                borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(0,0,0,0.35)',
-              }}
-            >
-              <Check size={s(12)} color={colors.success} strokeWidth={2.5} />
-              <T size={11} weight="medium" color="rgba(255,255,255,0.8)">{line}</T>
-            </View>
-          ))}
-        </View>
-      ) : null}
     </View>
   );
 }
 
 export function StreamLoading({
-  visible, phase, status, progress, themeId, launch, highlights, detail, onRetry, onExit,
+  visible, phase, status, progress, themeId, launch, highlights, detail, onRetry, onExit, onReveal,
 }: {
   visible: boolean;
   phase: LoadingPhase;
@@ -70,8 +54,11 @@ export function StreamLoading({
   detail?: string | null;
   onRetry: () => void;
   onExit: () => void;
+  /** Có khi stream đã sống mà loading che quá lâu: cho người chơi tự xem màn hình máy tính. */
+  onReveal?: () => void;
 }) {
-  const { s, insets } = useUi();
+  const { s, width, insets } = useUi();
+  const canReveal = Boolean(visible && onReveal);
   const theme = getLoadingTheme(themeId);
   const [photoIndex, setPhotoIndex] = useState(0);
   const [mounted, setMounted] = useState(visible);
@@ -115,6 +102,16 @@ export function StreamLoading({
   const failure = phase === 'error';
   const photo = theme.photos[photoIndex % theme.photos.length];
   const backdrop = launch?.heroUrl || loadingPhotoUrl(photo);
+  const description = phase === 'waiting'
+    ? 'Yêu cầu sẽ tự cập nhật ngay khi chủ phiên phản hồi'
+    : launch ? (canReveal
+      ? 'Game có launcher riêng thường đợi bạn bấm "Enter Game" — mở màn hình máy tính để bấm'
+      : 'Máy tính đang được tối ưu cho trò chơi — bạn sẽ vào thẳng màn hình loading của game')
+      : 'Jetsona đang mở đường truyền WebRTC trực tiếp';
+  const optimizationSummary = launch && highlights.length
+    ? `Đã tối ưu: ${highlights.join(' · ')}`
+    : null;
+  const actionWidth = Math.min(s(330), width * 0.38);
 
   return (
     <Animated.View style={[styles.root, { opacity }]} pointerEvents={visible ? 'auto' : 'none'} accessibilityViewIsModal>
@@ -133,52 +130,65 @@ export function StreamLoading({
         </View>
       ) : null}
 
-      <View style={{ position: 'absolute', left: s(34) + insets.left, right: s(34) + insets.right, bottom: s(26) + insets.bottom, gap: s(14) }}>
-        {launch ? <Heading launch={launch} highlights={highlights} /> : null}
+      <View style={[styles.content, { left: s(38) + insets.left, right: s(38) + insets.right, bottom: s(24) + insets.bottom }]}>
+        <View style={[styles.copyColumn, { gap: s(13), maxWidth: width * 0.58 }]}>
+          {launch ? <Heading launch={launch} /> : null}
 
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: s(24) }}>
-          <View style={{ flex: 1, gap: s(6) }}>
+          <View style={{ gap: s(6) }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10) }}>
               {failure ? <Monitor size={s(17)} color="#fca5a5" /> : <ActivityIndicator size="small" color="rgba(255,255,255,0.86)" />}
               <T size={14} weight="semibold" color={failure ? '#fecaca' : 'rgba(255,255,255,0.88)'} numberOfLines={1} style={{ flex: 1 }}>{status}</T>
             </View>
             {failure && detail ? <T size={10.5} color="rgba(255,255,255,0.35)" numberOfLines={2}>{detail}</T> : null}
             {!failure ? (
-              <T size={11} weight="medium" color="rgba(255,255,255,0.45)">
-                {phase === 'waiting'
-                  ? 'Yêu cầu sẽ tự cập nhật ngay khi chủ phiên phản hồi'
-                  : launch ? 'Máy tính đang được tối ưu cho trò chơi — bạn sẽ vào thẳng màn hình loading của game' : 'Jetsona đang mở đường truyền WebRTC trực tiếp'}
+              <T size={11} weight="medium" color="rgba(255,255,255,0.55)" leading={1.48}>
+                {description}
+                {optimizationSummary ? `\n${optimizationSummary}` : ''}
               </T>
             ) : null}
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(9) }}>
+        </View>
+
+        <View style={[styles.actionColumn, { width: actionWidth, gap: s(13) }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: s(9) }}>
             {failure ? (
               <Press onPress={onRetry} style={[styles.retry, { height: s(39), paddingHorizontal: s(17), borderRadius: s(20), gap: s(8) }]}>
                 <RefreshCw size={s(16)} color="#09090b" />
                 <T size={12} weight="bold" color="#09090b">Kết nối lại</T>
               </Press>
             ) : null}
+            {canReveal ? (
+              <Press onPress={onReveal} style={[styles.retry, { height: s(39), paddingHorizontal: s(17), borderRadius: s(20), gap: s(8) }]}>
+                <Monitor size={s(16)} color="#09090b" />
+                <T size={12} weight="bold" color="#09090b">Xem màn hình máy tính</T>
+              </Press>
+            ) : null}
             <Press onPress={onExit} style={[styles.exit, { height: s(39), paddingHorizontal: s(15), borderRadius: s(20) }]}>
               <T size={11} weight="semibold" color={colors.text3}>Thoát phiên</T>
             </Press>
           </View>
-        </View>
 
-        <View style={{ height: s(6), overflow: 'hidden', borderRadius: s(3), backgroundColor: 'rgba(255,255,255,0.1)' }}>
           <View
-            style={{
-              height: '100%', borderRadius: s(3), width: `${Math.max(failure ? progress - 22 : progress, 6)}%`,
-              backgroundColor: failure ? 'rgba(248,113,113,0.76)' : 'rgba(255,255,255,0.86)',
-            }}
-          />
-          {phase === 'connecting' ? (
-            <Animated.View
+            accessibilityRole="progressbar"
+            accessibilityLabel="Tiến trình mở trò chơi"
+            accessibilityValue={{ min: 0, max: 100, now: Math.round(progress) }}
+            style={{ height: s(3), overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.16)' }}
+          >
+            <View
               style={{
-                position: 'absolute', top: 0, bottom: 0, width: s(150), backgroundColor: 'rgba(255,255,255,0.22)',
-                transform: [{ translateX: sheen.interpolate({ inputRange: [0, 1], outputRange: [-s(160), s(720)] }) }],
+                height: '100%', width: `${Math.max(failure ? progress - 22 : progress, 6)}%`,
+                backgroundColor: failure ? 'rgba(248,113,113,0.82)' : 'rgba(255,255,255,0.9)',
               }}
             />
-          ) : null}
+            {phase === 'connecting' ? (
+              <Animated.View
+                style={{
+                  position: 'absolute', top: 0, bottom: 0, width: s(90), backgroundColor: 'rgba(255,255,255,0.3)',
+                  transform: [{ translateX: sheen.interpolate({ inputRange: [0, 1], outputRange: [-s(100), actionWidth] }) }],
+                }}
+              />
+            ) : null}
+          </View>
         </View>
       </View>
     </Animated.View>
@@ -187,6 +197,14 @@ export function StreamLoading({
 
 const styles = StyleSheet.create({
   root: { ...StyleSheet.absoluteFill, zIndex: 30, elevation: 30, overflow: 'hidden', backgroundColor: '#07060f' },
+  content: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+  },
+  copyColumn: { flex: 1 },
+  actionColumn: { alignItems: 'stretch' },
   attribution: {
     position: 'absolute',
     borderRadius: 999,

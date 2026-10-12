@@ -48,8 +48,8 @@ export function dispatchGuide(): void {
   guideHandlers.forEach((handler) => handler());
 }
 
-// Trang kiểm tra tay cầm cần đọc tín hiệu mà không để con trỏ bấm nhầm vào UI.
-// Nút B (quay lại) vẫn hoạt động khi con trỏ bị tạm dừng.
+// Trang kiểm tra tay cầm cần đọc tín hiệu mà không để D-pad/A điều khiển UI.
+// Nút B (quay lại) vẫn hoạt động khi điều hướng bị tạm dừng.
 let suspendCount = 0;
 
 export function suspendCursor(): () => void {

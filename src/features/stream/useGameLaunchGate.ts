@@ -23,6 +23,7 @@ import {
   gameLaunchErrorMessage,
   gameLaunchStage,
   isTerminalGamePhase,
+  COVER_SKIP_AFTER_MS,
   LAUNCH_REVEAL_AFTER_MS,
   STARTING_REVEAL_AFTER_MS,
   type GameBoostSummary,
@@ -72,6 +73,10 @@ export type GameLaunchGate = {
   notice: string | null;
   /** Đang chạy bằng đọc dự phòng vì PC chưa đẩy sự kiện. */
   degraded: boolean;
+  /** Màn loading đã che đủ lâu để cho người chơi tự tan nó. */
+  skippable: boolean;
+  /** Người chơi tự tan màn loading để thao tác trên desktop (launcher cần bấm "Enter Game"...). */
+  skip: () => void;
 };
 
 type Snapshot = { status: GameSessionStatus; phaseSince: number };
@@ -81,6 +86,7 @@ export function useGameLaunchGate(launch: PendingGameLaunch | null, streamLive: 
   const [revealed, setRevealed] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [degraded, setDegraded] = useState(false);
+  const [skippable, setSkippable] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const startSent = useRef(false);
   const startedAt = useRef<number | null>(null);
@@ -261,7 +267,21 @@ export function useGameLaunchGate(launch: PendingGameLaunch | null, streamLive: 
     }
   }, [revealed, status, streamLive]);
 
+  const coveringNow = Boolean(launch) && !revealed && stage.covering && streamLive;
+  useEffect(() => {
+    if (!coveringNow) { setSkippable(false); return; }
+    const timer = setTimeout(() => setSkippable(true), COVER_SKIP_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [coveringNow]);
+
+  const skip = useCallback(() => {
+    setNotice(null);
+    setRevealed(true);
+  }, []);
+
   return {
+    skip,
+    skippable,
     covering: Boolean(launch) && !revealed && stage.covering,
     label: stage.label,
     progress: stage.progress,

@@ -43,7 +43,7 @@ export default function ConsoleScreen() {
   const [powerOpen, setPowerOpen] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
 
-  // Ở màn thư viện, tay cầm điều khiển con trỏ giao diện (không phải PC).
+  // Ở màn thư viện, tay cầm điều hướng giao diện (không phải PC).
   useCaptureMode('ui');
 
   const library = usePcLibrary();

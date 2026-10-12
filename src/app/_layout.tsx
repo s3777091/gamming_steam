@@ -11,7 +11,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setImmersive } from 'jetsona-input';
 
 import { AuthProvider, useAuth } from '@/features/auth';
-import GamepadCursor from '@/features/gamepad/GamepadCursor';
+import { deactivateFocus } from '@/features/gamepad/focus';
+import GamepadNavigator from '@/features/gamepad/GamepadNavigator';
 import { useHardwareBack } from '@/features/gamepad/hooks';
 import LoginScreen from '@/features/login/LoginScreen';
 import { colors } from '@/theme';
@@ -44,10 +45,11 @@ function Gate() {
   if (auth.status === 'signed-out') return <LoginScreen />;
 
   return (
-    <View style={styles.fill}>
+    // Chạm màn hình thì ẩn viền tiêu điểm của tay cầm; D-pad bấm lại sẽ hiện lên.
+    <View style={styles.fill} onTouchStart={deactivateFocus}>
       <Stack screenOptions={{ headerShown: false, animation: 'fade', contentStyle: { backgroundColor: colors.bg } }} />
-      {/* Con trỏ tay cầm chỉ có ngoài màn stream; trong stream tay cầm thuộc về PC. */}
-      <GamepadCursor enabled={pathname !== '/stream'} />
+      {/* Điều hướng tay cầm chỉ có ngoài màn stream; trong stream tay cầm thuộc về PC. */}
+      <GamepadNavigator enabled={pathname !== '/stream'} />
     </View>
   );
 }

@@ -7,12 +7,14 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { Check, ChevronDown, ChevronRight, Loader, type LucideIcon } from 'lucide-react-native';
 
+import { useFocusable } from '@/features/gamepad/focus';
 import { colors } from '@/theme';
+import { FocusRing } from '@/ui/FocusRing';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
-export function SettingsGroup({ title, footnote, children }: { title?: string; footnote?: ReactNode; children: ReactNode }) {
+export function SettingsGroup({ title, children }: { title?: string; children: ReactNode }) {
   const { s } = useUi();
   const items = Array.isArray(children) ? children.filter(Boolean) : [children];
   return (
@@ -29,7 +31,6 @@ export function SettingsGroup({ title, footnote, children }: { title?: string; f
           </View>
         ))}
       </View>
-      {footnote ? <T size={9.9} color={colors.text4} leading={1.45} style={{ marginTop: s(8), paddingHorizontal: s(12) }}>{footnote}</T> : null}
     </View>
   );
 }
@@ -84,12 +85,11 @@ export function ToggleRow({ label, detail, checked, onChange }: { label: string;
 export type ChoiceOption<T extends string> = { value: T; label: string; description?: string };
 
 /** Hàng mở ngay tại chỗ thành danh sách lựa chọn: màn 430 px cao không có chỗ cho dropdown nổi. */
-export function ChoiceRow<V extends string>({ label, value, options, onChange, guidance }: {
+export function ChoiceRow<V extends string>({ label, value, options, onChange }: {
   label: string;
   value: V;
   options: ChoiceOption<V>[];
   onChange: (value: V) => void;
-  guidance?: string;
 }) {
   const { s } = useUi();
   const [open, setOpen] = useState(false);
@@ -102,7 +102,7 @@ export function ChoiceRow<V extends string>({ label, value, options, onChange, g
         accessibilityState={{ expanded: open }}
         style={rowStyle(s, open ? { backgroundColor: 'rgba(255,255,255,0.06)' } : undefined)}
       >
-        <RowText label={label} detail={open ? undefined : selected?.description} />
+        <RowText label={label} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
           <T size={12.2} color={colors.text2}>{selected?.label}</T>
           <ChevronDown size={s(16)} color={colors.text4} style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }} />
@@ -131,7 +131,6 @@ export function ChoiceRow<V extends string>({ label, value, options, onChange, g
               );
             })}
           </View>
-          {guidance ? <T size={10.2} color="rgba(255,255,255,0.45)" leading={1.45} style={{ marginTop: s(8), paddingHorizontal: s(12) }}>{guidance}</T> : null}
         </View>
       ) : null}
     </View>
@@ -146,8 +145,29 @@ export function SliderRow({ label, detail, value, min, max, step, format, onChan
   // Giá trị cục bộ để kéo mượt; chỉ báo ra ngoài khi nhả tay.
   const [local, setLocal] = useState(value);
   useEffect(() => setLocal(value), [value]);
+
+  // Tay cầm: D-pad trái/phải đổi giá trị theo bước ~5% thang; báo ra ngoài sau khi ngừng bấm.
+  const hostRef = useRef<View>(null);
+  const localRef = useRef(local);
+  localRef.current = local;
+  const commit = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(commit.current), []);
+  const focused = useFocusable({
+    ref: hostRef,
+    onPress: () => {},
+    adjust: (direction) => {
+      const unit = Math.max(step, Math.round((max - min) / 20 / step) * step);
+      const next = Math.min(max, Math.max(min, localRef.current + direction * unit));
+      localRef.current = next;
+      setLocal(next);
+      clearTimeout(commit.current);
+      commit.current = setTimeout(() => onChange(next), 350);
+      return true;
+    },
+  });
   return (
-    <View style={rowStyle(s)}>
+    <View ref={hostRef} style={rowStyle(s)}>
+      {focused ? <FocusRing radius={s(8)} /> : null}
       <RowText label={label} detail={detail} />
       <View style={{ width: Math.min(s(224), width * 0.3), flexDirection: 'row', alignItems: 'center', gap: s(8) }}>
         <Slider
@@ -155,7 +175,7 @@ export function SliderRow({ label, detail, value, min, max, step, format, onChan
           minimumValue={min}
           maximumValue={max}
           step={step}
-          value={value}
+          value={local}
           minimumTrackTintColor="#4c94ff"
           maximumTrackTintColor="rgba(255,255,255,0.18)"
           thumbTintColor={colors.white}

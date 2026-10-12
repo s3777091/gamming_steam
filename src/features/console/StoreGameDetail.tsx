@@ -4,7 +4,8 @@
 // components/StoreGameDetail.tsx + components/store-detail/*.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, ScrollView } from 'react-native';
+import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowUpRight, Building2, ChevronDown, ChevronLeft, ChevronRight, Gamepad2, Monitor, SquarePen,
@@ -118,11 +119,11 @@ function StatsRow({ view, onShowReviews }: { view: DetailView; onShowReviews: ()
   }
   return (
     <View style={{ marginHorizontal: s(20), marginTop: s(20), borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: DIVIDER, paddingTop: s(12) }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -s(20) }} contentContainerStyle={{ paddingHorizontal: s(8) }}>
+      <FocusScroll horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -s(20) }} contentContainerStyle={{ paddingHorizontal: s(8) }}>
         {cells.map((cell, index) => (
           <View key={index} style={{ borderLeftWidth: index ? StyleSheet.hairlineWidth : 0, borderLeftColor: DIVIDER }}>{cell}</View>
         ))}
-      </ScrollView>
+      </FocusScroll>
     </View>
   );
 }
@@ -157,7 +158,7 @@ function Screenshots({ view }: { view: DetailView }) {
   return (
     <View style={{ marginTop: s(24), borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: DIVIDER, paddingTop: s(20) }}>
       <View style={{ paddingHorizontal: s(20) }}><SectionHeading title="Xem trước" /></View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={itemWidth + s(12)} decelerationRate="fast"
+      <FocusScroll horizontal showsHorizontalScrollIndicator={false} snapToInterval={itemWidth + s(12)} decelerationRate="fast"
         style={{ marginTop: s(12) }} contentContainerStyle={{ paddingHorizontal: s(20), gap: s(12) }}
       >
         {detail.screenshots.map((shot, index) => (
@@ -168,7 +169,7 @@ function Screenshots({ view }: { view: DetailView }) {
             <Img source={{ uri: shot.thumbnail }} style={{ width: '100%', height: '100%' }} contentFit="cover" recyclingKey={`${shot.id}`} />
           </Press>
         ))}
-      </ScrollView>
+      </FocusScroll>
       <View style={{ marginHorizontal: s(20), marginTop: s(12), flexDirection: 'row', alignItems: 'center', gap: s(16), paddingBottom: s(12), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: DIVIDER }}>
         {platforms ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
@@ -262,7 +263,7 @@ function Reviews({ view, onLayout }: { view: DetailView; onLayout: (y: number) =
       {detail.reviews.length ? (
         <>
           <T size={13} weight="bold" color="rgba(255,255,255,0.92)" style={{ marginTop: s(20), paddingHorizontal: s(20) }}>Nhận xét hữu ích nhất</T>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={cardWidth + s(12)} decelerationRate="fast"
+          <FocusScroll horizontal showsHorizontalScrollIndicator={false} snapToInterval={cardWidth + s(12)} decelerationRate="fast"
             style={{ marginTop: s(10) }} contentContainerStyle={{ paddingHorizontal: s(20), gap: s(12) }}
           >
             {detail.reviews.map((review) => (
@@ -274,7 +275,7 @@ function Reviews({ view, onLayout }: { view: DetailView; onLayout: (y: number) =
                 <T size={11.2} color="rgba(255,255,255,0.62)" leading={1.55} numberOfLines={4} style={{ marginTop: s(8) }}>{review.text}</T>
               </Press>
             ))}
-          </ScrollView>
+          </FocusScroll>
         </>
       ) : null}
 
@@ -356,6 +357,7 @@ function DetailModal({ title, subtitle, onClose, onBack, wide, children }: {
   const { s, width, height } = useUi();
   useBack(() => { if (onBack) onBack(); else onClose(); });
   return (
+    <FocusLayer>
     <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: s(16), zIndex: 60 }]}>
       <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.72)' }]} onPress={onClose} />
       <View style={{ width: Math.min(s(wide ? 896 : 544), width - s(32)), maxHeight: height - s(32), borderRadius: s(22), overflow: 'hidden', borderWidth: 1, borderColor: colors.line, backgroundColor: '#101924' }}>
@@ -373,9 +375,10 @@ function DetailModal({ title, subtitle, onClose, onBack, wide, children }: {
             <X size={s(16)} color={colors.text2} />
           </Press>
         </View>
-        <ScrollView contentContainerStyle={{ padding: s(16) }} showsVerticalScrollIndicator={false}>{children}</ScrollView>
+        <FocusScroll contentContainerStyle={{ padding: s(16) }} showsVerticalScrollIndicator={false}>{children}</FocusScroll>
       </View>
     </View>
+    </FocusLayer>
   );
 }
 
@@ -603,10 +606,11 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, onCl
   const [failedLogo, setFailedLogo] = useState<string | null>(null);
 
   return (
+    <FocusLayer>
     <Animated.View
       style={[StyleSheet.absoluteFill, { backgroundColor: PAGE_BG, zIndex: 50, opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }]}
     >
-      <ScrollView ref={scroller} onScroll={onScroll} scrollEventThrottle={32} showsVerticalScrollIndicator={false}>
+      <FocusScroll ref={scroller} onScroll={onScroll} scrollEventThrottle={32} showsVerticalScrollIndicator={false}>
         <View>
           <Img
             source={{ uri: detail?.backgroundImage || detail?.headerImage || item.largeImage }}
@@ -669,7 +673,7 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, onCl
             ) : null}
           </View>
         </View>
-      </ScrollView>
+      </FocusScroll>
 
       {/* Thanh điều hướng nổi: trong suốt ở đầu trang, thu gọn khi cuộn qua nút chính. */}
       <View
@@ -702,6 +706,7 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, onCl
 
       {sheet && view ? <SheetView sheet={sheet} view={view} onClose={() => setSheet(null)} /> : null}
     </Animated.View>
+    </FocusLayer>
   );
 }
 

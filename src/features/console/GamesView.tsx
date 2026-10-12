@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View, ScrollView } from 'react-native';
+import { FocusScroll } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Download, Ellipsis, Info, Monitor, Newspaper, Play, ShoppingBag, Trophy, type LucideIcon } from 'lucide-react-native';
 
@@ -79,6 +80,7 @@ function PrimaryAction({ library, onPlay, onInstall, reachable }: {
     <Press
       onPress={!reachable || installed ? onPlay : onInstall}
       disabled={busy}
+      autoFocus
       accessibilityLabel={label}
       style={[styles.play, { width: size, height: size, borderRadius: size / 2 }]}
     >
@@ -161,7 +163,7 @@ function GameCard({ game, active, achievements, onSelect }: {
   const data = achievements.data;
   const percent = data?.supported && data.total ? Math.round(((data.unlocked || 0) / data.total) * 100) : null;
   return (
-    <Press onPress={onSelect} pressScale={0.98} accessibilityLabel={game.title}>
+    <Press onPress={onSelect} onFocused={onSelect} focusRadius={s(16)} pressScale={0.98} accessibilityLabel={game.title}>
       <Animated.View
         style={[
           styles.card,
@@ -244,7 +246,7 @@ export function GamesView({ library, reachable, menuOpen, onMenuOpenChange, onSe
         ) : null}
       </View>
 
-      <ScrollView
+      <FocusScroll
         ref={rail}
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -264,7 +266,7 @@ export function GamesView({ library, reachable, menuOpen, onMenuOpenChange, onSe
           />
         ))}
         <View style={{ width: s(ACTIVE.w) }} />
-      </ScrollView>
+      </FocusScroll>
     </View>
   );
 }

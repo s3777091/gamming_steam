@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import { Animated, Easing, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Animated, Easing, StyleSheet, TextInput, View } from 'react-native';
+import { FocusScroll } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Search, WifiOff, X, type LucideIcon } from 'lucide-react-native';
 
@@ -159,9 +160,9 @@ function SearchResults({ query, search, onOpenGame }: { query: string; search: S
   if (search.error) return <SearchMessage icon={WifiOff} title="Không thể tìm kiếm lúc này" detail={search.error} />;
   if (!search.results.length) return <SearchMessage icon={Search} title="Không tìm thấy game phù hợp" detail="Thử một tên ngắn hơn hoặc kiểm tra lại chính tả." />;
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: s(8), paddingHorizontal: s(2) }}>
+    <FocusScroll horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: s(8), paddingHorizontal: s(2) }}>
       {search.results.map((item) => <SearchResultCard key={item.appId} item={item} onOpen={() => onOpenGame(item)} />)}
-    </ScrollView>
+    </FocusScroll>
   );
 }
 

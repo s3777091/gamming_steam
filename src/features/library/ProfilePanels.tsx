@@ -1,4 +1,5 @@
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import { Clock3, Gamepad2, LockKeyhole, Play, Trophy, Users, X, ArrowUpRight } from 'lucide-react-native';
 
 import { openExternal } from '@/lib/open-external';
@@ -94,7 +95,7 @@ function RecentActivity({ profile, state }: { profile: SteamUserDetails; state: 
           <T size={9.5} color={colors.text3} tabular>{achievements.length} achievement mới</T>
         ) : null}
       </View>
-      <ScrollView
+      <FocusScroll
         horizontal
         showsHorizontalScrollIndicator={false}
         style={{ marginTop: s(6), marginHorizontal: -s(4) }}
@@ -126,7 +127,7 @@ function RecentActivity({ profile, state }: { profile: SteamUserDetails; state: 
             <T size={10.5} color={colors.text3}>{achievementsError || 'Chưa có achievement mới từ các game đã cài.'}</T>
           </View>
         ) : null}
-      </ScrollView>
+      </FocusScroll>
     </View>
   );
 }
@@ -227,6 +228,7 @@ export function PromotionPanel({ promotion, specials, onOpenGame, onClose }: {
   const rows: SteamStoreItem[][] = [];
   for (let index = 0; index < items.length; index += 2) rows.push(items.slice(index, index + 2));
   return (
+    <FocusLayer>
     <View style={StyleSheet.absoluteFill}>
       <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,12,18,0.76)' }]} onPress={onClose} />
       <View style={[styles.promoPanel, { width: panelWidth + insets.right, paddingRight: insets.right }]}>
@@ -241,7 +243,7 @@ export function PromotionPanel({ promotion, specials, onOpenGame, onClose }: {
             <X size={s(16)} color={colors.text2} />
           </Press>
         </View>
-        <ScrollView contentContainerStyle={{ padding: s(16), paddingBottom: s(24) + insets.bottom }} showsVerticalScrollIndicator={false}>
+        <FocusScroll contentContainerStyle={{ padding: s(16), paddingBottom: s(24) + insets.bottom }} showsVerticalScrollIndicator={false}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(16) }}>
             <View style={{ flex: 1 }}>
               <T size={12} weight="semibold" color="rgba(255,255,255,0.9)">Game đang giảm giá</T>
@@ -263,9 +265,10 @@ export function PromotionPanel({ promotion, specials, onOpenGame, onClose }: {
               </View>
             ))}
           </View>
-        </ScrollView>
+        </FocusScroll>
       </View>
     </View>
+    </FocusLayer>
   );
 }
 

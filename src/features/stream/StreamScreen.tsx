@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, StyleSheet, TextInput, View } from 'react-native';
 import { RTCView } from 'react-native-webrtc';
 import * as Clipboard from 'expo-clipboard';
-import { grabFrame } from 'jetsona-input';
+import { addListener, grabFrame } from 'jetsona-input';
 
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useSignedInUser } from '@/features/auth';
@@ -82,6 +82,15 @@ export default function StreamScreen() {
   const videoRef = useRef(videoSize);
   videoRef.current = videoSize;
 
+  // Tay cầm không điều khiển được màn loading: sau khi che đủ lâu, A tan nó để thao tác launcher.
+  const { skippable, skip } = gate;
+  useEffect(() => {
+    if (!covering || !skippable) return;
+    return addListener('onGamepadButton', (event) => {
+      if (event.down && event.button === 'a') skip();
+    });
+  }, [covering, skip, skippable]);
+
   const flashHint = useCallback((message: string) => {
     setHint(message);
   }, []);
@@ -95,12 +104,12 @@ export default function StreamScreen() {
   }, [flashHint, gate.notice]);
 
   const openGuide = useCallback(() => {
-    if (!live || covering) return;
+    if (!live) return;
     // Giữ khung hình TRƯỚC khi menu che mất để còn chụp ảnh được.
     void grabFrame().then(setHasFrame);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setGuideOpen(true);
-  }, [covering, live]);
+  }, [live]);
   const closeGuide = useCallback(() => setGuideOpen(false), []);
   useBack(() => { if (guideOpen) closeGuide(); else return true; }, live);
 
@@ -256,6 +265,7 @@ export default function StreamScreen() {
         detail={errorDetail}
         onRetry={() => setAttempt((value) => value + 1)}
         onExit={exit}
+        onReveal={covering && gate.skippable ? gate.skip : undefined}
       />
 
       {live && !covering ? (

@@ -4,7 +4,8 @@
 // đồng bộ sau. Bản native của components/settings/ConsoleSettings.tsx.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Animated, Easing, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, StyleSheet, View, ScrollView } from 'react-native';
+import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import {
   Check, ChevronLeft, Gamepad2, Gauge, Keyboard, Layers, Monitor, MonitorPlay, Mouse, RefreshCw, Sparkles, Volume2, Wifi, X, type LucideIcon,
 } from 'lucide-react-native';
@@ -130,6 +131,7 @@ export default function ConsoleSettings({ initialCategory = 'quality', backdropU
   const navWidth = Math.min(s(256), Math.max(s(184), width * 0.27));
 
   return (
+    <FocusLayer>
     <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#05080e', opacity: enter, zIndex: 60 }]}>
       {backdropUrl ? <Img source={{ uri: backdropUrl }} style={[StyleSheet.absoluteFill, { opacity: 0.35 }]} contentFit="cover" blurRadius={24} /> : null}
       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(5,8,14,0.82)' }]} />
@@ -149,7 +151,7 @@ export default function ConsoleSettings({ initialCategory = 'quality', backdropU
         </View>
 
         <View style={{ flex: 1, flexDirection: 'row', gap: Math.max(s(16), Math.min(s(40), width * 0.03)), paddingTop: s(4) }}>
-          <ScrollView style={{ width: navWidth, flexGrow: 0 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: s(8) }}>
+          <FocusScroll style={{ width: navWidth, flexGrow: 0 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: s(8) }}>
             {CATEGORIES.map((entry, index) => {
               const Icon = entry.icon;
               const active = entry.id === category;
@@ -158,6 +160,7 @@ export default function ConsoleSettings({ initialCategory = 'quality', backdropU
                 <View key={entry.id} style={divided ? { marginTop: s(8), borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: s(8) } : { marginTop: index ? s(2) : 0 }}>
                   <Press
                     onPress={() => select(entry.id)}
+                    autoFocus={active}
                     pressScale={0.985}
                     accessibilityState={{ selected: active }}
                     style={{
@@ -171,22 +174,17 @@ export default function ConsoleSettings({ initialCategory = 'quality', backdropU
                 </View>
               );
             })}
-          </ScrollView>
+          </FocusScroll>
 
-          <ScrollView ref={content} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: s(24) }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+          <FocusScroll ref={content} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: s(24) }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View key={category} style={{ maxWidth: s(640) }}>
               <View style={{ marginBottom: s(12), paddingHorizontal: s(12) }}>
                 <T size={15.2} weight="medium" tracking={-0.01}>{meta.label}</T>
                 <T size={10.6} color="rgba(255,255,255,0.45)" style={{ marginTop: s(2) }}>{meta.detail}</T>
-                {meta.stream && draft.deviceClass === 'phone' ? (
-                  <T size={9.9} color="rgba(143,188,255,0.8)" style={{ marginTop: s(4) }}>
-                    Tinh chỉnh riêng cho điện thoại · không đổi cài đặt trên PC hay laptop
-                  </T>
-                ) : null}
               </View>
               {page}
             </View>
-          </ScrollView>
+          </FocusScroll>
         </View>
       </View>
 
@@ -211,6 +209,7 @@ export default function ConsoleSettings({ initialCategory = 'quality', backdropU
         </View>
       ) : null}
     </Animated.View>
+    </FocusLayer>
   );
 }
 

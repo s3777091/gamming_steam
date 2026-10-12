@@ -23,6 +23,8 @@ import type { ViewerRegion } from './stream-settings';
 type Extra = {
   backendBaseUrl?: string;
   supabaseAnonKey?: string;
+  /** Proxy ảnh cho CDN Steam (bị chặn ở VN). Bỏ trống = mặc định; '' = tắt. */
+  imageProxyUrl?: string;
 };
 
 // ┌── Sửa chỗ này để chạy máy không cần cấu hình ──────────────────────────┐
@@ -48,6 +50,12 @@ export const SUPABASE_ANON_KEY = pick(
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
   pick(extra.supabaseAnonKey, EDITABLE.supabaseAnonKey),
 );
+
+/**
+ * Proxy ảnh Steam. `undefined` = dùng proxy mặc định trong image-proxy.ts; chuỗi
+ * rỗng (EXPO_PUBLIC_IMAGE_PROXY_URL= hoặc extra.imageProxyUrl "") = tắt proxy.
+ */
+export const IMAGE_PROXY_URL: string | undefined = process.env.EXPO_PUBLIC_IMAGE_PROXY_URL ?? extra.imageProxyUrl;
 
 /**
  * Host theo khu vực người xem. Cả hai domain đều终止 tại cùng origin VN
