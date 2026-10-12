@@ -1,0 +1,78 @@
+{
+  "expo": {
+    "name": "Jetsona",
+    "slug": "jetsona-console",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "icon": "./assets/icon.png",
+    "scheme": "jetsona",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#080c12",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "cloud.protexa.jetsona.console",
+      "supportsTablet": true,
+      "requireFullScreen": true,
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "Jetsona cần truy cập mạng nội bộ để truyền hình ảnh và điều khiển máy tính ở nhà.",
+        "NSBluetoothAlwaysUsageDescription": "Jetsona dùng Bluetooth để nhận tay cầm, bàn phím và chuột khi chơi game từ xa."
+      }
+    },
+    "android": {
+      "package": "cloud.protexa.jetsona.console",
+      "adaptiveIcon": {
+        "backgroundColor": "#080c12",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH_CONNECT"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#080c12",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-screen-orientation",
+        {
+          "initialOrientation": "LANDSCAPE"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24,
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "./plugins/with-jetsona-android",
+      "expo-font",
+      "expo-image"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "backendBaseUrl": "https://vn.protexa.cloud",
+      "supabaseAnonKey": "sb_publishable_-QsnqGoqBAspgJOSGXM1rX_N1hlwRkN"
+    }
+  }
+}

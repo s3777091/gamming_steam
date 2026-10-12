@@ -1,0 +1,212 @@
+{
+  "version": 2,
+  "assetsRoot": "public",
+  "storage": {
+    "bucket": "ui-media"
+  },
+  "assets": [
+    {
+      "path": "media/anime.mp4",
+      "size": 16339444,
+      "sha256": "ccd98a03c5449faa134d693ea41ea31ca3905904f4a117e0d04d8d45782160e1",
+      "contentType": "video/mp4",
+      "profile": "quality"
+    },
+    {
+      "path": "media/city-light-night.mp4",
+      "size": 15008652,
+      "sha256": "7e7df12a2cde79454b71b105c751173c58944d90eec65ac3e0a13ddecceabca2",
+      "contentType": "video/mp4",
+      "profile": "data_saver"
+    },
+    {
+      "path": "media/game.mp4",
+      "size": 30072777,
+      "sha256": "b0b4768a4d19711805dff6151465be871034fc916d6389d107fe71f882e3fcd9",
+      "contentType": "video/mp4",
+      "profile": "balanced"
+    },
+    {
+      "path": "media/moving.mp4",
+      "size": 39418133,
+      "sha256": "975b00d5b691fe58f74aac2fbc842bbd0e687d397c2a12960fd0ba0f859d7b68",
+      "contentType": "video/mp4",
+      "profile": "auto"
+    },
+    {
+      "path": "media/racing.mp4",
+      "size": 11856868,
+      "sha256": "d3d2c93c2f56c11583ccf19dccecff11d2d456cd0785bb91e8143820e881b905",
+      "contentType": "video/mp4",
+      "profile": "competitive"
+    },
+    {
+      "path": "media/loading/aurora-1.jpg",
+      "size": 258609,
+      "sha256": "6928cc2bf5a6c3d126c6578ac39907c3902dbef38a6e60f2d5c2e1d38e878589",
+      "contentType": "image/jpeg",
+      "loadingTheme": "aurora"
+    },
+    {
+      "path": "media/loading/aurora-2.jpg",
+      "size": 208170,
+      "sha256": "6aaa3c5b51078d78a493c29f2c6b2673e64872f99dded4239df28de3704aaecf",
+      "contentType": "image/jpeg",
+      "loadingTheme": "aurora"
+    },
+    {
+      "path": "media/loading/aurora-3.jpg",
+      "size": 292040,
+      "sha256": "42a10ec0b04cc0dbd957e4a1c9338ebd2c16e1c1e885c2be5205571d0f97c765",
+      "contentType": "image/jpeg",
+      "loadingTheme": "aurora"
+    },
+    {
+      "path": "media/loading/dark-ocean-1.jpg",
+      "size": 689407,
+      "sha256": "b67de25d2113ec39484f660f3b2add7df1ad2d2bba68be61467c13c9b2b086f3",
+      "contentType": "image/jpeg",
+      "loadingTheme": "dark_ocean"
+    },
+    {
+      "path": "media/loading/dark-ocean-2.jpg",
+      "size": 538536,
+      "sha256": "7f0f0ce650ac36cdc7b887896e82aa90a29e2b3f1891ae8bca96ef73f0049e1a",
+      "contentType": "image/jpeg",
+      "loadingTheme": "dark_ocean"
+    },
+    {
+      "path": "media/loading/dark-ocean-3.jpg",
+      "size": 506240,
+      "sha256": "a5b1738e9901103e2e1e72432a777038c2b7dbc1b85b0dd13dbbb56f77af24e0",
+      "contentType": "image/jpeg",
+      "loadingTheme": "dark_ocean"
+    },
+    {
+      "path": "media/loading/deep-space-1.jpg",
+      "size": 467671,
+      "sha256": "d6d55b0074cf1a21fe88f7c64f3bcc028ed3bcaea8e5fa61c54218093f4d4756",
+      "contentType": "image/jpeg",
+      "loadingTheme": "deep_space"
+    },
+    {
+      "path": "media/loading/deep-space-2.jpg",
+      "size": 345647,
+      "sha256": "f98a9be007432834c05131bd5af270ab6b364c8f398b60f235906d8e3bf00298",
+      "contentType": "image/jpeg",
+      "loadingTheme": "deep_space"
+    },
+    {
+      "path": "media/loading/deep-space-3.jpg",
+      "size": 294131,
+      "sha256": "9280b08ee53456311c75858fc7f2b7f13d22f50fc3d13833dbcf533b96189e4f",
+      "contentType": "image/jpeg",
+      "loadingTheme": "deep_space"
+    },
+    {
+      "path": "media/loading/desert-dreams-1.jpg",
+      "size": 336619,
+      "sha256": "2b18d37e1049f112bddc97f2cbe402f7e3bdf6c3a14e91c526bffb8abdd84d19",
+      "contentType": "image/jpeg",
+      "loadingTheme": "desert_dreams"
+    },
+    {
+      "path": "media/loading/desert-dreams-2.jpg",
+      "size": 175665,
+      "sha256": "db881b1b456d50f8f643faf780518d6bd4372fc65b89ab15e4fca57c1d07a407",
+      "contentType": "image/jpeg",
+      "loadingTheme": "desert_dreams"
+    },
+    {
+      "path": "media/loading/desert-dreams-3.jpg",
+      "size": 876866,
+      "sha256": "2af6dc210452cd3ca39ce0b51b2e2571c8f1fab7cd0ddde33579f58a38477845",
+      "contentType": "image/jpeg",
+      "loadingTheme": "desert_dreams"
+    },
+    {
+      "path": "media/loading/misty-wilds-1.jpg",
+      "size": 203000,
+      "sha256": "ae271eaa107637d0b36f26f83781b59f808ef53fbd9687e890ab2c4ccdda2a60",
+      "contentType": "image/jpeg",
+      "loadingTheme": "misty_wilds"
+    },
+    {
+      "path": "media/loading/misty-wilds-2.jpg",
+      "size": 543483,
+      "sha256": "229408d4c0d0cf011d9c88bfbd8c8de425bebdd9a9b6265f7f8496d01416e209",
+      "contentType": "image/jpeg",
+      "loadingTheme": "misty_wilds"
+    },
+    {
+      "path": "media/loading/misty-wilds-3.jpg",
+      "size": 491720,
+      "sha256": "649f9027b56afce247130998706b43bbd9b32e2fcab1625e09f4f826d62ea959",
+      "contentType": "image/jpeg",
+      "loadingTheme": "misty_wilds"
+    },
+    {
+      "path": "media/loading/neon-city-1.jpg",
+      "size": 248232,
+      "sha256": "5d0775bceb5ed2320aaffacdc1f83e50e5101cac43b48d91ed6dc5e06331de79",
+      "contentType": "image/jpeg",
+      "loadingTheme": "neon_city"
+    },
+    {
+      "path": "media/loading/neon-city-2.jpg",
+      "size": 303058,
+      "sha256": "eb956127ef02980f284ddb453db55cbe1576a4c858666854de953f11ec1c7a80",
+      "contentType": "image/jpeg",
+      "loadingTheme": "neon_city"
+    },
+    {
+      "path": "media/loading/neon-city-3.jpg",
+      "size": 282427,
+      "sha256": "f4b7cdeb4677411fee613a00792a21b571b838feeebb8090304c4b1c605d9b01",
+      "contentType": "image/jpeg",
+      "loadingTheme": "neon_city"
+    },
+    {
+      "path": "media/loading/night-drive-1.jpg",
+      "size": 662807,
+      "sha256": "1a73213cdeae90585b7085b2ce5edfe0210d837e6584d1156470da85db5b3081",
+      "contentType": "image/jpeg",
+      "loadingTheme": "night_drive"
+    },
+    {
+      "path": "media/loading/night-drive-2.jpg",
+      "size": 798033,
+      "sha256": "01c609b587de80ba2df1b9ab93c7dce278988068e49b661dd64e9481b4dd20b5",
+      "contentType": "image/jpeg",
+      "loadingTheme": "night_drive"
+    },
+    {
+      "path": "media/loading/night-drive-3.jpg",
+      "size": 125451,
+      "sha256": "232c4843c4a839baf811b386780a1406a1beae88d89c45e68520210fbd293437",
+      "contentType": "image/jpeg",
+      "loadingTheme": "night_drive"
+    },
+    {
+      "path": "media/loading/snowbound-1.jpg",
+      "size": 247040,
+      "sha256": "f36d08b44c14803e87ec88385ad16130c930887c1655840fc1074b86534f35a2",
+      "contentType": "image/jpeg",
+      "loadingTheme": "snowbound"
+    },
+    {
+      "path": "media/loading/snowbound-2.jpg",
+      "size": 550328,
+      "sha256": "b9dbed148fa910ff6bac2df86da4ee185f311546c95d9eb606c25d2a4344ae06",
+      "contentType": "image/jpeg",
+      "loadingTheme": "snowbound"
+    },
+    {
+      "path": "media/loading/snowbound-3.jpg",
+      "size": 254213,
+      "sha256": "9c42201d857b6c120563ccf0c7f715dc7ac4006133595fe8b465ba5b631a9a85",
+      "contentType": "image/jpeg",
+      "loadingTheme": "snowbound"
+    }
+  ]
+}
