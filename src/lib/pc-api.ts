@@ -41,6 +41,8 @@ export const PC_ROUTES = {
   store: '/store',
   storeSearch: (query: string) => `/store/search?q=${encodeURIComponent(query)}`,
   storeDetail: (appId: number) => `/store/${appId}`,
+  storePurchase: '/store/purchase',
+  storeOwnership: (appId: number) => `/store/${appId}/ownership`,
   steamProfile: '/steam/profile',
   display: '/display',
   clipboard: '/clipboard',

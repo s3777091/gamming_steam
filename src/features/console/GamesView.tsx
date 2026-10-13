@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, ScrollView } from 'react-native';
 import { FocusScroll } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Download, Ellipsis, FileText, Info, Monitor, Newspaper, Pause, Play, ShoppingBag, Trophy, type LucideIcon } from 'lucide-react-native';
+import { Download, Ellipsis, FileText, HardDrive, Info, Monitor, Newspaper, Pause, Play, ShoppingBag, Trophy, type LucideIcon } from 'lucide-react-native';
 
 import { isSteamAppId } from '@/features/library/format';
 import type { LibraryPanel, PcGame } from '@/features/library/types';
@@ -17,6 +17,7 @@ import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 import { DownloadStatusLine, ProgressRing, downloadInProgress } from './DownloadViews';
+import type { FlightRect } from './DownloadFlight';
 
 function GameTitle({ game }: { game: PcGame }) {
   const { s, width } = useUi();
@@ -101,6 +102,7 @@ function PrimaryAction({ library, download, canControl, onPlay, onInstall, onDow
       <Animated.View style={{ opacity: pulse }}>
         {tracking ? (
           tracking.status === 'eula' ? <FileText size={s(17)} color={colors.white} />
+            : tracking.status === 'config' ? <HardDrive size={s(17)} color={colors.white} />
             : tracking.status === 'downloading' && canControl ? <Pause size={s(16)} color={colors.white} fill={colors.white} />
               : <Download size={s(16)} color={colors.white} />
         ) : !reachable ? (
@@ -166,11 +168,13 @@ const ACTIVE = { w: 288, h: 112 };
 const IDLE = { w: 88, h: 88 };
 const GAP = 12;
 
-function GameCard({ game, active, achievements, onSelect }: {
+function GameCard({ game, active, achievements, onSelect, cardRef }: {
   game: PcGame;
   active: boolean;
   achievements: PcLibrary['achievements'];
   onSelect: () => void;
+  /** Gắn vào thẻ đang chọn: điểm xuất phát của hiệu ứng thẻ bay vào thông báo. */
+  cardRef: RefObject<View | null>;
 }) {
   const { s } = useUi();
   const grow = useRef(new Animated.Value(active ? 1 : 0)).current;
@@ -181,6 +185,7 @@ function GameCard({ game, active, achievements, onSelect }: {
   const data = achievements.data;
   const percent = data?.supported && data.total ? Math.round(((data.unlocked || 0) / data.total) * 100) : null;
   return (
+    <View ref={active ? cardRef : undefined} collapsable={false}>
     <Press onPress={onSelect} onFocused={onSelect} focusRadius={s(16)} pressScale={0.98} accessibilityLabel={game.title}>
       <Animated.View
         style={[
@@ -206,11 +211,12 @@ function GameCard({ game, active, achievements, onSelect }: {
         ) : null}
       </Animated.View>
     </Press>
+    </View>
   );
 }
 
 /** Tab Games: logo + nút của game đang chọn, phía dưới là kệ mọi game trên PC. */
-export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenChange, onSelectGame, onOpenPanel, onPlay, onOpenEula }: {
+export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenChange, onSelectGame, onOpenPanel, onPlay, onOpenPrompt, onInstallStart, onInstallResult }: {
   library: PcLibrary;
   downloads: SteamDownloads;
   reachable: boolean;
@@ -219,26 +225,41 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
   onSelectGame: (id: string) => void;
   onOpenPanel: (panel: LibraryPanel) => void;
   onPlay: () => void;
-  onOpenEula: () => void;
+  /** Mở hộp thoại Steam đang chờ trả lời (chọn nơi cài đặt hoặc điều khoản). */
+  onOpenPrompt: () => void;
+  /** Bấm Tải: thẻ game thu vào ô nhỏ rồi chờ kết quả (xem DownloadFlight). */
+  onInstallStart: (info: { imageUrl: string | null; from: FlightRect }) => void;
+  onInstallResult: (ok: boolean) => void;
 }) {
   const { s } = useUi();
+  const activeCard = useRef<View>(null);
   const { games, selected, error, installOpenedId } = library;
   const selectedAppId = isSteamAppId(selected?.steamAppId) ? Number(selected.steamAppId) : null;
   const tracked = downloadForApp(downloads.state, selectedAppId);
   // PC đã nhận lệnh cài nhưng agent chưa kịp báo: hiện "đang chuẩn bị" ngay.
   const download: GameDownload | null = tracked ?? (selectedAppId && downloads.expectedAppId === selectedAppId ? {
     appid: selectedAppId, name: selected?.title ?? null, status: 'preparing', label: 'Đang chuẩn bị cài đặt',
-    percent: null, downloaded: 0, total: 0, bytesPerSec: 0, etaSec: null, error: null, eulas: null,
+    percent: null, downloaded: 0, total: 0, bytesPerSec: 0, etaSec: null, error: null, eulas: null, config: null,
   } : null);
   const elsewhere = download ? null : primaryDownload(downloads.state);
   const showDownload = Boolean(download && selected?.installed === false);
 
   const install = async () => {
-    if (await library.installSelected() && selectedAppId) downloads.expect(selectedAppId);
+    if (library.installingId) return;
+    // Đo thẻ đang chọn để hiệu ứng bắt đầu đúng chỗ; đo không được thì vẫn cài bình thường.
+    const from = await new Promise<FlightRect | null>((resolve) => {
+      const node = activeCard.current;
+      if (!node) { resolve(null); return; }
+      node.measureInWindow((x, y, w, h) => resolve(w > 0 && h > 0 ? { x, y, w, h } : null));
+    });
+    if (from) onInstallStart({ imageUrl: selected?.artworkUrl || selected?.heroUrl || null, from });
+    const ok = await library.installSelected();
+    if (ok && selectedAppId) downloads.expect(selectedAppId);
+    if (from) onInstallResult(ok);
   };
   const onDownloadPress = () => {
     if (!download) return;
-    if (download.status === 'eula') onOpenEula();
+    if (download.status === 'eula' || download.status === 'config') onOpenPrompt();
     else if (!downloads.canControl) return;
     else if (download.status === 'downloading') downloads.pause(download.appid);
     else if (download.status === 'paused') downloads.resume(download.appid);
@@ -288,7 +309,7 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
           </View>
         ) : null}
         {!error && showDownload && download ? (
-          <DownloadStatusLine download={download} canControl={downloads.canControl} onOpenEula={onOpenEula} />
+          <DownloadStatusLine download={download} canControl={downloads.canControl} onOpenEula={onOpenPrompt} />
         ) : null}
         {!error && !showDownload && elsewhere && downloadInProgress(elsewhere) ? (
           <T size={10.4} weight="medium" color="rgba(255,255,255,0.6)" tabular numberOfLines={1} style={{ marginTop: s(10) }}>
@@ -322,6 +343,7 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
             active={game.id === selected?.id}
             achievements={library.achievements}
             onSelect={() => onSelectGame(game.id)}
+            cardRef={activeCard}
           />
         ))}
         <View style={{ width: s(ACTIVE.w) }} />

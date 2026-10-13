@@ -1,9 +1,9 @@
 // Giao diện lượt tải game Steam: vòng tiến trình trên nút chính, dòng trạng thái
 // dưới logo và hộp đồng ý điều khoản. Dữ liệu đến thẳng từ PC qua DataChannel
-// (features/library/useSteamDownloads.ts).
+// (features/library/useSteamDownloads.ts). Hộp thoại chọn ổ đĩa nằm ở InstallConfigSheet.tsx.
 
 import { Pressable, StyleSheet, View } from 'react-native';
-import { ExternalLink, FileText, X } from 'lucide-react-native';
+import { ExternalLink, FileText, HardDrive, X } from 'lucide-react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import { FocusLayer } from '@/features/gamepad/focus';
@@ -18,11 +18,11 @@ import { T } from '@/ui/Text';
 
 /** Trạng thái còn đang diễn ra: nút chính hiện vòng tiến trình thay vì nút Cài đặt. */
 export function downloadInProgress(download: GameDownload | null): boolean {
-  return Boolean(download && ['preparing', 'eula', 'downloading', 'working', 'queued', 'paused', 'installed'].includes(download.status));
+  return Boolean(download && ['preparing', 'config', 'eula', 'downloading', 'working', 'queued', 'paused', 'installed'].includes(download.status));
 }
 
 /** Vòng tiến trình vẽ quanh nút tròn; percent null = chưa biết (vòng mờ). */
-export function ProgressRing({ size, percent }: { size: number; percent: number | null }) {
+export function ProgressRing({ size, percent, color = colors.white }: { size: number; percent: number | null; color?: string }) {
   const stroke = Math.max(2, size * 0.07);
   const radius = (size - stroke) / 2;
   const length = 2 * Math.PI * radius;
@@ -35,7 +35,7 @@ export function ProgressRing({ size, percent }: { size: number; percent: number 
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={colors.white}
+          stroke={color}
           strokeWidth={stroke}
           fill="none"
           strokeLinecap="round"
@@ -78,14 +78,18 @@ export function DownloadStatusLine({ download, canControl, onOpenEula }: {
       {download.error ? (
         <T size={10} color={failed ? '#fecaca' : colors.text3} leading={1.45} numberOfLines={2}>{download.error}</T>
       ) : null}
-      {download.status === 'eula' ? (
+      {download.status === 'eula' || download.status === 'config' ? (
         canControl ? (
           <Press onPress={onOpenEula} style={[styles.eulaButton, { alignSelf: 'flex-start', gap: s(6), paddingHorizontal: s(12), height: s(28), borderRadius: s(14) }]}>
-            <FileText size={s(12)} color={colors.onAccent} />
-            <T size={10.4} weight="semibold" color={colors.onAccent}>Xem điều khoản</T>
+            {download.status === 'config' ? <HardDrive size={s(12)} color={colors.onAccent} /> : <FileText size={s(12)} color={colors.onAccent} />}
+            <T size={10.4} weight="semibold" color={colors.onAccent}>{download.status === 'config' ? 'Chọn nơi cài đặt' : 'Xem điều khoản'}</T>
           </Press>
         ) : (
-          <T size={10} color={colors.text3}>Đang chờ người bấm tải đồng ý điều khoản của nhà phát hành.</T>
+          <T size={10} color={colors.text3}>
+            {download.status === 'config'
+              ? 'Đang chờ người bấm tải chọn nơi cài đặt.'
+              : 'Đang chờ người bấm tải đồng ý điều khoản của nhà phát hành.'}
+          </T>
         )
       ) : null}
     </View>

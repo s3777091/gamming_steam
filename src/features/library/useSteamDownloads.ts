@@ -129,6 +129,10 @@ async function openLink(userId: string): Promise<Link> {
   }
 }
 
+export type ConfigAnswer =
+  | { accept: true; folder: number; desktopShortcut: boolean; startMenuShortcut: boolean }
+  | { accept: false };
+
 export type SteamDownloads = {
   /** Trạng thái cuối cùng agent gửi (giữ lại sau khi agent thoát). */
   state: DownloadsState | null;
@@ -141,6 +145,8 @@ export type SteamDownloads = {
   expect: (appid: number) => void;
   expectedAppId: number | null;
   answerEula: (appid: number, accept: boolean) => void;
+  /** Trả lời hộp thoại Install: ổ đĩa + lối tắt; accept=false là huỷ cài đặt. */
+  answerConfig: (appid: number, answer: ConfigAnswer) => void;
   pause: (appid: number) => void;
   resume: (appid: number) => void;
 };
@@ -287,6 +293,7 @@ export function useSteamDownloads(userId: string, onInstalled?: (appid: number) 
     expect,
     expectedAppId,
     answerEula: (appid, accept) => send({ type: 'eula', appid, accept }),
+    answerConfig: (appid, answer) => send({ type: 'config', appid, ...answer }),
     pause: (appid) => send({ type: 'pause', appid }),
     resume: (appid) => send({ type: 'resume', appid }),
   };

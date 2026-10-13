@@ -165,6 +165,7 @@ export function demoResponse(path: string): unknown | null {
   if (path === '/games') return { ok: true, games: GAMES, steamProfile: PROFILE.profile };
   if (path === '/store') return STORE;
   if (path.startsWith('/store/search')) return { ok: true, total: 8, items: [...STORE.specials, ...STORE.topSellers] };
+  if (/^\/store\/\d+\/ownership$/.test(path)) return { ok: true, owned: false, installed: false };
   if (path.startsWith('/store/')) return { ok: false, error: 'Dữ liệu mẫu không có chi tiết game.' };
   if (path === '/steam/profile') return PROFILE;
   return null;

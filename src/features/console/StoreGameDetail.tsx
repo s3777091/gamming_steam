@@ -8,8 +8,8 @@ import { Animated, Easing, Pressable, StyleSheet, View, type NativeScrollEvent, 
 import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  ArrowUpRight, Building2, ChevronDown, ChevronLeft, ChevronRight, Gamepad2, Monitor, SquarePen,
-  ThumbsDown, ThumbsUp, Trophy, X,
+  ArrowUpRight, Building2, Check, ChevronDown, ChevronLeft, ChevronRight, Download, Gamepad2, Gift, Loader, Monitor,
+  Play, ShoppingCart, SquarePen, ThumbsDown, ThumbsUp, Trophy, X,
 } from 'lucide-react-native';
 
 import { useBack } from '@/features/gamepad/hooks';
@@ -545,6 +545,39 @@ function SheetView({ sheet, view, onClose }: { sheet: DetailSheet; view: DetailV
 
 // ---------------------------------------------------------------- trang chính
 
+/** Nút chính của trang: Mua / Nhận / Tải / Chơi, do màn chứa quyết định theo quyền sở hữu. */
+export type StoreBuyAction = {
+  label: string;
+  /** Hiện cạnh nhãn ở thanh trên khi cuộn qua phần giá (ví dụ "Mua · 199.000 ₫"). */
+  price?: string;
+  icon: 'buy' | 'free' | 'download' | 'play' | 'wait' | 'owned';
+  disabled?: boolean;
+  onPress: () => void;
+};
+
+const BUY_ICONS = { buy: ShoppingCart, free: Gift, download: Download, play: Play, wait: Loader, owned: Check } as const;
+
+function BuyButton({ action, compact }: { action: StoreBuyAction; compact?: boolean }) {
+  const { s } = useUi();
+  const Icon = BUY_ICONS[action.icon];
+  const filled = action.icon === 'play';
+  return (
+    <Press
+      onPress={action.onPress}
+      disabled={action.disabled}
+      sound="confirm"
+      accessibilityLabel={action.label}
+      style={{
+        height: s(36), paddingHorizontal: s(compact ? 14 : 18), borderRadius: s(18), flexDirection: 'row', alignItems: 'center', gap: s(7),
+        backgroundColor: colors.white, opacity: action.disabled ? 0.55 : 1,
+      }}
+    >
+      <Icon size={s(compact ? 14 : 15)} color="#08111d" strokeWidth={2.3} fill={filled ? '#08111d' : 'none'} />
+      <T size={compact ? 10.2 : 11.2} weight="bold" color="#08111d" numberOfLines={1}>{compact && action.price ? `${action.label} · ${action.price}` : action.label}</T>
+    </Press>
+  );
+}
+
 function DetailLoading() {
   const { s, width } = useUi();
   return (
@@ -558,12 +591,13 @@ function DetailLoading() {
   );
 }
 
-export function StoreGameDetail({ item, detail, loading, error, priceLabel, onClose }: {
+export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyAction, onClose }: {
   item: StoreDetailItem & { discounted: boolean; discountPercent: number };
   detail: SteamStoreGameDetail | null;
   loading: boolean;
   error: string | null;
   priceLabel: string;
+  buyAction?: StoreBuyAction;
   onClose: () => void;
 }) {
   const { s, insets } = useUi();
@@ -573,6 +607,13 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, onCl
   const scroller = useRef<ScrollView>(null);
   const reviewsY = useRef(0);
   const enter = useRef(new Animated.Value(0)).current;
+
+  const isFree = detail?.isFree || priceLabel.toLowerCase().includes('miễn phí') || priceLabel.toLowerCase().includes('free');
+  const effectiveBuyAction: StoreBuyAction = buyAction ?? {
+    label: isFree ? 'Chơi miễn phí' : 'Mở trên Steam',
+    icon: isFree ? 'free' : 'buy',
+    onPress: () => void openExternal(item.storeUrl || `https://store.steampowered.com/app/${item.appId}/`),
+  };
 
   useBack(() => { if (sheet) setSheet(null); else onClose(); });
   useEffect(() => {
@@ -639,10 +680,7 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, onCl
                 )}
                 {genres.length ? <T size={11.8} weight="medium" color="rgba(255,255,255,0.5)" numberOfLines={1} style={{ marginTop: s(6) }}>{genres.slice(0, 3).join(', ')}</T> : null}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10), marginTop: s(12), flexWrap: 'wrap' }}>
-                  <Press onPress={() => void openExternal(storeUrl)} style={{ height: s(36), paddingHorizontal: s(16), borderRadius: s(18), flexDirection: 'row', alignItems: 'center', gap: s(6), backgroundColor: colors.white }}>
-                    <T size={10.9} weight="bold" color="#08111d">Mở trên Steam</T>
-                    <ArrowUpRight size={s(14)} color="#08111d" strokeWidth={2} />
-                  </Press>
+                  <BuyButton action={effectiveBuyAction} />
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8) }}>
                     {item.discounted ? (
                       <View style={{ backgroundColor: colors.accent, borderRadius: s(6), paddingHorizontal: s(6), paddingVertical: s(2) }}>
@@ -651,6 +689,13 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, onCl
                     ) : null}
                     <T size={11.8} weight="semibold" tabular color="rgba(255,255,255,0.8)">{priceLabel}</T>
                   </View>
+                  <Press
+                    onPress={() => void openExternal(storeUrl)}
+                    accessibilityLabel="Mở trang Steam trên trình duyệt"
+                    style={[styles.navButton, { width: s(36), height: s(36), borderRadius: s(18) }]}
+                  >
+                    <ArrowUpRight size={s(15)} color="rgba(255,255,255,0.8)" strokeWidth={2} />
+                  </Press>
                 </View>
               </View>
             </View>
@@ -660,7 +705,7 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, onCl
             ) : error ? (
               <View style={{ marginHorizontal: s(20), marginTop: s(24), padding: s(12), borderRadius: s(12), borderWidth: 1, borderColor: 'rgba(254,202,202,0.16)', backgroundColor: 'rgba(69,10,10,0.36)' }}>
                 <T size={11.2} weight="semibold" color="#fee2e2">{error}</T>
-                <T size={10.2} color="rgba(254,226,226,0.58)" leading={1.5} style={{ marginTop: s(4) }}>Bạn vẫn có thể mở trang Steam bằng nút phía trên.</T>
+                <T size={10.2} color="rgba(254,226,226,0.58)" leading={1.5} style={{ marginTop: s(4) }}>Bạn vẫn có thể mua hoặc mở trang Steam bằng các nút phía trên.</T>
               </View>
             ) : view ? (
               <>
@@ -695,14 +740,15 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, onCl
             <Img source={{ uri: coverSource }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
           </View>
         ) : <View />}
-        <Press
-          onPress={() => void openExternal(storeUrl)}
-          accessibilityLabel="Mở trên Steam"
-          style={[styles.navButton, compact ? { paddingHorizontal: s(14), borderColor: 'transparent', backgroundColor: colors.white } : { width: s(36) }, { height: s(36), borderRadius: s(18), flexDirection: 'row', gap: s(6) }]}
-        >
-          {compact ? <T size={10.2} weight="bold" color="#08111d">{priceLabel}</T> : null}
-          <ArrowUpRight size={s(16)} color={compact ? '#08111d' : 'rgba(255,255,255,0.86)'} strokeWidth={2} />
-        </Press>
+        {compact ? <BuyButton action={effectiveBuyAction} compact /> : (
+          <Press
+            onPress={() => void openExternal(storeUrl)}
+            accessibilityLabel="Mở trang Steam trên trình duyệt"
+            style={[styles.navButton, { width: s(36), height: s(36), borderRadius: s(18) }]}
+          >
+            <ArrowUpRight size={s(16)} color="rgba(255,255,255,0.86)" strokeWidth={2} />
+          </Press>
+        )}
       </View>
 
       {sheet && view ? <SheetView sheet={sheet} view={view} onClose={() => setSheet(null)} /> : null}

@@ -6,15 +6,36 @@ export const STEAM_DOWNLOADS_PRESENCE = 'jetsona:steam-downloads:home-pc';
 export const STEAM_DOWNLOADS_CHANNEL = 'steam-downloads';
 
 export type InstallPhase =
-  | 'starting' | 'wizard' | 'eula' | 'queued' | 'installed' | 'failed' | 'cancelled' | 'manual';
+  | 'starting' | 'wizard' | 'config' | 'eula' | 'queued' | 'installed' | 'failed' | 'cancelled' | 'manual';
 
 export type SteamEula = { id: string; version: number; url: string };
+
+/** Một ổ đĩa / thư viện Steam có thể cài game vào (hộp thoại Install của Steam). */
+export type InstallFolder = {
+  index: number;
+  label: string;
+  path: string;
+  freeBytes: number;
+  capacityBytes: number;
+  isDefault: boolean;
+};
+
+/** Nội dung hộp thoại Install: dung lượng, ổ đĩa, lối tắt. Người bấm Tải chọn trên điện thoại. */
+export type InstallConfig = {
+  requiredBytes: number;
+  folders: InstallFolder[];
+  selectedFolder: number;
+  canChangeFolder: boolean;
+  desktopShortcut: boolean;
+  startMenuShortcut: boolean;
+};
 
 export type InstallFlow = {
   appid: number;
   name: string | null;
   phase: InstallPhase;
   eulas: SteamEula[] | null;
+  config?: InstallConfig | null;
   error: string | null;
   updatedAt: number;
 };
@@ -67,6 +88,7 @@ export type AgentMessage =
 export type AppCommand =
   | { type: 'hello' }
   | { type: 'eula'; appid: number; accept: boolean }
+  | { type: 'config'; appid: number; accept: boolean; folder?: number; desktopShortcut?: boolean; startMenuShortcut?: boolean }
   | { type: 'pause'; appid: number }
   | { type: 'resume'; appid: number }
   | { type: 'cancel'; appid: number };
@@ -104,7 +126,7 @@ export function parseAgentMessage(raw: unknown): AgentMessage | null {
 }
 
 export type GameDownloadStatus =
-  | 'preparing' | 'eula' | 'downloading' | 'working' | 'paused' | 'queued'
+  | 'preparing' | 'config' | 'eula' | 'downloading' | 'working' | 'paused' | 'queued'
   | 'installed' | 'failed' | 'cancelled' | 'manual';
 
 /** Mọi thứ UI cần cho MỘT game, gộp từ luồng cài đặt + hàng đợi + lượt đang chạy. */
@@ -120,6 +142,7 @@ export type GameDownload = {
   etaSec: number | null;
   error: string | null;
   eulas: SteamEula[] | null;
+  config: InstallConfig | null;
 };
 
 // update_state của Steam (chuỗi nội bộ). Ngoài 'Downloading', các bước đều là
@@ -151,6 +174,7 @@ export function downloadForApp(state: DownloadsState | null, appid: number | nul
     etaSec: null as number | null,
     error: null as string | null,
     eulas: null as SteamEula[] | null,
+    config: null as InstallConfig | null,
   };
 
   if (flow && (flow.phase === 'starting' || flow.phase === 'wizard')) {
@@ -159,6 +183,9 @@ export function downloadForApp(state: DownloadsState | null, appid: number | nul
       status: 'preparing',
       label: state.steam.status === 'starting' ? 'Đang mở Steam trên máy tính' : 'Đang chuẩn bị cài đặt',
     };
+  }
+  if (flow?.phase === 'config' && flow.config) {
+    return { ...base, status: 'config', label: 'Chọn nơi cài đặt', total: flow.config.requiredBytes, config: flow.config };
   }
   if (flow?.phase === 'eula') {
     return { ...base, status: 'eula', label: 'Cần đồng ý điều khoản', eulas: flow.eulas ?? [] };
@@ -198,7 +225,7 @@ export function downloadForApp(state: DownloadsState | null, appid: number | nul
 export function primaryDownload(state: DownloadsState | null): GameDownload | null {
   if (!state) return null;
   const order = [
-    state.installs.find((flow) => flow.phase === 'eula')?.appid,
+    state.installs.find((flow) => flow.phase === 'config' || flow.phase === 'eula')?.appid,
     state.active?.appid,
     state.installs.find((flow) => flow.phase === 'starting' || flow.phase === 'wizard')?.appid,
     state.queue.find((item) => !item.completed)?.appid,
@@ -208,6 +235,33 @@ export function primaryDownload(state: DownloadsState | null): GameDownload | nu
     if (download) return download;
   }
   return null;
+}
+
+const LIST_ORDER: Record<GameDownloadStatus, number> = {
+  config: 0, eula: 0, downloading: 1, working: 1, paused: 2, preparing: 3, queued: 4,
+  failed: 5, manual: 5, cancelled: 6, installed: 7,
+};
+
+/** Mọi lượt tải Steam đang biết (đang chạy, đang chờ, vừa xong), việc cần người trả lời lên đầu. */
+export function allDownloads(state: DownloadsState | null): GameDownload[] {
+  if (!state) return [];
+  const appids = new Set<number>();
+  for (const flow of state.installs) appids.add(flow.appid);
+  if (state.active) appids.add(state.active.appid);
+  for (const item of state.queue) appids.add(item.appid);
+  const list: GameDownload[] = [];
+  for (const appid of appids) {
+    const download = downloadForApp(state, appid);
+    if (download) list.push(download);
+  }
+  const queueIndex = (appid: number) => state.queue.find((item) => item.appid === appid)?.queueIndex ?? 0;
+  return list.sort((a, b) => (LIST_ORDER[a.status] - LIST_ORDER[b.status]) || (queueIndex(a.appid) - queueIndex(b.appid)));
+}
+
+/** Còn đang diễn ra (chưa xong, chưa lỗi): dùng cho số đếm trên chuông thông báo. */
+export function isDownloadActive(download: GameDownload): boolean {
+  return download.status !== 'installed' && download.status !== 'failed'
+    && download.status !== 'cancelled' && download.status !== 'manual';
 }
 
 export function formatBytes(bytes: number): string {

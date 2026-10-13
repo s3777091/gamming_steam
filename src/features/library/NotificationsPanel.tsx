@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ChevronRight,
   Megaphone,
+  Download,
   Newspaper,
   Tag,
 } from 'lucide-react-native';
@@ -16,6 +17,7 @@ import { Skeleton } from '@/ui/Skeleton';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
+import { DownloadNotificationCard, type DownloadItem } from './DownloadNotificationCard';
 import { formatRelative, formatShortDate, formatStorePrice } from './format';
 import type {
   AppNotification,
@@ -25,7 +27,7 @@ import type {
   SteamStoreItem,
 } from './types';
 
-type NotificationTab = 'all' | 'discounts' | 'updates';
+type NotificationTab = 'all' | 'downloads' | 'discounts' | 'updates';
 
 function newsMeta(parts: (string | null | undefined)[]): string {
   return parts.filter(Boolean).join('  /  ');
@@ -214,33 +216,50 @@ export function NotificationsPanel({
   notifications,
   discounts,
   updates,
+  downloads,
+  canControlDownloads,
   loading,
   error,
   onOpenStoreGame,
+  onPauseDownload,
+  onResumeDownload,
+  onOpenDownloadPrompt,
   onClose,
 }: {
   notifications: AppNotification[];
   discounts: GameDiscountNotification[];
   updates: GameUpdateNotification[];
+  downloads: DownloadItem[];
+  canControlDownloads: boolean;
   loading: boolean;
   error: string | null;
   onOpenStoreGame: (item: SteamStoreItem) => void;
+  onPauseDownload: (appid: number) => void;
+  onResumeDownload: (appid: number) => void;
+  onOpenDownloadPrompt: (appid: number) => void;
   onClose: () => void;
 }) {
   const { s } = useUi();
-  const [activeTab, setActiveTab] = useState<NotificationTab>('all');
+  // Có lượt tải đang chạy thì mở thẳng tab Tải xuống: đó là lý do người dùng bấm vào chuông.
+  const [activeTab, setActiveTab] = useState<NotificationTab>(() => (downloads.length ? 'downloads' : 'all'));
   const [selectedNews, setSelectedNews] = useState<GameUpdateNotification | null>(null);
 
-  const displayedItems = activeTab === 'all'
-    ? notifications
-    : activeTab === 'discounts'
-      ? discounts
-      : updates;
+  const tabs: { id: NotificationTab; label: string }[] = [
+    { id: 'all', label: `Tất cả (${notifications.length + downloads.length})` },
+    ...(downloads.length ? [{ id: 'downloads' as const, label: `Tải xuống (${downloads.length})` }] : []),
+    { id: 'discounts', label: `Giảm giá (${discounts.length})` },
+    { id: 'updates', label: `Cập nhật game (${updates.length})` },
+  ];
+  const tab = tabs.some((entry) => entry.id === activeTab) ? activeTab : 'all';
+
+  const feedItems = tab === 'all' ? notifications : tab === 'discounts' ? discounts : tab === 'updates' ? updates : [];
+  const downloadRows = tab === 'all' || tab === 'downloads' ? downloads : [];
+  const nothing = !downloadRows.length && !feedItems.length;
 
   return (
     <SidePanel
       title="Thông báo"
-      subtitle="Ưu đãi Steam & Cập nhật game đã cài"
+      subtitle="Tải xuống, ưu đãi Steam & cập nhật game đã cài"
       width={540}
       onClose={onClose}
     >
@@ -254,94 +273,75 @@ export function NotificationsPanel({
         <View style={{ gap: s(12) }}>
           {/* Thanh chuyển tab phân loại */}
           <View style={{ flexDirection: 'row', gap: s(8) }}>
-            <Press
-              onPress={() => setActiveTab('all')}
-              style={[
-                styles.tabPill,
-                {
-                  height: s(28),
-                  paddingHorizontal: s(10),
-                  borderRadius: s(14),
-                  backgroundColor: activeTab === 'all' ? 'rgba(102,168,255,0.18)' : 'rgba(255,255,255,0.06)',
-                  borderColor: activeTab === 'all' ? 'rgba(102,168,255,0.35)' : 'rgba(255,255,255,0.1)',
-                },
-              ]}
-            >
-              <T size={10} weight="semibold" color={activeTab === 'all' ? colors.white : colors.text3}>
-                Tất cả ({notifications.length})
-              </T>
-            </Press>
-
-            <Press
-              onPress={() => setActiveTab('discounts')}
-              style={[
-                styles.tabPill,
-                {
-                  height: s(28),
-                  paddingHorizontal: s(10),
-                  borderRadius: s(14),
-                  backgroundColor: activeTab === 'discounts' ? 'rgba(102,168,255,0.18)' : 'rgba(255,255,255,0.06)',
-                  borderColor: activeTab === 'discounts' ? 'rgba(102,168,255,0.35)' : 'rgba(255,255,255,0.1)',
-                },
-              ]}
-            >
-              <T size={10} weight="semibold" color={activeTab === 'discounts' ? colors.white : colors.text3}>
-                Giảm giá ({discounts.length})
-              </T>
-            </Press>
-
-            <Press
-              onPress={() => setActiveTab('updates')}
-              style={[
-                styles.tabPill,
-                {
-                  height: s(28),
-                  paddingHorizontal: s(10),
-                  borderRadius: s(14),
-                  backgroundColor: activeTab === 'updates' ? 'rgba(102,168,255,0.18)' : 'rgba(255,255,255,0.06)',
-                  borderColor: activeTab === 'updates' ? 'rgba(102,168,255,0.35)' : 'rgba(255,255,255,0.1)',
-                },
-              ]}
-            >
-              <T size={10} weight="semibold" color={activeTab === 'updates' ? colors.white : colors.text3}>
-                Cập nhật game ({updates.length})
-              </T>
-            </Press>
+            {tabs.map((entry) => {
+              const on = tab === entry.id;
+              return (
+                <Press
+                  key={entry.id}
+                  onPress={() => setActiveTab(entry.id)}
+                  style={[
+                    styles.tabPill,
+                    {
+                      height: s(28),
+                      paddingHorizontal: s(10),
+                      borderRadius: s(14),
+                      backgroundColor: on ? 'rgba(102,168,255,0.18)' : 'rgba(255,255,255,0.06)',
+                      borderColor: on ? 'rgba(102,168,255,0.35)' : 'rgba(255,255,255,0.1)',
+                    },
+                  ]}
+                >
+                  <T size={10} weight="semibold" color={on ? colors.white : colors.text3}>{entry.label}</T>
+                </Press>
+              );
+            })}
           </View>
 
-          {/* Danh sách thông báo */}
-          {loading && !notifications.length ? (
-            <ListSkeleton rows={4} />
-          ) : error && !notifications.length ? (
-            <PanelMessage icon={Megaphone} message={error} hint="Kiểm tra kết nối tới máy tính và thử lại." />
-          ) : displayedItems.length === 0 ? (
-            <PanelMessage
-              icon={Megaphone}
-              message="Không có thông báo nào trong mục này."
-              hint={activeTab === 'discounts' ? 'Hiện không có trò chơi nào đang có khuyến mãi mới.' : 'Các trò chơi đã cài chưa có thông báo cập nhật mới.'}
-            />
-          ) : (
-            <View style={{ gap: s(8) }}>
-              {displayedItems.map((item) => {
-                if (item.type === 'discount') {
-                  return (
-                    <DiscountNotificationCard
-                      key={item.id}
-                      item={item}
-                      onPress={() => onOpenStoreGame(item.storeItem)}
-                    />
-                  );
-                }
+          <View style={{ gap: s(8) }}>
+            {downloadRows.map((item) => (
+              <DownloadNotificationCard
+                key={item.download.appid}
+                item={item}
+                canControl={canControlDownloads}
+                onPause={onPauseDownload}
+                onResume={onResumeDownload}
+                onOpenPrompt={onOpenDownloadPrompt}
+              />
+            ))}
+            {feedItems.map((item) => {
+              if (item.type === 'discount') {
                 return (
-                  <UpdateNotificationCard
+                  <DiscountNotificationCard
                     key={item.id}
                     item={item}
-                    onPress={() => setSelectedNews(item)}
+                    onPress={() => onOpenStoreGame(item.storeItem)}
                   />
                 );
-              })}
-            </View>
-          )}
+              }
+              return (
+                <UpdateNotificationCard
+                  key={item.id}
+                  item={item}
+                  onPress={() => setSelectedNews(item)}
+                />
+              );
+            })}
+          </View>
+
+          {nothing ? (
+            tab === 'downloads' ? (
+              <PanelMessage icon={Download} message="Chưa có lượt tải nào." hint="Bấm Cài đặt ở một game chưa có trên máy tính để bắt đầu." />
+            ) : loading ? (
+              <ListSkeleton rows={4} />
+            ) : error ? (
+              <PanelMessage icon={Megaphone} message={error} hint="Kiểm tra kết nối tới máy tính và thử lại." />
+            ) : (
+              <PanelMessage
+                icon={Megaphone}
+                message="Không có thông báo nào trong mục này."
+                hint={tab === 'discounts' ? 'Hiện không có trò chơi nào đang có khuyến mãi mới.' : 'Các trò chơi đã cài chưa có thông báo cập nhật mới.'}
+              />
+            )
+          ) : null}
         </View>
       )}
     </SidePanel>

@@ -4,10 +4,12 @@ import test from 'node:test';
 
 import {
   type DownloadsState,
+  allDownloads,
   downloadForApp,
   formatBytes,
   formatEta,
   formatSpeed,
+  isDownloadActive,
   parseAgentMessage,
   primaryDownload,
 } from '../steam-downloads.ts';
@@ -110,4 +112,50 @@ test('định dạng dung lượng, tốc độ, thời gian', () => {
   assert.equal(formatEta(180), 'còn 3 phút');
   assert.equal(formatEta(3 * 3600 + 5 * 60), 'còn 3 giờ 5 phút');
   assert.equal(formatEta(null), '');
+});
+
+const config = {
+  requiredBytes: 61_300_000_000,
+  folders: [{ index: 0, label: 'Ổ đĩa cục bộ (C:)', path: 'C:\Steam', freeBytes: 317_773_721_600, capacityBytes: 999_099_985_920, isDefault: true }],
+  selectedFolder: 0,
+  canChangeFolder: false,
+  desktopShortcut: true,
+  startMenuShortcut: true,
+};
+
+test('chờ chọn nơi cài đặt mang theo ổ đĩa và dung lượng cần', () => {
+  const result = downloadForApp(state({ installs: [flow('config', { config })] }), 570);
+  assert.equal(result?.status, 'config');
+  assert.equal(result?.label, 'Chọn nơi cài đặt');
+  assert.equal(result?.total, 61_300_000_000);
+  assert.deepEqual(result?.config, config);
+  // Agent cũ không gửi config: không có gì để hiện nên bỏ qua.
+  assert.equal(downloadForApp(state({ installs: [flow('config')] }), 570), null);
+});
+
+test('primaryDownload cũng ưu tiên game đang chờ chọn nơi cài đặt', () => {
+  const item = {
+    appid: 730, name: 'CS2', active: false, paused: false, completed: false, queueIndex: 0,
+    downloaded: 0, total: 0, error: null, completedAt: null,
+  };
+  assert.equal(primaryDownload(state({ queue: [item], installs: [flow('config', { config })] }))?.appid, 570);
+});
+
+test('allDownloads gộp mọi game, việc cần trả lời lên đầu, xong xuống cuối', () => {
+  const item = (appid: number, extra = {}) => ({
+    appid, name: `Game ${appid}`, active: false, paused: false, completed: false, queueIndex: 1,
+    downloaded: 0, total: 0, error: null, completedAt: null, ...extra,
+  });
+  const list = allDownloads(state({
+    installs: [flow('config', { config })],
+    queue: [item(100, { completed: true }), item(200), item(300, { queueIndex: 0 })],
+    active: {
+      appid: 400, name: 'Active', state: 'Downloading', isInstall: true, isWorkshop: false,
+      percent: 5, downloaded: 1, total: 20, bytesPerSec: 1000, peakBytesPerSec: 0, diskBytesPerSec: 0, etaSec: 60, paused: false,
+    },
+  }));
+  assert.deepEqual(list.map((entry) => entry.appid), [570, 400, 300, 200, 100]);
+  assert.deepEqual(allDownloads(null), []);
+  assert.equal(isDownloadActive(list[0]), true);
+  assert.equal(isDownloadActive(list[4]), false);
 });

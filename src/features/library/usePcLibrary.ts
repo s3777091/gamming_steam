@@ -44,6 +44,8 @@ async function readCachedLibrary(): Promise<Snapshot> {
 }
 
 export type LaunchResult = { sessionId: string | null; resumed: boolean };
+/** `error` null khi bỏ qua vì đang có lượt cài khác. */
+export type InstallResult = { ok: boolean; error: string | null };
 
 /** Game cài sẵn (hoặc cài được) trên PC, cộng thao tác mở/cài và achievement của game đang chọn. */
 export function usePcLibrary() {
@@ -149,29 +151,35 @@ export function usePcLibrary() {
     }
   }, [launchingId, selected]);
 
-  /** true khi PC đã nhận lệnh cài. */
-  const installSelected = useCallback(async (): Promise<boolean> => {
-    if (!selected || installingId) return false;
-    setInstallingId(selected.id);
+  /** PC đã nhận lệnh cài chưa. `id` dạng steam-<appid>, kể cả game vừa mua chưa có trong kệ. */
+  const installGame = useCallback(async (id: string): Promise<InstallResult> => {
+    if (installingId) return { ok: false, error: null };
+    setInstallingId(id);
     setInstallOpenedId(null);
     setError(null);
     try {
       const result = await pcPostJson<{ ok?: boolean; error?: string; downloadAgent?: boolean }>(
         PC_ROUTES.gameInstall,
-        { id: selected.id },
+        { id },
         'Không mở được trình cài đặt Steam.',
       );
       // Có agent tải game: tiến trình đi thẳng về qua DataChannel. Không có (PC cũ)
       // thì Steam mở hộp thoại trên máy tính như trước.
-      if (mounted.current && !result.downloadAgent) setInstallOpenedId(selected.id);
-      return true;
+      if (mounted.current && !result.downloadAgent) setInstallOpenedId(id);
+      return { ok: true, error: null };
     } catch (installError) {
-      if (mounted.current) setError(installError instanceof Error ? installError.message : 'Không mở được trình cài đặt Steam.');
-      return false;
+      const message = installError instanceof Error ? installError.message : 'Không mở được trình cài đặt Steam.';
+      if (mounted.current) setError(message);
+      return { ok: false, error: message };
     } finally {
       if (mounted.current) setInstallingId(null);
     }
-  }, [installingId, selected]);
+  }, [installingId]);
+
+  const installSelected = useCallback(
+    async (): Promise<boolean> => (selected ? (await installGame(selected.id)).ok : false),
+    [installGame, selected],
+  );
 
   return {
     games,
@@ -189,6 +197,7 @@ export function usePcLibrary() {
     installOpenedId,
     launchSelected,
     installSelected,
+    installGame,
     achievements,
     achievementCache,
   };
