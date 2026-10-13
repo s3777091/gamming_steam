@@ -1,15 +1,14 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, ScrollView } from 'react-native';
 import { FocusScroll } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Download, Ellipsis, FileText, HardDrive, Info, Monitor, Newspaper, Pause, Play, ShoppingBag, Trophy, type LucideIcon } from 'lucide-react-native';
+import { Download, Ellipsis, FileText, HardDrive, Monitor, Pause, Play, Trash2, Trophy } from 'lucide-react-native';
 
 import { isSteamAppId } from '@/features/library/format';
 import type { LibraryPanel, PcGame } from '@/features/library/types';
 import type { PcLibrary } from '@/features/library/usePcLibrary';
 import type { SteamDownloads } from '@/features/library/useSteamDownloads';
-import { openExternal } from '@/lib/open-external';
-import { type GameDownload, downloadForApp, primaryDownload } from '@/lib/steam-downloads';
+import { type GameDownload, type GameUninstall, downloadForApp, primaryDownload, uninstallForApp } from '@/lib/steam-downloads';
 import { colors } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
@@ -59,9 +58,10 @@ function GameTitle({ game }: { game: PcGame }) {
   );
 }
 
-function PrimaryAction({ library, download, canControl, onPlay, onInstall, onDownloadPress, reachable }: {
+function PrimaryAction({ library, download, uninstall, canControl, onPlay, onInstall, onDownloadPress, reachable }: {
   library: PcLibrary;
   download: GameDownload | null;
+  uninstall: GameUninstall | null;
   canControl: boolean;
   onPlay: () => void;
   onInstall: () => void;
@@ -73,10 +73,11 @@ function PrimaryAction({ library, download, canControl, onPlay, onInstall, onDow
   const installed = selected?.installed !== false;
   // Đang tải: nút thành vòng tiến trình; bấm để tạm dừng/tiếp tục hoặc xem điều khoản.
   const tracking = reachable && !installed && downloadInProgress(download) ? download : null;
-  const label = tracking ? tracking.label
+  const uninstalling = uninstall && uninstall.status !== 'failed' && uninstall.status !== 'uninstalled' ? uninstall : null;
+  const label = uninstalling ? uninstalling.label : tracking ? tracking.label
     : !reachable ? 'Mở máy tính' : installed ? (launchingId ? 'Đang mở' : 'Play') : installingId ? 'Đang mở Steam' : 'Cài đặt';
   const pulse = useRef(new Animated.Value(1)).current;
-  const busy = Boolean(launchingId || installingId)
+  const busy = Boolean(launchingId || installingId || library.uninstallingId || uninstalling)
     || Boolean(tracking && ['preparing', 'working', 'queued', 'installed'].includes(tracking.status));
   useEffect(() => {
     if (!busy) { pulse.setValue(1); return; }
@@ -98,9 +99,11 @@ function PrimaryAction({ library, download, canControl, onPlay, onInstall, onDow
       accessibilityLabel={label}
       style={[styles.play, { width: size, height: size, borderRadius: size / 2 }]}
     >
-      {tracking ? <ProgressRing size={size} percent={tracking.percent} /> : null}
+      {uninstalling ? <ProgressRing size={size} percent={uninstalling.progress} /> : tracking ? <ProgressRing size={size} percent={tracking.percent} /> : null}
       <Animated.View style={{ opacity: pulse }}>
-        {tracking ? (
+        {uninstalling ? (
+          <Trash2 size={s(16)} color={colors.white} />
+        ) : tracking ? (
           tracking.status === 'eula' ? <FileText size={s(17)} color={colors.white} />
             : tracking.status === 'config' ? <HardDrive size={s(17)} color={colors.white} />
             : tracking.status === 'downloading' && canControl ? <Pause size={s(16)} color={colors.white} fill={colors.white} />
@@ -117,49 +120,27 @@ function PrimaryAction({ library, download, canControl, onPlay, onInstall, onDow
   );
 }
 
-function MenuItem({ icon: Icon, label, onPress }: { icon: LucideIcon; label: string; onPress: () => void }) {
+/** Nút (…) cạnh Play: mở bảng tùy chọn game phong cách Console. */
+function GameMoreButton({ active, onPress }: { active: boolean; onPress: () => void }) {
   const { s } = useUi();
-  return (
-    <Press onPress={onPress} pressScale={0.98} style={{ flexDirection: 'row', alignItems: 'center', gap: s(8), paddingHorizontal: s(12), paddingVertical: s(9), borderRadius: s(12) }}>
-      <Icon size={s(14)} color="rgba(255,255,255,0.82)" strokeWidth={1.8} />
-      <T size={11} weight="medium" color="rgba(255,255,255,0.86)">{label}</T>
-    </Press>
-  );
-}
-
-/** Nút (…) cạnh Play: thông tin game, cập nhật, thành tựu, trang Store. */
-function GameMenu({ game, open, onOpenChange, onOpenPanel }: {
-  game: PcGame;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onOpenPanel: (panel: LibraryPanel) => void;
-}) {
-  const { s } = useUi();
-  const choose = (panel: LibraryPanel) => {
-    onOpenChange(false);
-    onOpenPanel(panel);
-  };
   const size = s(44);
   return (
-    <View style={{ zIndex: 40 }}>
-      <Press
-        onPress={() => onOpenChange(!open)}
-        accessibilityLabel="Tùy chọn game"
-        style={[styles.more, { width: size, height: size, borderRadius: size / 2 }]}
-      >
-        <Ellipsis size={s(16)} color="rgba(255,255,255,0.7)" strokeWidth={2} />
-      </Press>
-      {open ? (
-        <View style={[styles.menu, { bottom: size + s(8), minWidth: s(216), borderRadius: s(16), padding: s(6) }]}>
-          <MenuItem icon={Info} label="Thông tin game" onPress={() => choose('info')} />
-          {game.steamAppId ? <MenuItem icon={Newspaper} label="Cập nhật & bản sửa lỗi" onPress={() => choose('news')} /> : null}
-          {game.steamAppId ? <MenuItem icon={Trophy} label="Thành tựu" onPress={() => choose('achievements')} /> : null}
-          {game.storeUrl ? (
-            <MenuItem icon={ShoppingBag} label="Store" onPress={() => { onOpenChange(false); void openExternal(game.storeUrl!); }} />
-          ) : null}
-        </View>
-      ) : null}
-    </View>
+    <Press
+      onPress={onPress}
+      accessibilityLabel="Tùy chọn game"
+      style={[
+        styles.more,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          borderColor: active ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.16)',
+          backgroundColor: active ? 'rgba(255,255,255,0.12)' : 'rgba(10,17,28,0.34)',
+        },
+      ]}
+    >
+      <Ellipsis size={s(16)} color={active ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.7)'} strokeWidth={2} />
+    </Press>
   );
 }
 
@@ -167,6 +148,19 @@ function GameMenu({ game, open, onOpenChange, onOpenPanel }: {
 const ACTIVE = { w: 288, h: 112 };
 const IDLE = { w: 88, h: 88 };
 const GAP = 12;
+// Vạch đứng ngăn game đã cài (bên trái) với game chưa cài (bên phải).
+const DIVIDER = { w: 1.5, h: 88 };
+
+function ShelfDivider() {
+  const { s } = useUi();
+  return (
+    <LinearGradient
+      pointerEvents="none"
+      colors={['rgba(255,255,255,0)', 'rgba(255,255,255,0.5)', 'rgba(255,255,255,0)']}
+      style={{ width: s(DIVIDER.w), height: s(DIVIDER.h), marginBottom: s(8), borderRadius: s(DIVIDER.w) }}
+    />
+  );
+}
 
 function GameCard({ game, active, achievements, onSelect, cardRef }: {
   game: PcGame;
@@ -216,7 +210,7 @@ function GameCard({ game, active, achievements, onSelect, cardRef }: {
 }
 
 /** Tab Games: logo + nút của game đang chọn, phía dưới là kệ mọi game trên PC. */
-export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenChange, onSelectGame, onOpenPanel, onPlay, onOpenPrompt, onInstallStart, onInstallResult }: {
+export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenChange, onSelectGame, onOpenPanel, onPlay, onUninstall, onOpenPrompt, onInstallStart, onInstallResult }: {
   library: PcLibrary;
   downloads: SteamDownloads;
   reachable: boolean;
@@ -225,6 +219,7 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
   onSelectGame: (id: string) => void;
   onOpenPanel: (panel: LibraryPanel) => void;
   onPlay: () => void;
+  onUninstall: (game: PcGame) => void;
   /** Mở hộp thoại Steam đang chờ trả lời (chọn nơi cài đặt hoặc điều khoản). */
   onOpenPrompt: () => void;
   /** Bấm Tải: thẻ game thu vào ô nhỏ rồi chờ kết quả (xem DownloadFlight). */
@@ -236,6 +231,17 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
   const { games, selected, error, installOpenedId } = library;
   const selectedAppId = isSteamAppId(selected?.steamAppId) ? Number(selected.steamAppId) : null;
   const tracked = downloadForApp(downloads.state, selectedAppId);
+  const trackedUninstall = uninstallForApp(downloads.state, selectedAppId);
+  const uninstall: GameUninstall | null = trackedUninstall ?? (
+    selectedAppId && downloads.expectedUninstallAppId === selectedAppId ? {
+      appid: selectedAppId,
+      name: selected?.title ?? null,
+      status: 'starting',
+      label: 'Đang khởi động agent gỡ cài đặt',
+      progress: 8,
+      error: null,
+    } : null
+  );
   // PC đã nhận lệnh cài nhưng agent chưa kịp báo: hiện "đang chuẩn bị" ngay.
   const download: GameDownload | null = tracked ?? (selectedAppId && downloads.expectedAppId === selectedAppId ? {
     appid: selectedAppId, name: selected?.title ?? null, status: 'preparing', label: 'Đang chuẩn bị cài đặt',
@@ -266,13 +272,20 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
   };
   const rail = useRef<ScrollView>(null);
   const railWidth = useRef(0);
-  const selectedIndex = Math.max(0, games.findIndex((game) => game.id === selected?.id));
+  // Game đã cài đứng trước, game chưa cài đứng sau vạch ngăn; thứ tự trong mỗi nhóm giữ nguyên.
+  const shelf = useMemo(() => {
+    const installed = games.filter((game) => game.installed !== false);
+    const missing = games.filter((game) => game.installed === false);
+    return { ordered: [...installed, ...missing], installedCount: installed.length, hasDivider: installed.length > 0 && missing.length > 0 };
+  }, [games]);
+  const selectedIndex = Math.max(0, shelf.ordered.findIndex((game) => game.id === selected?.id));
 
   // Vị trí thẻ đang chọn tính được từ kích thước đã biết, không cần đo layout.
   const centerSelected = (animated: boolean) => {
     const idleW = s(IDLE.w);
     const activeW = s(ACTIVE.w);
-    const left = selectedIndex * (idleW + s(GAP));
+    const dividerShift = shelf.hasDivider && selectedIndex >= shelf.installedCount ? s(DIVIDER.w) + s(GAP) : 0;
+    const left = selectedIndex * (idleW + s(GAP)) + dividerShift;
     const x = left - (railWidth.current - activeW) / 2;
     rail.current?.scrollTo({ x: Math.max(0, x), animated });
   };
@@ -281,11 +294,10 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
     const frame = requestAnimationFrame(() => centerSelected(true));
     return () => cancelAnimationFrame(frame);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.id, games.length]);
+  }, [selected?.id, games.length, shelf.installedCount]);
 
   return (
     <View style={{ flex: 1 }}>
-      {menuOpen ? <Pressable style={StyleSheet.absoluteFill} onPress={() => onMenuOpenChange(false)} /> : null}
       <View pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: s(16), paddingTop: s(8), zIndex: 40 }}>
         <View pointerEvents="box-none" style={{ flexDirection: 'row', alignItems: 'flex-end', gap: s(28) }}>
           {selected ? <GameTitle key={selected.id} game={selected} /> : null}
@@ -293,13 +305,19 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
             <PrimaryAction
               library={library}
               download={download}
+              uninstall={uninstall}
               canControl={downloads.canControl}
               onPlay={onPlay}
               onInstall={() => void install()}
               onDownloadPress={onDownloadPress}
               reachable={reachable}
             />
-            {selected ? <GameMenu game={selected} open={menuOpen} onOpenChange={onMenuOpenChange} onOpenPanel={onOpenPanel} /> : null}
+            {selected ? (
+              <GameMoreButton
+                active={menuOpen}
+                onPress={() => onMenuOpenChange(!menuOpen)}
+              />
+            ) : null}
           </View>
         </View>
 
@@ -310,6 +328,18 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
         ) : null}
         {!error && showDownload && download ? (
           <DownloadStatusLine download={download} canControl={downloads.canControl} onOpenEula={onOpenPrompt} />
+        ) : null}
+        {!error && uninstall ? (
+          <View style={{ marginTop: s(10), maxWidth: s(460), gap: s(6) }}>
+            <T size={10.4} weight="medium" color={uninstall.status === 'failed' ? '#fecaca' : 'rgba(255,255,255,0.78)'} numberOfLines={1}>
+              {uninstall.error || uninstall.label}
+            </T>
+            {uninstall.status !== 'failed' ? (
+              <View style={[styles.uninstallTrack, { height: s(3), borderRadius: s(2) }]}>
+                <View style={{ width: `${uninstall.progress}%`, height: '100%', borderRadius: s(2), backgroundColor: colors.accent }} />
+              </View>
+            ) : null}
+          </View>
         ) : null}
         {!error && !showDownload && elsewhere && downloadInProgress(elsewhere) ? (
           <T size={10.4} weight="medium" color="rgba(255,255,255,0.6)" tabular numberOfLines={1} style={{ marginTop: s(10) }}>
@@ -336,15 +366,17 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
         decelerationRate="fast"
         accessibilityRole="list"
       >
-        {games.map((game) => (
-          <GameCard
-            key={game.id}
-            game={game}
-            active={game.id === selected?.id}
-            achievements={library.achievements}
-            onSelect={() => onSelectGame(game.id)}
-            cardRef={activeCard}
-          />
+        {shelf.ordered.map((game, index) => (
+          <Fragment key={game.id}>
+            {shelf.hasDivider && index === shelf.installedCount ? <ShelfDivider /> : null}
+            <GameCard
+              game={game}
+              active={game.id === selected?.id}
+              achievements={library.achievements}
+              onSelect={() => onSelectGame(game.id)}
+              cardRef={activeCard}
+            />
+          </Fragment>
         ))}
         <View style={{ width: s(ACTIVE.w) }} />
       </FocusScroll>
@@ -370,18 +402,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.16)',
     backgroundColor: 'rgba(10,17,28,0.34)',
   },
-  menu: {
-    position: 'absolute',
-    left: 0,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    backgroundColor: 'rgba(10,17,28,0.96)',
-    shadowColor: '#020812',
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 18 },
-    elevation: 16,
-  },
+  uninstallTrack: { width: '100%', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.14)' },
   card: { overflow: 'hidden', borderWidth: 1, backgroundColor: colors.card },
   trophy: {
     position: 'absolute',

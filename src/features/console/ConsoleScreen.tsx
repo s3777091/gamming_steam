@@ -11,10 +11,10 @@ import { useBack, useGamepadTabs } from '@/features/gamepad/hooks';
 import { useCaptureMode } from '@/features/gamepad/captureMode';
 import { formatStorePrice, isSteamAppId } from '@/features/library/format';
 import type { DownloadItem } from '@/features/library/DownloadNotificationCard';
-import { GameAchievementsPanel, GameInfoPanel, GameNewsPanel } from '@/features/library/GamePanels';
+import { GameDetailPanel } from '@/features/library/GamePanels';
 import { NotificationsPanel } from '@/features/library/NotificationsPanel';
 import { PromotionPanel, SteamProfilePanel } from '@/features/library/ProfilePanels';
-import type { LibraryPanel, SteamPromotion, SteamStoreItem, StoreTab } from '@/features/library/types';
+import { STORE_TAB_ORDER, type LibraryPanel, type PcGame, type SteamPromotion, type SteamStoreItem, type StoreTab } from '@/features/library/types';
 import { useNotifications } from '@/features/library/useNotifications';
 import { usePcLibrary } from '@/features/library/usePcLibrary';
 import { useSteamDownloads } from '@/features/library/useSteamDownloads';
@@ -23,8 +23,8 @@ import { useSteamProfile } from '@/features/library/useSteamProfile';
 import { useSteamStore, useStoreGameDetail, useStoreSearch } from '@/features/library/useSteamStore';
 import { useDeviceStatus } from '@/features/devices/useDeviceStatus';
 import ConsoleSettings, { type SettingsCategory } from '@/features/settings/ConsoleSettings';
-import { savePendingGameLaunch } from '@/lib/game-launch';
-import { type GameDownload, allDownloads, downloadForApp, isDownloadActive } from '@/lib/steam-downloads';
+import { clearPendingGameLaunch, savePendingGameLaunch } from '@/lib/game-launch';
+import { type GameDownload, allDownloads, downloadForApp, isDownloadActive, uninstallForApp } from '@/lib/steam-downloads';
 import { type PurchaseOffer, type PurchaseTarget, purchaseKind } from '@/lib/steam-purchase';
 import { useUi } from '@/ui/scale';
 
@@ -33,14 +33,18 @@ import { EulaSheet } from './DownloadViews';
 import { GamesView } from './GamesView';
 import { InstallConfigSheet } from './InstallConfigSheet';
 import { LibraryHeader } from './LibraryHeader';
-import { LibraryBackdrop, LibraryEmpty, LibrarySkeleton, StoreError, StoreLoading } from './LibraryStates';
+import { LibraryBackdrop, LibraryEmpty, LibrarySkeleton, PcWallpaper, StoreError, StoreLoading } from './LibraryStates';
 import { PcPowerSheet } from './PcPowerSheet';
+import { PcView } from './PcView';
 import { PurchaseSheet } from './PurchaseSheet';
 import { RemoteConnectionMenu } from './RemoteConnectionMenu';
 import { usePcSleepWake } from './usePcSleepWake';
 import { type StoreBuyAction, StoreGameDetail } from './StoreGameDetail';
 import { StoreHome } from './StoreHome';
 import { StoreSearchField, StoreSearchPanel } from './StoreSearch';
+import { UninstallSheet } from './UninstallSheet';
+import { GameOptionsModal } from './GameOptionsModal';
+import { ConsoleTabTransition } from './ConsoleTabTransition';
 import { T } from '@/ui/Text';
 
 export default function ConsoleScreen() {
@@ -57,9 +61,11 @@ export default function ConsoleScreen() {
   const [settingsCategory, setSettingsCategory] = useState<SettingsCategory | null>(null);
   const [powerOpen, setPowerOpen] = useState(false);
   const [remoteMenuOpen, setRemoteMenuOpen] = useState(false);
+  const [uninstallTarget, setUninstallTarget] = useState<PcGame | null>(null);
   const searchInputRef = useRef<TextInput>(null);
   const rootRef = useRef<View>(null);
   const bellRef = useRef<View>(null);
+  const remoteAnchorRef = useRef<View>(null);
   const [flight, setFlight] = useState<Flight | null>(null);
   const flightBusy = useRef(false);
   const flightResult = useRef<'ok' | 'fail' | null>(null);
@@ -76,7 +82,11 @@ export default function ConsoleScreen() {
     void library.reload(true);
   }, [library]));
   // Tiến trình tải đi thẳng từ PC qua WebRTC; tải xong thì đọc lại thư viện để hiện Play.
-  const downloads = useSteamDownloads(userId, () => void library.reload(true));
+  const downloads = useSteamDownloads(
+    userId,
+    () => void library.reload(true),
+    () => void library.reload(true),
+  );
   // Việc Steam đang chờ người bấm Tải trả lời (chọn ổ đĩa, đồng ý điều khoản): tự mở hộp
   // thoại; đóng thì mở lại từ nút "Chọn nơi cài đặt" / "Xem điều khoản".
   const [promptClosed, setPromptClosed] = useState<string | null>(null);
@@ -129,7 +139,17 @@ export default function ConsoleScreen() {
   const backdropUrl = activeTab === 'store'
     ? storePreview?.backgroundImage || storePreview?.headerImage
     : selected?.heroUrl;
-  const selectedAppId = isSteamAppId(selected?.steamAppId) ? Number(selected.steamAppId) : null;
+  const uninstallAppId = isSteamAppId(uninstallTarget?.steamAppId) ? Number(uninstallTarget.steamAppId) : null;
+  const uninstallOperation = uninstallForApp(downloads.state, uninstallAppId) ?? (
+    uninstallAppId && downloads.expectedUninstallAppId === uninstallAppId ? {
+      appid: uninstallAppId,
+      name: uninstallTarget?.title ?? null,
+      status: 'starting' as const,
+      label: 'Đang khởi động agent gỡ cài đặt',
+      progress: 8,
+      error: null,
+    } : null
+  );
 
   useEffect(() => {
     if (!storeSearchOpen) return;
@@ -154,7 +174,7 @@ export default function ConsoleScreen() {
     setRemoteMenuOpen(false);
   }, []);
 
-  const anyOverlay = Boolean(settingsCategory || selectedStoreItem || selectedPromotion || panel || menuOpen || storeSearchOpen || powerOpen || remoteMenuOpen || purchase.visible);
+  const anyOverlay = Boolean(settingsCategory || selectedStoreItem || selectedPromotion || panel || menuOpen || storeSearchOpen || powerOpen || remoteMenuOpen || uninstallTarget || purchase.visible);
 
   // Nút B / Back: đóng lớp trên cùng trước. Các panel tự đăng ký Back riêng; ở đây
   // chỉ cần xử lý những lớp do màn này sở hữu (menu, ô tìm kiếm).
@@ -165,10 +185,11 @@ export default function ConsoleScreen() {
     return true;
   }, remoteMenuOpen || menuOpen || storeSearchOpen);
 
-  // LB/RB đổi giữa Games và Store khi không có lớp nào đang mở.
+  // LB/RB đổi giữa Games, Store và PC khi không có lớp nào đang mở.
   useGamepadTabs((direction) => {
     if (anyOverlay) return false;
-    switchTab(direction < 0 ? 'games' : 'store');
+    const next = STORE_TAB_ORDER[STORE_TAB_ORDER.indexOf(activeTab) + direction];
+    if (next) switchTab(next);
   });
 
   const selectGame = (id: string) => {
@@ -245,6 +266,13 @@ export default function ConsoleScreen() {
         createdAt: Date.now(),
       });
     }
+    router.push('/stream');
+  };
+
+  // Tab PC: stream thẳng desktop, cùng cấu hình stream và đường WebRTC như khi chơi game.
+  const connectPc = () => {
+    if (!library.reachable) { setPowerOpen(true); return; }
+    clearPendingGameLaunch();
     router.push('/stream');
   };
 
@@ -388,6 +416,7 @@ export default function ConsoleScreen() {
       onSelectGame={selectGame}
       onOpenPanel={setPanel}
       onPlay={() => void play()}
+      onUninstall={setUninstallTarget}
       onOpenPrompt={openPrompt}
       onInstallStart={startFlight}
       onInstallResult={resolveFlight}
@@ -402,9 +431,19 @@ export default function ConsoleScreen() {
     />
   );
 
+  const pcContent = (
+    <PcView
+      reachable={library.reachable}
+      refreshing={library.refreshing || library.loading}
+      error={library.error}
+      onConnect={connectPc}
+    />
+  );
+
   return (
     <View ref={rootRef} collapsable={false} style={styles.root}>
       <LibraryBackdrop url={backdropUrl} store={activeTab === 'store'} />
+      <PcWallpaper visible={activeTab === 'pc'} />
 
       <View
         style={{
@@ -424,9 +463,11 @@ export default function ConsoleScreen() {
           onOpenSettings={openSettings}
           onOpenNotifications={openNotifications}
           unreadCount={notifications.unreadCount}
+          notificationCount={notifications.notifications.length + activeDownloads.length}
           downloadCount={activeDownloads.length}
           downloadPercent={ringPercent}
           bellRef={bellRef}
+          remoteAnchorRef={remoteAnchorRef}
           remoteMenuOpen={remoteMenuOpen}
           onToggleRemoteMenu={toggleRemoteMenu}
           remoteOnline={deviceStatus.online}
@@ -444,7 +485,10 @@ export default function ConsoleScreen() {
             />
           )}
         />
-        {activeTab === 'store' ? storeContent : gamesContent}
+        <ConsoleTabTransition
+          activeTab={activeTab}
+          renderTab={(tab) => (tab === 'store' ? storeContent : tab === 'pc' ? pcContent : gamesContent)}
+        />
       </View>
 
       {selectedStoreItem ? (() => {
@@ -476,6 +520,8 @@ export default function ConsoleScreen() {
           onPauseDownload={downloads.pause}
           onResumeDownload={downloads.resume}
           onOpenDownloadPrompt={openDownloadPrompt}
+          onClearAll={notifications.clearAll}
+          onClearNotification={notifications.clearNotification}
           loading={notifications.loading}
           error={notifications.error}
           onOpenStoreGame={openStoreGame}
@@ -483,17 +529,17 @@ export default function ConsoleScreen() {
         />
       ) : null}
 
-      {panel === 'profile' ? <SteamProfilePanel state={profile} onClose={() => setPanel(null)} /> : null}
-      {panel === 'info' && selected ? <GameInfoPanel game={selected} onClose={() => setPanel(null)} /> : null}
-      {panel === 'news' && selected && selectedAppId !== null ? (
-        <GameNewsPanel key={selectedAppId} appId={selectedAppId} gameTitle={selected.title} onClose={() => setPanel(null)} />
+      {panel === 'profile' ? (
+        <SteamProfilePanel state={profile} fallbackProfile={library.steamProfile} onClose={() => setPanel(null)} />
       ) : null}
-      {panel === 'achievements' && selected && selectedAppId !== null ? (
-        <GameAchievementsPanel
-          gameTitle={selected.title}
-          data={library.achievements.data}
-          loading={library.achievements.loading}
-          error={library.achievements.error}
+      {(panel === 'info' || panel === 'news' || panel === 'achievements') && selected ? (
+        <GameDetailPanel
+          game={selected}
+          activeTab={panel}
+          onTabChange={setPanel}
+          achievementsData={library.achievements.data}
+          achievementsLoading={library.achievements.loading}
+          achievementsError={library.achievements.error}
           onClose={() => setPanel(null)}
         />
       ) : null}
@@ -552,8 +598,41 @@ export default function ConsoleScreen() {
         />
       ) : null}
 
+      {uninstallTarget && uninstallAppId ? (
+        <UninstallSheet
+          key={uninstallTarget.id}
+          game={uninstallTarget}
+          operation={uninstallOperation}
+          requesting={library.uninstallingId === uninstallTarget.id}
+          notice={downloads.notice}
+          onClose={() => setUninstallTarget(null)}
+          onConfirm={async () => {
+            const result = await library.uninstallGame(uninstallTarget.id);
+            if (result.ok) downloads.expectUninstall(uninstallAppId);
+            return result;
+          }}
+        />
+      ) : null}
+
+      {menuOpen && selected ? (
+        <GameOptionsModal
+          game={selected}
+          uninstalling={Boolean(uninstallOperation && uninstallOperation.status !== 'failed' && uninstallOperation.status !== 'uninstalled')}
+          onClose={() => setMenuOpen(false)}
+          onOpenPanel={(panel) => {
+            setMenuOpen(false);
+            setPanel(panel);
+          }}
+          onUninstall={() => {
+            setMenuOpen(false);
+            setUninstallTarget(selected);
+          }}
+        />
+      ) : null}
+
       <RemoteConnectionMenu
         open={remoteMenuOpen}
+        anchorRef={remoteAnchorRef}
         onClose={() => setRemoteMenuOpen(false)}
         online={deviceStatus.online}
         stage={deviceStatus.stage}

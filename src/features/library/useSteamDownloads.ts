@@ -144,6 +144,9 @@ export type SteamDownloads = {
   /** Gọi ngay sau khi PC nhận lệnh cài: hiện "đang chuẩn bị" trong lúc agent khởi động. */
   expect: (appid: number) => void;
   expectedAppId: number | null;
+  /** Gọi sau khi PC nhận lệnh gỡ để hiện trạng thái trong lúc agent khởi động. */
+  expectUninstall: (appid: number) => void;
+  expectedUninstallAppId: number | null;
   answerEula: (appid: number, accept: boolean) => void;
   /** Trả lời hộp thoại Install: ổ đĩa + lối tắt; accept=false là huỷ cài đặt. */
   answerConfig: (appid: number, answer: ConfigAnswer) => void;
@@ -151,17 +154,25 @@ export type SteamDownloads = {
   resume: (appid: number) => void;
 };
 
-export function useSteamDownloads(userId: string, onInstalled?: (appid: number) => void): SteamDownloads {
+export function useSteamDownloads(
+  userId: string,
+  onInstalled?: (appid: number) => void,
+  onUninstalled?: (appid: number) => void,
+): SteamDownloads {
   const [state, setState] = useState<DownloadsState | null>(null);
   const [agentOnline, setAgentOnline] = useState(false);
   const [connected, setConnected] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [expectedAppId, setExpectedAppId] = useState<number | null>(null);
+  const [expectedUninstallAppId, setExpectedUninstallAppId] = useState<number | null>(null);
   const linkRef = useRef<Link | null>(null);
   const installedRef = useRef(new Set<number>());
+  const uninstalledRef = useRef(new Set<number>());
   const farewellRef = useRef(false);
   const onInstalledRef = useRef(onInstalled);
   useEffect(() => { onInstalledRef.current = onInstalled; }, [onInstalled]);
+  const onUninstalledRef = useRef(onUninstalled);
+  useEffect(() => { onUninstalledRef.current = onUninstalled; }, [onUninstalled]);
 
   const send = useCallback((command: AppCommand) => {
     const channel = linkRef.current?.channel;
@@ -176,8 +187,16 @@ export function useSteamDownloads(userId: string, onInstalled?: (appid: number) 
       installedRef.current.add(flow.appid);
       onInstalledRef.current?.(flow.appid);
     }
+    for (const flow of next.uninstalls ?? []) {
+      if (flow.phase !== 'uninstalled' || uninstalledRef.current.has(flow.appid)) continue;
+      uninstalledRef.current.add(flow.appid);
+      onUninstalledRef.current?.(flow.appid);
+    }
     setExpectedAppId((current) => (
       current && next.installs.some((flow) => flow.appid === current) ? null : current
+    ));
+    setExpectedUninstallAppId((current) => (
+      current && next.uninstalls?.some((flow) => flow.appid === current) ? null : current
     ));
   }, []);
 
@@ -278,10 +297,22 @@ export function useSteamDownloads(userId: string, onInstalled?: (appid: number) 
     return () => clearTimeout(timer);
   }, [expectedAppId]);
 
+  useEffect(() => {
+    if (!expectedUninstallAppId) return;
+    const timer = setTimeout(() => setExpectedUninstallAppId(null), 90_000);
+    return () => clearTimeout(timer);
+  }, [expectedUninstallAppId]);
+
   const expect = useCallback((appid: number) => {
     installedRef.current.delete(appid);
     setNotice(null);
     setExpectedAppId(appid);
+  }, []);
+
+  const expectUninstall = useCallback((appid: number) => {
+    uninstalledRef.current.delete(appid);
+    setNotice(null);
+    setExpectedUninstallAppId(appid);
   }, []);
 
   return {
@@ -292,6 +323,8 @@ export function useSteamDownloads(userId: string, onInstalled?: (appid: number) 
     notice,
     expect,
     expectedAppId,
+    expectUninstall,
+    expectedUninstallAppId,
     answerEula: (appid, accept) => send({ type: 'eula', appid, accept }),
     answerConfig: (appid, answer) => send({ type: 'config', appid, ...answer }),
     pause: (appid) => send({ type: 'pause', appid }),

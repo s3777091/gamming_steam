@@ -12,6 +12,7 @@ import {
   isDownloadActive,
   parseAgentMessage,
   primaryDownload,
+  uninstallForApp,
 } from '../steam-downloads.ts';
 
 function state(overrides: Partial<DownloadsState> = {}): DownloadsState {
@@ -23,6 +24,7 @@ function state(overrides: Partial<DownloadsState> = {}): DownloadsState {
     active: null,
     queue: [],
     installs: [],
+    uninstalls: [],
     controllers: [],
     ...overrides,
   };
@@ -40,6 +42,19 @@ test('parseAgentMessage nhận state, bye, notice và bỏ tin lạ', () => {
   assert.equal(parseAgentMessage('{"type":"state","v":2}'), null);
   assert.equal(parseAgentMessage('không phải json'), null);
   assert.equal(parseAgentMessage(42), null);
+});
+
+test('tiến trình gỡ cài đặt lấy từ Steam client', () => {
+  const uninstall = (phase: NonNullable<DownloadsState['uninstalls']>[number]['phase'], error: string | null = null) => state({
+    uninstalls: [{ appid: 570, name: 'Dota 2', phase, error, updatedAt: 1 }],
+  });
+  assert.deepEqual(uninstallForApp(uninstall('starting'), 570), {
+    appid: 570, name: 'Dota 2', status: 'starting', label: 'Đang mở Steam trên máy tính', progress: 12, error: null,
+  });
+  assert.equal(uninstallForApp(uninstall('uninstalling'), 570)?.label, 'Steam đang gỡ cài đặt');
+  assert.equal(uninstallForApp(uninstall('uninstalled'), 570)?.progress, 100);
+  assert.equal(uninstallForApp(uninstall('failed', 'đang chạy'), 570)?.error, 'đang chạy');
+  assert.equal(uninstallForApp(state(), 570), null);
 });
 
 test('đang mở Steam -> preparing', () => {

@@ -2,8 +2,9 @@
 // trên PC (giao diện chính chủ, xem qua stream). App chỉ theo dõi tới khi game vào
 // thư viện rồi mời Tải về — không bao giờ thấy thông tin thẻ hay bấm mua thay.
 
-import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Check, CircleCheck, Download, ExternalLink, Gift, Lock, MonitorPlay, Play, RefreshCw, ShieldCheck,
@@ -16,7 +17,7 @@ import { formatStorePrice } from '@/features/library/format';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { openExternal } from '@/lib/open-external';
 import {
-  type PurchaseOffer, type PurchaseState, type PurchaseTarget, purchaseKind, purchaseSavings, steamWebUrl,
+  type PurchaseOffer, type PurchasePhase, type PurchaseState, type PurchaseTarget, purchaseKind, purchaseSavings, steamWebUrl,
 } from '@/lib/steam-purchase';
 import { colors } from '@/theme';
 import { Img } from '@/ui/Img';
@@ -128,27 +129,105 @@ function PriceBlock({ offer }: { offer: PurchaseOffer }) {
   );
 }
 
-function Button({ label, icon, onPress, primary, busy, disabled, autoFocus, sound = 'select' }: {
-  label: string; icon?: ReactNode; onPress: () => void; primary?: boolean; busy?: boolean; disabled?: boolean; autoFocus?: boolean;
+type ButtonVariant = 'secondary' | 'primary' | 'success';
+
+function Button({
+  label,
+  icon,
+  onPress,
+  variant = 'secondary',
+  flex,
+  busy,
+  disabled,
+  autoFocus,
+  sound = 'select',
+  shakeAnim,
+  errorGlowAnim,
+  scaleAnim,
+}: {
+  label: string;
+  icon?: ReactNode;
+  onPress: () => void;
+  variant?: ButtonVariant;
+  flex?: number;
+  busy?: boolean;
+  disabled?: boolean;
+  autoFocus?: boolean;
   sound?: 'select' | 'confirm' | 'back';
+  shakeAnim?: Animated.Value;
+  errorGlowAnim?: Animated.Value;
+  scaleAnim?: Animated.Value;
 }) {
   const { s } = useUi();
-  return (
+  const isPrimary = variant === 'primary';
+  const isSuccess = variant === 'success';
+
+  const textColor = isSuccess ? '#ffffff' : isPrimary ? '#0a111c' : colors.text;
+
+  const content = (
     <Press
       onPress={onPress}
       disabled={disabled || busy}
       autoFocus={autoFocus}
       sound={sound}
       style={[
-        primary ? styles.primary : styles.secondary,
-        { height: s(40), paddingHorizontal: s(primary ? 20 : 16), borderRadius: s(20), gap: s(7) },
-        primary && { flexGrow: 1 },
+        styles.buttonBase,
+        isSuccess ? styles.success : isPrimary ? styles.primary : styles.secondary,
+        {
+          height: s(42),
+          paddingHorizontal: s(isPrimary || isSuccess ? 18 : 16),
+          borderRadius: s(21),
+          gap: s(7),
+        },
+        flex !== undefined && { flex: 1, alignSelf: 'stretch' },
         disabled && { opacity: 0.45 },
       ]}
     >
-      {busy ? <ActivityIndicator size="small" color={primary ? '#0a111c' : colors.text2} /> : icon}
-      <T size={11.8} weight={primary ? 'bold' : 'semibold'} color={primary ? '#0a111c' : colors.text2} numberOfLines={1}>{label}</T>
+      {errorGlowAnim ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              borderRadius: s(21),
+              borderWidth: 1.8,
+              borderColor: colors.danger,
+              backgroundColor: 'rgba(248,113,113,0.14)',
+              opacity: errorGlowAnim,
+            },
+          ]}
+        />
+      ) : null}
+      {busy ? (
+        <ActivityIndicator size="small" color={isSuccess ? '#ffffff' : isPrimary ? '#0a111c' : colors.text2} />
+      ) : (
+        icon
+      )}
+      <T
+        size={11.8}
+        weight={isPrimary || isSuccess ? 'bold' : 'semibold'}
+        color={textColor}
+        numberOfLines={1}
+      >
+        {label}
+      </T>
     </Press>
+  );
+
+  const transform = [
+    shakeAnim ? { translateX: shakeAnim } : null,
+    scaleAnim ? { scale: scaleAnim } : null,
+  ].filter(Boolean) as unknown as NonNullable<ViewStyle['transform']>;
+
+  return (
+    <Animated.View
+      style={[
+        flex !== undefined && { flex },
+        transform.length > 0 && { transform },
+      ]}
+    >
+      {content}
+    </Animated.View>
   );
 }
 
@@ -202,7 +281,7 @@ export function PurchaseSheet({
   installing: boolean;
   /** Lý do lượt cài sau khi mua chưa bắt đầu được. */
   notice: string | null;
-  onCheckout: (target: PurchaseTarget) => void;
+  onCheckout: (target: PurchaseTarget) => void | Promise<unknown>;
   onOpenStream: () => void;
   onInstall: () => void;
   onPlay: () => void;
@@ -214,7 +293,87 @@ export function PurchaseSheet({
   const { offer, phase } = state;
   const kind = purchaseKind(offer);
   const enter = useState(() => new Animated.Value(0))[0];
+  const [shakeAnim] = useState(() => new Animated.Value(0));
+  const [errorGlowAnim] = useState(() => new Animated.Value(0));
+  const [successScale] = useState(() => new Animated.Value(1));
+  const prevPhaseRef = useRef<PurchasePhase>(phase);
+  const [justSucceeded, setJustSucceeded] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+
   useBack(() => { onClose(); });
+
+  const triggerShake = useCallback(() => {
+    shakeAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue: -8, duration: 45, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 8, duration: 55, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -6, duration: 50, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 6, duration: 50, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -3, duration: 45, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 3, duration: 45, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: 0, duration: 40, easing: Easing.linear, useNativeDriver: true }),
+    ]).start();
+
+    errorGlowAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(errorGlowAnim, { toValue: 1, duration: 70, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      Animated.timing(errorGlowAnim, { toValue: 0, duration: 420, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+    ]).start();
+
+    try {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } catch {}
+  }, [shakeAnim, errorGlowAnim]);
+
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      if (phase === 'failed') {
+        const timer = setTimeout(() => triggerShake(), 260);
+        return () => clearTimeout(timer);
+      }
+      return;
+    }
+
+    if (phase === 'failed') {
+      triggerShake();
+    }
+  }, [phase, state.error, triggerShake]);
+
+  useEffect(() => {
+    if (phase === 'owned' && prevPhaseRef.current !== 'owned') {
+      setJustSucceeded(true);
+      successScale.setValue(1);
+      Animated.sequence([
+        Animated.timing(successScale, { toValue: 1.07, duration: 160, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.spring(successScale, { toValue: 1, stiffness: 280, damping: 14, mass: 0.7, useNativeDriver: true }),
+      ]).start();
+      try {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      playUiSound('confirm');
+
+      const timer = setTimeout(() => {
+        setJustSucceeded(false);
+      }, 2200);
+      return () => clearTimeout(timer);
+    }
+    prevPhaseRef.current = phase;
+  }, [phase, successScale]);
+
+  const handleRetry = useCallback(async () => {
+    if (retrying) return;
+    setRetrying(true);
+    try {
+      await onCheckout(state.target);
+    } catch {
+      triggerShake();
+    } finally {
+      setRetrying(false);
+    }
+  }, [onCheckout, retrying, state.target, triggerShake]);
+
   useEffect(() => {
     Animated.timing(enter, { toValue: 1, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [enter]);
@@ -242,13 +401,16 @@ export function PurchaseSheet({
       actions = (
         <>
           <Button
+            flex={1}
+            variant="secondary"
             label="Giỏ hàng"
             icon={<ShoppingCart size={s(15)} color={colors.text2} strokeWidth={2} />}
             onPress={() => onCheckout('cart')}
             disabled={phase === 'opening' || kind === 'unavailable'}
           />
           <Button
-            primary
+            flex={1.4}
+            variant="primary"
             autoFocus
             sound="confirm"
             label={phase === 'opening' ? 'Đang mở Steam…' : kind === 'unavailable' ? 'Chưa mở bán' : checkoutLabel}
@@ -273,8 +435,8 @@ export function PurchaseSheet({
       );
       actions = (
         <>
-          <Button label="Ẩn" onPress={onClose} sound="back" />
-          <Button primary autoFocus label="Mở màn hình máy tính" icon={<MonitorPlay size={s(15)} color="#0a111c" strokeWidth={2.2} />} onPress={onOpenStream} />
+          <Button flex={1} variant="secondary" label="Ẩn" onPress={onClose} sound="back" />
+          <Button flex={1.4} variant="primary" autoFocus label="Mở màn hình máy tính" icon={<MonitorPlay size={s(15)} color="#0a111c" strokeWidth={2.2} />} onPress={onOpenStream} />
         </>
       );
       break;
@@ -289,9 +451,9 @@ export function PurchaseSheet({
       );
       actions = (
         <>
-          <Button label="Quay lại" onPress={onBack} sound="back" />
-          <Button label="Màn hình máy tính" icon={<MonitorPlay size={s(15)} color={colors.text2} strokeWidth={2} />} onPress={onOpenStream} />
-          <Button primary autoFocus label="Kiểm tra lại" icon={<RefreshCw size={s(14)} color="#0a111c" strokeWidth={2.4} />} onPress={onRecheck} />
+          <Button flex={1} variant="secondary" label="Quay lại" onPress={onBack} sound="back" />
+          <Button flex={1.3} variant="secondary" label="Màn hình máy tính" icon={<MonitorPlay size={s(15)} color={colors.text2} strokeWidth={2} />} onPress={onOpenStream} />
+          <Button flex={1.2} variant="primary" autoFocus label="Kiểm tra lại" icon={<RefreshCw size={s(14)} color="#0a111c" strokeWidth={2.4} />} onPress={onRecheck} />
         </>
       );
       break;
@@ -307,11 +469,23 @@ export function PurchaseSheet({
       actions = (
         <>
           <Button
+            flex={1}
+            variant="secondary"
             label="Trình duyệt"
             icon={<ExternalLink size={s(14)} color={colors.text2} strokeWidth={2} />}
             onPress={() => void openExternal(steamWebUrl(offer.appId, state.target))}
           />
-          <Button primary autoFocus label="Thử lại" icon={<RefreshCw size={s(14)} color="#0a111c" strokeWidth={2.4} />} onPress={onBack} />
+          <Button
+            flex={1}
+            variant="primary"
+            autoFocus
+            shakeAnim={shakeAnim}
+            errorGlowAnim={errorGlowAnim}
+            label={retrying ? 'Đang thử lại…' : 'Thử lại'}
+            busy={retrying}
+            icon={retrying ? undefined : <RefreshCw size={s(14)} color="#0a111c" strokeWidth={2.4} />}
+            onPress={handleRetry}
+          />
         </>
       );
       break;
@@ -326,12 +500,34 @@ export function PurchaseSheet({
       );
       actions = (
         <>
-          <Button label="Để sau" onPress={onClose} sound="back" />
-          {state.installed ? (
-            <Button primary autoFocus sound="confirm" label="Chơi ngay" icon={<Play size={s(14)} color="#0a111c" fill="#0a111c" />} onPress={onPlay} />
-          ) : (
-            <Button primary autoFocus sound="confirm" label={installing ? 'Đang mở Steam…' : 'Tải về máy'} busy={installing} icon={<Download size={s(15)} color="#0a111c" strokeWidth={2.4} />} onPress={onInstall} />
-          )}
+          <Button flex={1} variant="secondary" label="Để sau" onPress={onClose} sound="back" />
+          <Button
+            flex={1}
+            variant="success"
+            autoFocus
+            sound="confirm"
+            scaleAnim={successScale}
+            label={
+              justSucceeded
+                ? 'Thanh toán thành công'
+                : state.installed
+                  ? 'Chơi ngay'
+                  : installing
+                    ? 'Đang mở Steam…'
+                    : 'Tải về máy'
+            }
+            icon={
+              justSucceeded ? (
+                <CircleCheck size={s(15)} color="#ffffff" strokeWidth={2.4} />
+              ) : state.installed ? (
+                <Play size={s(14)} color="#ffffff" fill="#ffffff" />
+              ) : (
+                <Download size={s(15)} color="#ffffff" strokeWidth={2.4} />
+              )
+            }
+            busy={installing}
+            onPress={state.installed ? onPlay : onInstall}
+          />
         </>
       );
       break;
@@ -378,7 +574,7 @@ export function PurchaseSheet({
             <Stepper state={state} />
             {status}
             {notice && phase === 'owned' ? <T size={10} color="#fecaca" leading={1.4}>{notice}</T> : null}
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: s(10) }}>{actions}</View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10) }}>{actions}</View>
           </View>
         </Animated.View>
       </View>
@@ -397,6 +593,28 @@ const styles = StyleSheet.create({
   close: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.07)' },
   dot: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, backgroundColor: CARD_BG },
   steamTag: { position: 'absolute', flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(5,8,13,0.62)', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
-  primary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
-  secondary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong },
+  buttonBase: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  primary: {
+    backgroundColor: colors.white,
+  },
+  secondary: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  success: {
+    backgroundColor: '#16a34a',
+    borderWidth: 1,
+    borderColor: 'rgba(74,222,128,0.45)',
+    shadowColor: '#22c55e',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 4,
+  },
 });

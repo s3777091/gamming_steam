@@ -15,7 +15,7 @@ import { useBack } from '@/features/gamepad/hooks';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 
 import { PERSONA_STATE_LABEL, formatHours, formatNumber, formatStorePrice } from './format';
-import type { ProfileAchievement, SteamPromotion, SteamStoreItem, SteamUserDetails } from './types';
+import type { ProfileAchievement, SteamProfile, SteamPromotion, SteamStoreItem, SteamUserDetails } from './types';
 import type { SteamProfileState } from './useSteamProfile';
 
 const COUNTRY_NAMES: Record<string, string> = {
@@ -159,32 +159,71 @@ function ProfileStats({ profile }: { profile: SteamUserDetails }) {
   );
 }
 
-export function SteamProfilePanel({ state, onClose }: { state: SteamProfileState; onClose: () => void }) {
+export function SteamProfilePanel({
+  state,
+  fallbackProfile,
+  onClose,
+}: {
+  state: SteamProfileState;
+  fallbackProfile?: SteamProfile | null;
+  onClose: () => void;
+}) {
   const { s } = useUi();
   const profile = state.details;
+  const displayProfile: SteamUserDetails | null = profile ?? (fallbackProfile ? {
+    steamId: fallbackProfile.steamId,
+    personaName: fallbackProfile.personaName,
+    profileUrl: fallbackProfile.profileUrl,
+    avatarUrl: fallbackProfile.avatarUrl,
+    personState: fallbackProfile.personState,
+    gameExtraInfo: fallbackProfile.gameExtraInfo,
+    lastLogoff: fallbackProfile.lastLogoff,
+    realName: null,
+    countryCode: null,
+    createdAt: null,
+    profilePublic: true,
+    level: null,
+    xp: null,
+    xpForCurrentLevel: null,
+    xpNeededToLevelUp: null,
+    ownedGames: null,
+    totalPlaytimeMinutes: null,
+    friends: null,
+    recentGames: [],
+  } : null);
+
   return (
     <SidePanel title="Hồ sơ Steam" onClose={onClose} width={440}>
-      {state.loading && !profile ? (
+      {state.loading && !displayProfile ? (
         <View style={{ gap: s(12) }}>
           <Skeleton height={s(72)} radius={s(16)} tone={0.07} />
           <Skeleton height={s(64)} radius={s(16)} tone={0.06} />
           <Skeleton height={s(96)} radius={s(16)} tone={0.06} />
         </View>
-      ) : state.error && !profile ? (
+      ) : state.error && !displayProfile ? (
         <PanelMessage icon={LockKeyhole} message={state.error} />
-      ) : profile ? (
+      ) : displayProfile ? (
         <View style={{ gap: s(16) }}>
-          <ProfileIdentity profile={profile} />
-          <RecentActivity profile={profile} state={state} />
-          <ProfileStats profile={profile} />
-          {!profile.profilePublic ? (
-            <View style={[styles.notice, { padding: s(10), borderRadius: s(12) }]}>
-              <T size={10.5} color="rgba(254,243,199,0.7)" leading={1.5}>
-                Hồ sơ Steam đang riêng tư nên một số mục không đọc được. Đặt Game details và Friends list thành Public trong Steam để hiện đủ.
-              </T>
+          <ProfileIdentity profile={displayProfile} />
+          {profile ? (
+            <>
+              <RecentActivity profile={profile} state={state} />
+              <ProfileStats profile={profile} />
+              {!profile.profilePublic ? (
+                <View style={[styles.notice, { padding: s(10), borderRadius: s(12) }]}>
+                  <T size={10.5} color="rgba(254,243,199,0.7)" leading={1.5}>
+                    Hồ sơ Steam đang riêng tư nên một số mục không đọc được. Đặt Game details và Friends list thành Public trong Steam để hiện đủ.
+                  </T>
+                </View>
+              ) : null}
+              {profile.profileUrl ? <SteamLink href={profile.profileUrl}>Mở hồ sơ trên Steam</SteamLink> : null}
+            </>
+          ) : (
+            <View style={{ gap: s(12), marginTop: s(8) }}>
+              <Skeleton height={s(64)} radius={s(16)} tone={0.06} />
+              <Skeleton height={s(96)} radius={s(16)} tone={0.06} />
             </View>
-          ) : null}
-          {profile.profileUrl ? <SteamLink href={profile.profileUrl}>Mở hồ sơ trên Steam</SteamLink> : null}
+          )}
         </View>
       ) : null}
     </SidePanel>

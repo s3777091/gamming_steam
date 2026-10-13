@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type RefObject } from 'react';
 import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Moon, Play, Power, RotateCw, X } from 'lucide-react-native';
 
+import { FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { colors } from '@/theme';
@@ -11,6 +12,7 @@ import { T } from '@/ui/Text';
 
 export type RemoteConnectionMenuProps = {
   open: boolean;
+  anchorRef?: RefObject<View | null>;
   onClose: () => void;
   online: boolean | null;
   stage?: string;
@@ -23,13 +25,14 @@ export type RemoteConnectionMenuProps = {
 };
 
 /**
- * Tab điều khiển kết nối Remote PC phong cách iOS:
- * - Thả xuống mượt mà (ease in) ngay bên dưới icon kết nối.
- * - Gồm 3 icon nằm ngang (Stream, Làm mới, Đi ngủ/Đánh thức).
- * - Hiệu ứng spring-like fluid bezier của iOS.
+ * Menu điều khiển kết nối Remote PC:
+ * - Hiệu ứng slide out trượt xuống dưới từ thanh header.
+ * - Các nút chức năng thiết kế đồng bộ glassmorphism tinh tế.
+ * - Chỉ giữ icon nhỏ gọn, lược bỏ các text thừa tránh gây rối mắt.
  */
 export function RemoteConnectionMenu({
   open,
+  anchorRef,
   onClose,
   online,
   stage,
@@ -45,16 +48,26 @@ export function RemoteConnectionMenu({
   const [spinAnim] = useState(() => new Animated.Value(0));
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isSleeping, setIsSleeping] = useState(false);
+  const [anchorPos, setAnchorPos] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
-  // Hiệu ứng ease in từ trên xuống mượt như iOS
+  // Đo tọa độ nút bấm kết nối để thả menu chuẩn xác ngay bên dưới
+  useEffect(() => {
+    if (open && anchorRef?.current) {
+      anchorRef.current.measureInWindow((x, y, width, height) => {
+        if (width > 0 && height > 0) {
+          setAnchorPos({ x, y, width, height });
+        }
+      });
+    }
+  }, [open, anchorRef]);
+
+  // Hiệu ứng slide out trượt mượt mà từ trên xuống
   useEffect(() => {
     if (open) {
-      setIsSleeping(false);
-      setFeedback(null);
       anim.setValue(0);
       Animated.timing(anim, {
         toValue: 1,
-        duration: 260,
+        duration: 240,
         easing: Easing.bezier(0.16, 1, 0.3, 1),
         useNativeDriver: true,
       }).start();
@@ -64,10 +77,12 @@ export function RemoteConnectionMenu({
   const closeWithAnimation = useCallback(() => {
     Animated.timing(anim, {
       toValue: 0,
-      duration: 170,
+      duration: 160,
       easing: Easing.bezier(0.4, 0, 1, 1),
       useNativeDriver: true,
     }).start(() => {
+      setIsSleeping(false);
+      setFeedback(null);
       onClose();
     });
   }, [anim, onClose]);
@@ -95,8 +110,8 @@ export function RemoteConnectionMenu({
       easing: Easing.bezier(0.2, 0.8, 0.2, 1),
       useNativeDriver: true,
     }).start(() => {
-      setFeedback('Đã làm mới kết nối');
-      setTimeout(() => setFeedback(null), 2000);
+      setFeedback('Đã làm mới');
+      setTimeout(() => setFeedback(null), 1800);
     });
     onReload();
   };
@@ -105,18 +120,19 @@ export function RemoteConnectionMenu({
     if (isSleeping) return;
     playUiSound('confirm');
     setIsSleeping(true);
-    setFeedback('Đang ru PC ngủ & thoát…');
+    setFeedback('Đang ru ngủ…');
     try {
       await onSleep();
     } catch {
       setIsSleeping(false);
-      setFeedback('Không thể ru ngủ');
+      setFeedback('Lỗi ru ngủ');
+      setTimeout(() => setFeedback(null), 1800);
     }
   };
 
   const handleWake = () => {
     playUiSound('confirm');
-    setFeedback('Đang gửi tín hiệu bật máy…');
+    setFeedback('Đang gửi tín hiệu…');
     onWake?.();
     setTimeout(() => setFeedback(null), 2500);
   };
@@ -128,195 +144,213 @@ export function RemoteConnectionMenu({
 
   if (!open) return null;
 
-  const cardWidth = Math.min(s(318), screenWidth - s(32));
+  const cardWidth = Math.min(s(184), screenWidth - s(24));
+  const fallbackTop = s(48) + insets.top + s(4);
+  const fallbackRight = Math.max(s(16), s(22) + insets.right + s(96));
+
+  const topPos = anchorPos ? anchorPos.y + anchorPos.height + s(6) : fallbackTop;
+  const leftPos = anchorPos
+    ? Math.max(
+        s(12) + insets.left,
+        Math.min(
+          anchorPos.x + anchorPos.width / 2 - cardWidth / 2,
+          screenWidth - cardWidth - s(12) - insets.right,
+        ),
+      )
+    : undefined;
 
   return (
-    <View style={[StyleSheet.absoluteFill, { zIndex: 60, elevation: 60 }]}>
-      {/* Lớp nền mờ trong suốt để chạm ngoài đóng tab */}
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0, 0, 0, 0.38)', opacity: anim }]}>
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={closeWithAnimation}
-          accessibilityLabel="Đóng menu kết nối"
-        />
-      </Animated.View>
+    <FocusLayer>
+      <View style={[StyleSheet.absoluteFill, { zIndex: 60, elevation: 60 }]}>
+        {/* Lớp nền trong suốt bắt chạm ngoài để đóng */}
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0, 0, 0, 0.32)', opacity: anim }]}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={closeWithAnimation}
+            accessibilityLabel="Đóng menu kết nối"
+          />
+        </Animated.View>
 
-      {/* Tab pill nổi ngang kiểu iOS ease in xuống */}
-      <Animated.View
-        style={[
-          styles.iosPill,
-          {
-            width: cardWidth,
-            top: s(48) + insets.top + s(4),
-            right: Math.max(s(16), s(22) + insets.right + s(96)),
-            borderRadius: s(22),
-            paddingHorizontal: s(12),
-            paddingTop: s(10),
-            paddingBottom: s(11),
-            opacity: anim,
-            transform: [
-              {
-                translateY: anim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-26, 0],
-                }),
-              },
-              {
-                scale: anim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.88, 1],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
-        {/* Dòng trạng thái nhỏ trên cùng */}
-        <View style={styles.topBar}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
-            <View
-              style={[
-                styles.dot,
+        {/* Khung nổi glass trượt xuống mượt mà từ trên */}
+        <Animated.View
+          style={[
+            styles.glassCard,
+            {
+              width: cardWidth,
+              top: topPos,
+              left: leftPos,
+              right: leftPos !== undefined ? undefined : fallbackRight,
+              borderRadius: s(16),
+              paddingHorizontal: s(10),
+              paddingTop: s(9),
+              paddingBottom: s(10),
+              opacity: anim,
+              transform: [
                 {
-                  width: s(6),
-                  height: s(6),
-                  borderRadius: s(3),
-                  backgroundColor: isOnline ? colors.success : isConnecting ? colors.warning : colors.text4,
+                  translateY: anim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-18, 0],
+                  }),
                 },
-              ]}
-            />
-            <T size={10.2} weight="semibold" color={colors.text2}>
-              {isOnline ? 'PC đã kết nối' : isConnecting ? 'Đang kết nối PC…' : 'PC đang ngủ / tắt'}
-            </T>
-          </View>
+                {
+                  scale: anim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.93, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          {/* Thanh trạng thái nhỏ gọn phía trên */}
+          <View style={styles.topBar}>
+            {feedback ? (
+              <T size={10} weight="semibold" color={colors.accentSoft} numberOfLines={1}>
+                {feedback}
+              </T>
+            ) : (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(5) }}>
+                <View
+                  style={[
+                    styles.dot,
+                    {
+                      width: s(6),
+                      height: s(6),
+                      borderRadius: s(3),
+                      backgroundColor: isOnline ? colors.success : isConnecting ? colors.warning : colors.text4,
+                    },
+                  ]}
+                />
+                <T size={10} weight="semibold" color={colors.text2}>
+                  {isOnline ? 'PC đã kết nối' : isConnecting ? 'Đang kết nối…' : 'PC đang tắt'}
+                </T>
+              </View>
+            )}
 
-          {feedback ? (
-            <T size={9.8} weight="semibold" color={colors.accentSoft} numberOfLines={1}>
-              {feedback}
-            </T>
-          ) : (
             <Press
               onPress={closeWithAnimation}
               sound="back"
-              accessibilityLabel="Đóng tab"
-              style={[styles.closeIconBtn, { width: s(20), height: s(20), borderRadius: s(10) }]}
+              focusable={false}
+              accessibilityLabel="Đóng menu"
+              style={[styles.closeBtn, { width: s(18), height: s(18), borderRadius: s(9) }]}
             >
-              <X size={s(11)} color={colors.text3} />
+              <X size={s(10)} color={colors.text3} />
             </Press>
-          )}
-        </View>
+          </View>
 
-        {/* 3 ICON NẰM NGANG (Horizontal Tab) */}
-        <View style={[styles.horizontalRow, { gap: s(8), marginTop: s(8) }]}>
-          {/* 1. Streaming */}
-          <Press
-            onPress={handleStream}
-            sound="confirm"
-            pressScale={0.93}
-            style={[styles.tabButton, { borderRadius: s(16), paddingVertical: s(10) }]}
-            accessibilityLabel="Phát trực tiếp streaming"
-          >
-            <View style={[styles.iconBubble, { width: s(40), height: s(40), borderRadius: s(20), backgroundColor: 'rgba(102,168,255,0.2)' }]}>
-              <Play size={s(17)} color={colors.accent} fill={colors.accent} />
-            </View>
-            <T size={11} weight="semibold" color={colors.white} style={{ marginTop: s(6) }}>
-              Stream
-            </T>
-            <T size={8.8} color={colors.text3} style={{ marginTop: s(1) }}>
-              Phát PC
-            </T>
-          </Press>
+          {/* Dãy 3 icon chức năng chuẩn phong cách glass, đồng bộ giao diện */}
+          <View style={[styles.actionRow, { gap: s(7), marginTop: s(8) }]}>
+            {/* 1. Streaming */}
+            <Press
+              autoFocus={open}
+              onPress={handleStream}
+              sound="confirm"
+              pressScale={0.93}
+              style={[
+                styles.glassBtn,
+                {
+                  height: s(36),
+                  borderRadius: s(11),
+                  backgroundColor: 'rgba(102, 168, 255, 0.12)',
+                  borderColor: 'rgba(102, 168, 255, 0.24)',
+                },
+              ]}
+              accessibilityLabel="Stream phát PC"
+            >
+              <Play size={s(14)} color={colors.accent} fill={colors.accent} />
+            </Press>
 
-          {/* 2. Reload kết nối */}
-          <Press
-            onPress={handleReload}
-            sound="navigate"
-            pressScale={0.93}
-            style={[styles.tabButton, { borderRadius: s(16), paddingVertical: s(10) }]}
-            accessibilityLabel="Làm mới kết nối remote"
-          >
-            <View style={[styles.iconBubble, { width: s(40), height: s(40), borderRadius: s(20), backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+            {/* 2. Làm mới kết nối */}
+            <Press
+              onPress={handleReload}
+              sound="navigate"
+              pressScale={0.93}
+              style={[
+                styles.glassBtn,
+                {
+                  height: s(36),
+                  borderRadius: s(11),
+                  backgroundColor: 'rgba(255, 255, 255, 0.07)',
+                  borderColor: 'rgba(255, 255, 255, 0.13)',
+                },
+              ]}
+              accessibilityLabel="Làm mới kết nối remote"
+            >
               {refreshing ? (
                 <ActivityIndicator size="small" color={colors.text2} />
               ) : (
                 <Animated.View style={{ transform: [{ rotate: spinInterpolation }] }}>
-                  <RotateCw size={s(17)} color={colors.text} strokeWidth={2.2} />
+                  <RotateCw size={s(14)} color={colors.text} strokeWidth={2} />
                 </Animated.View>
               )}
-            </View>
-            <T size={11} weight="semibold" color={colors.white} style={{ marginTop: s(6) }}>
-              Làm mới
-            </T>
-            <T size={8.8} color={colors.text3} style={{ marginTop: s(1) }}>
-              Nối lại PC
-            </T>
-          </Press>
+            </Press>
 
-          {/* 3. Đi ngủ (Sleep PC) / Đánh thức */}
-          {isOnline ? (
-            <Press
-              onPress={() => void handleSleep()}
-              sound="confirm"
-              pressScale={0.93}
-              style={[styles.tabButton, { borderRadius: s(16), paddingVertical: s(10) }]}
-              accessibilityLabel="Cho PC đi ngủ"
-            >
-              <View style={[styles.iconBubble, { width: s(40), height: s(40), borderRadius: s(20), backgroundColor: 'rgba(192,132,252,0.2)' }]}>
+            {/* 3. Đi ngủ (Sleep PC) / Đánh thức */}
+            {isOnline ? (
+              <Press
+                onPress={() => void handleSleep()}
+                sound="confirm"
+                pressScale={0.93}
+                style={[
+                  styles.glassBtn,
+                  {
+                    height: s(36),
+                    borderRadius: s(11),
+                    backgroundColor: 'rgba(192, 132, 252, 0.12)',
+                    borderColor: 'rgba(192, 132, 252, 0.24)',
+                  },
+                ]}
+                accessibilityLabel="Ru PC ngủ & thoát"
+              >
                 {isSleeping ? (
                   <ActivityIndicator size="small" color="#c084fc" />
                 ) : (
-                  <Moon size={s(17)} color="#c084fc" strokeWidth={2.2} />
+                  <Moon size={s(14)} color="#c084fc" strokeWidth={2} />
                 )}
-              </View>
-              <T size={11} weight="semibold" color={colors.white} style={{ marginTop: s(6) }}>
-                Đi ngủ
-              </T>
-              <T size={8.8} color={colors.text3} style={{ marginTop: s(1) }}>
-                Ru & thoát
-              </T>
-            </Press>
-          ) : (
-            <Press
-              onPress={handleWake}
-              sound="confirm"
-              pressScale={0.93}
-              style={[styles.tabButton, { borderRadius: s(16), paddingVertical: s(10) }]}
-              accessibilityLabel="Đánh thức PC"
-            >
-              <View style={[styles.iconBubble, { width: s(40), height: s(40), borderRadius: s(20), backgroundColor: 'rgba(74,222,128,0.2)' }]}>
-                <Power size={s(17)} color={colors.success} strokeWidth={2.2} />
-              </View>
-              <T size={11} weight="semibold" color={colors.white} style={{ marginTop: s(6) }}>
-                Bật máy
-              </T>
-              <T size={8.8} color={colors.text3} style={{ marginTop: s(1) }}>
-                Wake-on-LAN
-              </T>
-            </Press>
-          )}
-        </View>
-      </Animated.View>
-    </View>
+              </Press>
+            ) : (
+              <Press
+                onPress={handleWake}
+                sound="confirm"
+                pressScale={0.93}
+                style={[
+                  styles.glassBtn,
+                  {
+                    height: s(36),
+                    borderRadius: s(11),
+                    backgroundColor: 'rgba(74, 222, 128, 0.12)',
+                    borderColor: 'rgba(74, 222, 128, 0.24)',
+                  },
+                ]}
+                accessibilityLabel="Đánh thức PC"
+              >
+                <Power size={s(14)} color={colors.success} strokeWidth={2} />
+              </Press>
+            )}
+          </View>
+        </Animated.View>
+      </View>
+    </FocusLayer>
   );
 }
 
 const styles = StyleSheet.create({
-  iosPill: {
+  glassCard: {
     position: 'absolute',
     borderWidth: 1.2,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(14, 22, 34, 0.94)',
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    backgroundColor: 'rgba(10, 17, 28, 0.94)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.6,
-    shadowRadius: 22,
-    elevation: 28,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 24,
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
   },
   dot: {
     shadowColor: '#000',
@@ -324,26 +358,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 2,
   },
-  closeIconBtn: {
+  closeBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  horizontalRow: {
+  actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  tabButton: {
+  glassBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  iconBubble: {
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

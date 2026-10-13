@@ -54,6 +54,47 @@ export function FocusRing({ radius, variant = 'card', visible = true, onHidden }
     opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 1 - extra] }),
   });
 
+  if (variant === 'row') {
+    return (
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          opacity: appear,
+        }}
+      >
+        {/* Lớp phủ sáng nhẹ cho cả hàng đang chọn */}
+        <View
+          pointerEvents="none"
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius, backgroundColor: 'rgba(255,255,255,0.08)' }}
+        />
+        {/* Viền quầng sáng thở nhẹ ngay sát viền hàng */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: -1, left: -1, right: -1, bottom: -1,
+            borderRadius: radius + 1,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.3)',
+            opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [0.8, 0.4] }),
+          }}
+        />
+        {/* Viền tiêu điểm trắng sắc nét bao trọn hàng */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0, left: 0, right: 0, bottom: 0,
+            borderRadius: radius,
+            borderWidth: RING,
+            borderColor: 'rgba(255,255,255,0.96)',
+          }}
+        />
+      </Animated.View>
+    );
+  }
+
   return (
     <Animated.View
       pointerEvents="none"
@@ -62,15 +103,9 @@ export function FocusRing({ radius, variant = 'card', visible = true, onHidden }
         opacity: appear,
       }}
     >
-      {/* Quầng sáng: hai dải mờ dần ra ngoài. */}
+      {/* Quầng sáng: hai dải mờ dần ra ngoài cho thẻ (card). */}
       <Animated.View pointerEvents="none" style={band(GAP + RING + 7, 4, 0.05, 0.5)} />
       <Animated.View pointerEvents="none" style={band(GAP + RING + 3, 4, 0.12, 0.35)} />
-      {variant === 'row' ? (
-        <View
-          pointerEvents="none"
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius, backgroundColor: 'rgba(255,255,255,0.09)' }}
-        />
-      ) : null}
       <View
         pointerEvents="none"
         style={{

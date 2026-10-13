@@ -1,223 +1,600 @@
-// Màn loading của stream. Bấm Play từ kệ game thì đây là màn "đang vào game":
-// ảnh hero + logo chính thức + những gì PC đã tối ưu, và nó che khung hình cho
-// tới khi cửa sổ game lên foreground. Mở desktop thường thì xoay ảnh theo chủ đề.
+// Màn hình loading của stream lấy cảm hứng từ MetroHero (locked scroll-scrub video hero).
+// Hiệu ứng đoàn tàu (subway train) chạy mượt mà ở nền, kết hợp zoom điện ảnh vào Game hoặc PC máy tính.
+// Tại vị trí trung tâm hiển thị trạng thái kết nối ngắn gọn, sắc nét (không có description rườm rà).
 
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, StyleSheet, View } from 'react-native';
+import React, { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  Easing,
+  Platform,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Monitor, RefreshCw } from 'lucide-react-native';
+import { Monitor, RefreshCw, X } from 'lucide-react-native';
 
 import type { PendingGameLaunch } from '@/lib/game-launch';
-import { getLoadingTheme, loadingPhotoUrl, type LoadingThemeId } from '@/lib/loading-themes';
+import type { LoadingThemeId } from '@/lib/loading-themes';
 import { colors } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
-type LoadingPhase = 'connecting' | 'waiting' | 'live' | 'error';
+export type LoadingPhase = 'connecting' | 'waiting' | 'live' | 'error';
 
-function Heading({ launch }: { launch: PendingGameLaunch }) {
-  const { s, width } = useUi();
-  const [logoFailed, setLogoFailed] = useState(false);
-  const logoUrl = launch.logoUrl && !logoFailed ? launch.logoUrl : null;
+const METRO_TRAIN_VIDEO =
+  'https://cdn.21st.dev/assets/mirror/21/21a77eac28eacbb7e142016eefeaa0b4a766619e51113629a3bc6df6af066c0f.mp4';
+
+const DEFAULT_PC_BACKDROP =
+  'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1920&q=80';
+
+const COL_BG = '#05070D';
+const COL_TEXT = '#F2F4F8';
+
+/**
+ * Rút gọn các dòng trạng thái dài dòng (như giải phóng RAM, khởi chạy quy trình...)
+ * thành các trạng thái ngắn gọn, sắc nét chuẩn giao diện điện ảnh.
+ */
+export function formatLoadingStatus(rawStatus: string, phase: LoadingPhase): string {
+  if (phase === 'error') return 'MẤT KẾT NỐI';
+  if (!rawStatus) return 'ĐANG KẾT NỐI';
+
+  const lower = rawStatus.toLowerCase();
+
+  // Nhóm tối ưu RAM / Game Booster / Hệ thống
+  if (
+    lower.includes('giải phóng ram') ||
+    lower.includes('tối ưu') ||
+    lower.includes('optimize') ||
+    lower.includes('ram') ||
+    lower.includes('booster') ||
+    lower.includes('dọn dẹp')
+  ) {
+    return 'ĐANG TỐI ƯU';
+  }
+
+  // Nhóm mở game / khởi động game
+  if (
+    lower.includes('đang mở') ||
+    lower.includes('vào game') ||
+    lower.includes('khởi động') ||
+    lower.includes('starting') ||
+    lower.includes('launching')
+  ) {
+    return 'ĐANG VÀO GAME';
+  }
+
+  // Nhóm chờ người dùng / phòng stream
+  if (
+    lower.includes('chờ người dùng') ||
+    lower.includes('chờ') ||
+    lower.includes('waiting') ||
+    lower.includes('yêu cầu')
+  ) {
+    return 'ĐANG CHỜ PHẢN HỒI';
+  }
+
+  // Nhóm hoàn tất / khung hình đầu tiên
+  if (
+    lower.includes('khung hình') ||
+    lower.includes('sẵn sàng') ||
+    lower.includes('truyền trực tiếp')
+  ) {
+    return 'SẴN SÀNG';
+  }
+
+  // Nhóm kết nối mạng / WebRTC / xác thực
+  if (
+    lower.includes('xác nhận') ||
+    lower.includes('quyền sử dụng') ||
+    lower.includes('tìm host') ||
+    lower.includes('kết nối') ||
+    lower.includes('webrtc') ||
+    lower.includes('đường truyền')
+  ) {
+    return 'ĐANG KẾT NỐI';
+  }
+
+  // Nếu chữ ngắn gọn (< 24 ký tự)
+  if (rawStatus.length <= 24) {
+    return rawStatus.replace(/[.…]+$/, '').trim().toUpperCase();
+  }
+
+  return 'ĐANG THIẾT LẬP';
+}
+
+// Bọc an toàn trong trường hợp native module chưa được biên dịch trong binary dev-client
+class VideoErrorBoundary extends Component<
+  { fallback: ReactNode; children: ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    console.warn('[StreamLoading] expo-video native module not ready, using animated backdrop:', error);
+  }
+
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
+
+/**
+ * Phát video đoàn tàu ngầm mượt mà bằng expo-video.
+ */
+function NativeMetroVideo({ videoUrl }: { videoUrl: string }) {
+  let VideoViewComponent: any = null;
+  let useVideoPlayerHook: any = null;
+
+  try {
+    const ExpoVideo = require('expo-video');
+    VideoViewComponent = ExpoVideo.VideoView;
+    useVideoPlayerHook = ExpoVideo.useVideoPlayer;
+  } catch {
+    // Sẽ được VideoErrorBoundary xử lý
+  }
+
+  if (!VideoViewComponent || !useVideoPlayerHook) {
+    throw new Error('expo-video module not available');
+  }
+
+  return <NativeMetroVideoInner VideoView={VideoViewComponent} useVideoPlayer={useVideoPlayerHook} videoUrl={videoUrl} />;
+}
+
+function NativeMetroVideoInner({
+  VideoView,
+  useVideoPlayer,
+  videoUrl,
+}: {
+  VideoView: any;
+  useVideoPlayer: any;
+  videoUrl: string;
+}) {
+  const player = useVideoPlayer(videoUrl, (p: any) => {
+    try {
+      p.loop = true;
+      p.muted = true;
+      p.play();
+    } catch {
+      // Ignore initial setup warning
+    }
+  });
+
   return (
-    <View style={{ gap: s(8) }}>
-      <T size={9} weight="semibold" color="rgba(255,255,255,0.52)" tracking={0.24}>ĐANG VÀO GAME</T>
-      {logoUrl ? (
-        <Img
-          source={{ uri: logoUrl }}
-          accessibilityLabel={launch.title}
-          style={{ width: Math.min(s(350), width * 0.45), height: s(76) }}
-          contentFit="contain"
-          contentPosition="left"
-          transition={0}
-          onError={() => setLogoFailed(true)}
-        />
-      ) : (
-        <T size={31} weight="bold" tracking={-0.025} numberOfLines={2} style={{ maxWidth: width * 0.58 }}>{launch.title}</T>
-      )}
-    </View>
+    <VideoView
+      player={player}
+      style={StyleSheet.absoluteFill}
+      contentFit="cover"
+      nativeControls={false}
+      allowsFullscreen={false}
+    />
   );
 }
 
 export function StreamLoading({
-  visible, phase, status, progress, themeId, launch, highlights, detail, onRetry, onExit, onReveal,
+  visible,
+  phase,
+  status,
+  progress,
+  themeId,
+  launch,
+  highlights = [],
+  detail,
+  onRetry,
+  onExit,
+  onReveal,
 }: {
   visible: boolean;
   phase: LoadingPhase;
   status: string;
   progress: number;
-  themeId: LoadingThemeId;
+  themeId?: LoadingThemeId;
   launch: PendingGameLaunch | null;
-  highlights: string[];
+  highlights?: string[];
   detail?: string | null;
   onRetry: () => void;
   onExit: () => void;
-  /** Có khi stream đã sống mà loading che quá lâu: cho người chơi tự xem màn hình máy tính. */
   onReveal?: () => void;
 }) {
-  const { s, width, insets } = useUi();
+  const { s, width } = useUi();
   const canReveal = Boolean(visible && onReveal);
-  const theme = getLoadingTheme(themeId);
-  const [photoIndex, setPhotoIndex] = useState(0);
+  const failure = phase === 'error';
+
   const [mounted, setMounted] = useState(visible);
   const opacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
-  const kenBurns = useRef(new Animated.Value(0)).current;
+
+  // Zoom chậm mượt mà theo phong cách Ken Burns cho đoàn tàu
+  const trainZoom = useRef(new Animated.Value(0)).current;
+  // Zoom cho Game hoặc PC
+  const targetZoom = useRef(new Animated.Value(0)).current;
+  // Sheen quét sáng qua thanh tiến trình
   const sheen = useRef(new Animated.Value(0)).current;
+  // Hiệu ứng mờ/rõ trạng thái
+  const textScale = useRef(new Animated.Value(0.95)).current;
 
   useEffect(() => {
     if (visible) setMounted(true);
-    const animation = Animated.timing(opacity, {
-      toValue: visible ? 1 : 0, duration: 680, easing: Easing.out(Easing.cubic), useNativeDriver: true,
+    const anim = Animated.timing(opacity, {
+      toValue: visible ? 1 : 0,
+      duration: 550,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
     });
-    animation.start(({ finished }) => { if (finished && !visible) setMounted(false); });
-    return () => animation.stop();
+    anim.start(({ finished }) => {
+      if (finished && !visible) setMounted(false);
+    });
+    return () => anim.stop();
   }, [opacity, visible]);
 
+  // Hiệu ứng chuyển động đoàn tàu chạy mượt mà
   useEffect(() => {
     if (!visible) return;
-    kenBurns.setValue(0);
-    const animation = Animated.timing(kenBurns, { toValue: 1, duration: 18_000, easing: Easing.out(Easing.cubic), useNativeDriver: true });
-    animation.start();
-    return () => animation.stop();
-  }, [kenBurns, photoIndex, visible]);
+    trainZoom.setValue(0);
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(trainZoom, {
+          toValue: 1,
+          duration: 14_000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(trainZoom, {
+          toValue: 0,
+          duration: 14_000,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [trainZoom, visible]);
 
-  // Xoay ảnh nền chủ đề (chỉ khi không phải màn vào game).
+  // Hiệu ứng Zoom vào Game hoặc PC khi tiến trình tăng dần
   useEffect(() => {
-    if (!visible || launch) return;
-    const timer = setInterval(() => setPhotoIndex((value) => (value + 1) % theme.photos.length), 7_000);
-    return () => clearInterval(timer);
-  }, [launch, theme.photos.length, visible]);
+    if (!visible) return;
+    const normalized = Math.min(Math.max(progress / 100, 0), 1);
+    Animated.timing(targetZoom, {
+      toValue: normalized,
+      duration: 450,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [progress, targetZoom, visible]);
 
+  // Hiệu ứng nhịp thở nhẹ cho chữ trạng thái
   useEffect(() => {
-    if (!visible || phase !== 'connecting') { sheen.stopAnimation(); return; }
+    if (!visible) return;
+    Animated.spring(textScale, {
+      toValue: 1,
+      friction: 6,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+  }, [status, textScale, visible]);
+
+  // Shimmer hiệu ứng trên thanh tiến trình
+  useEffect(() => {
+    if (!visible || phase !== 'connecting') {
+      sheen.stopAnimation();
+      return;
+    }
     sheen.setValue(0);
-    const animation = Animated.loop(Animated.timing(sheen, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.cubic), useNativeDriver: true }));
-    animation.start();
-    return () => animation.stop();
+    const anim = Animated.loop(
+      Animated.timing(sheen, {
+        toValue: 1,
+        duration: 1600,
+        easing: Easing.inOut(Easing.cubic),
+        useNativeDriver: true,
+      })
+    );
+    anim.start();
+    return () => anim.stop();
   }, [phase, sheen, visible]);
 
+  const displayStatus = useMemo(() => formatLoadingStatus(status, phase), [status, phase]);
+
+  const targetBackdrop = launch?.heroUrl || DEFAULT_PC_BACKDROP;
+
   if (!mounted) return null;
-  const failure = phase === 'error';
-  const photo = theme.photos[photoIndex % theme.photos.length];
-  const backdrop = launch?.heroUrl || loadingPhotoUrl(photo);
-  const description = phase === 'waiting'
-    ? 'Yêu cầu sẽ tự cập nhật ngay khi chủ phiên phản hồi'
-    : launch ? (canReveal
-      ? 'Game có launcher riêng thường đợi bạn bấm "Enter Game" — mở màn hình máy tính để bấm'
-      : 'Máy tính đang được tối ưu cho trò chơi — bạn sẽ vào thẳng màn hình loading của game')
-      : 'Jetsona đang mở đường truyền WebRTC trực tiếp';
-  const optimizationSummary = launch && highlights.length
-    ? `Đã tối ưu: ${highlights.join(' · ')}`
-    : null;
-  const actionWidth = Math.min(s(330), width * 0.38);
+
+  const trainScaleInterpolation = trainZoom.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1.0, 1.07],
+  });
+
+  const targetScaleInterpolation = targetZoom.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1.0, 1.12],
+  });
+
+  // Độ mờ của Game/PC hiện dần khi tiến trình tăng cao
+  const targetOpacityInterpolation = targetZoom.interpolate({
+    inputRange: [0, 0.4, 0.85, 1],
+    outputRange: [0.12, 0.28, 0.65, 0.9],
+  });
+
+  const progressPercent = Math.min(Math.max(progress, 4), 100);
 
   return (
-    <Animated.View style={[styles.root, { opacity }]} pointerEvents={visible ? 'auto' : 'none'} accessibilityViewIsModal>
-      <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ scale: kenBurns.interpolate({ inputRange: [0, 1], outputRange: [1.04, 1.14] }) }] }]}>
-        <Img key={backdrop} source={{ uri: backdrop }} style={StyleSheet.absoluteFill} contentFit="cover" transition={900} priority="high" />
+    <Animated.View
+      style={[styles.root, { opacity }]}
+      pointerEvents={visible ? 'auto' : 'none'}
+      accessibilityViewIsModal
+    >
+      {/* 1. LỚP ĐOÀN TÀU (Đoàn tàu phía sau chính là loading) */}
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          { transform: [{ scale: trainScaleInterpolation }] },
+        ]}
+      >
+        <VideoErrorBoundary
+          fallback={
+            <Img
+              source={{ uri: targetBackdrop }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              priority="high"
+            />
+          }
+        >
+          <NativeMetroVideo videoUrl={METRO_TRAIN_VIDEO} />
+        </VideoErrorBoundary>
       </Animated.View>
+
+      {/* 2. ZOOM VÀO GAME HOẶC PC MÁY TÍNH */}
+      {/* Lớp nền của Game/PC sẽ zoom dần vào tâm khi kết nối tiến triển */}
+      <Animated.View
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            opacity: targetOpacityInterpolation,
+            transform: [{ scale: targetScaleInterpolation }],
+          },
+        ]}
+        pointerEvents="none"
+      >
+        <Img
+          source={{ uri: targetBackdrop }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          priority="high"
+        />
+      </Animated.View>
+
+      {/* 3. LỚP PHỦ MÀU ĐẬM VIGNETTE CINEMATIC */}
       <LinearGradient
-        colors={launch ? ['rgba(5,8,14,0.15)', 'rgba(5,8,14,0.55)', 'rgba(5,8,14,0.96)'] : ['rgba(27,21,51,0.5)', 'rgba(7,6,15,0.95)']}
-        locations={launch ? [0, 0.55, 1] : [0, 0.74]}
+        colors={[
+          'rgba(5,7,13,0.5)',
+          'rgba(5,7,13,0.15)',
+          'rgba(5,7,13,0.3)',
+          'rgba(5,7,13,0.85)',
+        ]}
+        locations={[0, 0.3, 0.7, 1]}
         style={StyleSheet.absoluteFill}
+        pointerEvents="none"
       />
 
-      {!launch ? (
-        <View style={[styles.attribution, { top: s(18) + insets.top, right: s(22) + insets.right, paddingHorizontal: s(10), paddingVertical: s(6) }]}>
-          <T size={9} weight="semibold" color="rgba(255,255,255,0.38)">Ảnh: {photo.photographer} · Unsplash</T>
+      {/* NÚT THOÁT PHIÊN Ở GÓC TRÊN BÊN PHẢI */}
+      <View style={styles.topBar}>
+        <Press
+          onPress={onExit}
+          accessibilityLabel="Thoát phiên"
+          sound="back"
+          style={styles.exitPill}
+        >
+          <X size={s(14)} color="rgba(255,255,255,0.7)" />
+          <T size={11} weight="medium" color="rgba(255,255,255,0.75)">
+            Thoát
+          </T>
+        </Press>
+      </View>
+
+      {/* 4. CHỮ TRẠNG THÁI KẾT NỐI Ở CHÍNH GIỮA (CHỖ KHOANH VÀNG ẢNH 2) */}
+      {/* Không có Description dài dòng, chữ lớn phong cách THE CITY OPENS */}
+      <View style={styles.centerContainer} pointerEvents="none">
+        {/* Tiêu đề phụ: Tên Game hoặc PC */}
+        {launch ? (
+          <View style={{ alignItems: 'center', marginBottom: s(10) }}>
+            {launch.logoUrl ? (
+              <Img
+                source={{ uri: launch.logoUrl }}
+                style={{ width: Math.min(s(220), width * 0.45), height: s(46) }}
+                contentFit="contain"
+                transition={0}
+              />
+            ) : (
+              <T
+                size={11.5}
+                weight="bold"
+                color="rgba(242,244,248,0.75)"
+                tracking={0.2}
+                numberOfLines={1}
+              >
+                {launch.title.toUpperCase()}
+              </T>
+            )}
+          </View>
+        ) : (
+          <T
+            size={11}
+            weight="bold"
+            color="rgba(242,244,248,0.65)"
+            tracking={0.25}
+            style={{ marginBottom: s(8) }}
+          >
+            PC STREAMING
+          </T>
+        )}
+
+        {/* Trạng thái kết nối nổi bật */}
+        <Animated.View style={{ transform: [{ scale: textScale }] }}>
+          <T
+            size={Platform.OS === 'web' ? 46 : s(32)}
+            weight="bold"
+            color={failure ? '#F87171' : COL_TEXT}
+            tracking={-0.015}
+            style={styles.centerTitle}
+          >
+            {displayStatus}
+          </T>
+        </Animated.View>
+
+        {/* Chỉ hiện chi tiết khi bị lỗi kết nối để người dùng biết khắc phục */}
+        {failure && detail ? (
+          <T
+            size={11.5}
+            color="rgba(254,202,202,0.8)"
+            style={{ marginTop: s(8), textAlign: 'center', maxWidth: width * 0.6 }}
+          >
+            {detail}
+          </T>
+        ) : null}
+      </View>
+
+      {/* NÚT THAO TÁC KHI CÓ LỖI HOẶC CẦN MỞ DESKTOP */}
+      {(failure || canReveal) ? (
+        <View style={styles.bottomActions}>
+          {failure ? (
+            <Press onPress={onRetry} style={styles.actionBtn}>
+              <RefreshCw size={s(15)} color="#09090B" />
+              <T size={12} weight="bold" color="#09090B">
+                Kết nối lại
+              </T>
+            </Press>
+          ) : null}
+          {canReveal ? (
+            <Press onPress={onReveal} style={styles.actionBtn}>
+              <Monitor size={s(15)} color="#09090B" />
+              <T size={12} weight="bold" color="#09090B">
+                Xem màn hình máy tính
+              </T>
+            </Press>
+          ) : null}
         </View>
       ) : null}
 
-      <View style={[styles.content, { left: s(38) + insets.left, right: s(38) + insets.right, bottom: s(24) + insets.bottom }]}>
-        <View style={[styles.copyColumn, { gap: s(13), maxWidth: width * 0.58 }]}>
-          {launch ? <Heading launch={launch} /> : null}
-
-          <View style={{ gap: s(6) }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10) }}>
-              {failure ? <Monitor size={s(17)} color="#fca5a5" /> : <ActivityIndicator size="small" color="rgba(255,255,255,0.86)" />}
-              <T size={14} weight="semibold" color={failure ? '#fecaca' : 'rgba(255,255,255,0.88)'} numberOfLines={1} style={{ flex: 1 }}>{status}</T>
-            </View>
-            {failure && detail ? <T size={10.5} color="rgba(255,255,255,0.35)" numberOfLines={2}>{detail}</T> : null}
-            {!failure ? (
-              <T size={11} weight="medium" color="rgba(255,255,255,0.55)" leading={1.48}>
-                {description}
-                {optimizationSummary ? `\n${optimizationSummary}` : ''}
-              </T>
-            ) : null}
-          </View>
-        </View>
-
-        <View style={[styles.actionColumn, { width: actionWidth, gap: s(13) }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: s(9) }}>
-            {failure ? (
-              <Press onPress={onRetry} style={[styles.retry, { height: s(39), paddingHorizontal: s(17), borderRadius: s(20), gap: s(8) }]}>
-                <RefreshCw size={s(16)} color="#09090b" />
-                <T size={12} weight="bold" color="#09090b">Kết nối lại</T>
-              </Press>
-            ) : null}
-            {canReveal ? (
-              <Press onPress={onReveal} style={[styles.retry, { height: s(39), paddingHorizontal: s(17), borderRadius: s(20), gap: s(8) }]}>
-                <Monitor size={s(16)} color="#09090b" />
-                <T size={12} weight="bold" color="#09090b">Xem màn hình máy tính</T>
-              </Press>
-            ) : null}
-            <Press onPress={onExit} style={[styles.exit, { height: s(39), paddingHorizontal: s(15), borderRadius: s(20) }]}>
-              <T size={11} weight="semibold" color={colors.text3}>Thoát phiên</T>
-            </Press>
-          </View>
-
-          <View
-            accessibilityRole="progressbar"
-            accessibilityLabel="Tiến trình mở trò chơi"
-            accessibilityValue={{ min: 0, max: 100, now: Math.round(progress) }}
-            style={{ height: s(3), overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.16)' }}
-          >
-            <View
-              style={{
-                height: '100%', width: `${Math.max(failure ? progress - 22 : progress, 6)}%`,
-                backgroundColor: failure ? 'rgba(248,113,113,0.82)' : 'rgba(255,255,255,0.9)',
-              }}
-            />
-            {phase === 'connecting' ? (
-              <Animated.View
-                style={{
-                  position: 'absolute', top: 0, bottom: 0, width: s(90), backgroundColor: 'rgba(255,255,255,0.3)',
-                  transform: [{ translateX: sheen.interpolate({ inputRange: [0, 1], outputRange: [-s(100), actionWidth] }) }],
-                }}
-              />
-            ) : null}
-          </View>
-        </View>
+      {/* 5. THANH TIẾN TRÌNH THANH MẢNH Ở ĐÁY MÀN HÌNH (CHUẨN METROHERO) */}
+      <View
+        accessibilityRole="progressbar"
+        accessibilityLabel="Tiến trình kết nối"
+        accessibilityValue={{ min: 0, max: 100, now: Math.round(progressPercent) }}
+        style={styles.progressTrack}
+      >
+        <View
+          style={[
+            styles.progressBar,
+            {
+              width: `${progressPercent}%`,
+              backgroundColor: failure
+                ? 'rgba(248,113,113,0.95)'
+                : 'rgba(255,255,255,0.92)',
+            },
+          ]}
+        />
+        {phase === 'connecting' ? (
+          <Animated.View
+            style={[
+              styles.progressSheen,
+              {
+                transform: [
+                  {
+                    translateX: sheen.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-s(120), width],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+        ) : null}
       </View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { ...StyleSheet.absoluteFill, zIndex: 30, elevation: 30, overflow: 'hidden', backgroundColor: '#07060f' },
-  content: {
+  root: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 40,
+    elevation: 40,
+    overflow: 'hidden',
+    backgroundColor: COL_BG,
+  },
+  topBar: {
     position: 'absolute',
+    top: 24,
+    right: 24,
+    zIndex: 50,
+  },
+  exitPill: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
-  copyColumn: { flex: 1 },
-  actionColumn: { alignItems: 'stretch' },
-  attribution: {
-    position: 'absolute',
-    borderRadius: 999,
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderColor: 'rgba(255,255,255,0.15)',
   },
-  retry: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.92)' },
-  exit: {
+  centerContainer: {
+    position: 'absolute',
+    inset: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    backgroundColor: 'rgba(0,0,0,0.15)',
+    paddingHorizontal: '8%',
+  },
+  centerTitle: {
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 24,
+  },
+  bottomActions: {
+    position: 'absolute',
+    bottom: 24,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    gap: 12,
+    zIndex: 50,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 38,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    gap: 8,
+  },
+  progressTrack: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+  },
+  progressSheen: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 90,
+    backgroundColor: 'rgba(255,255,255,0.45)',
   },
 });

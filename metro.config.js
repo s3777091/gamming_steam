@@ -10,11 +10,14 @@ const path = require('path');
 const config = getDefaultConfig(__dirname);
 
 const parentNodeModules = path.resolve(__dirname, '..', 'node_modules');
-const escaped = parentNodeModules.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const existing = config.resolver.blockList;
-config.resolver.blockList = [
-  ...(Array.isArray(existing) ? existing : existing ? [existing] : []),
-  new RegExp(`${escaped}[\\\\/].*`),
-];
+const localNodeModules = path.resolve(__dirname, 'node_modules');
+if (parentNodeModules !== localNodeModules) {
+  const escaped = parentNodeModules.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const existing = config.resolver.blockList;
+  config.resolver.blockList = [
+    ...(Array.isArray(existing) ? existing : existing ? [existing] : []),
+    new RegExp(`${escaped}[\\\\/].*`),
+  ];
+}
 
 module.exports = config;

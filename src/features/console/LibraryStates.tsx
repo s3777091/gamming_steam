@@ -1,4 +1,5 @@
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Gamepad2, Monitor, RefreshCw, WifiOff } from 'lucide-react-native';
 
@@ -11,6 +12,17 @@ import { T } from '@/ui/Text';
 
 /** Ảnh nền toàn màn hình theo tab đang mở, kèm lớp tối để chữ đọc được. */
 export function LibraryBackdrop({ url, store }: { url: string | null | undefined; store: boolean }) {
+  const [storeAnim] = useState(() => new Animated.Value(store ? 1 : 0));
+
+  useEffect(() => {
+    Animated.timing(storeAnim, {
+      toValue: store ? 1 : 0,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [store, storeAnim]);
+
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {url ? (
@@ -22,36 +34,115 @@ export function LibraryBackdrop({ url, store }: { url: string | null | undefined
           transition={560}
         />
       ) : null}
-      {store ? (
-        <>
-          <LinearGradient
-            colors={['rgba(5,10,17,0.82)', 'rgba(5,10,17,0.42)', 'rgba(5,10,17,0.06)', 'rgba(5,10,17,0.24)']}
-            locations={[0, 0.38, 0.73, 1]}
-            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <LinearGradient
-            colors={['rgba(5,10,17,0.42)', 'rgba(5,10,17,0)', 'rgba(5,10,17,0.16)', 'rgba(5,10,17,0.96)']}
-            locations={[0, 0.28, 0.48, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-        </>
-      ) : (
-        <>
-          <LinearGradient
-            colors={['rgba(8,12,18,0.92)', 'rgba(8,12,18,0.58)', 'rgba(8,12,18,0.18)', 'rgba(8,12,18,0.44)']}
-            locations={[0, 0.47, 0.76, 1]}
-            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <LinearGradient
-            colors={['rgba(8,12,18,0.58)', 'rgba(8,12,18,0.08)', 'rgba(8,12,18,0.80)']}
-            locations={[0, 0.33, 1]}
-            style={StyleSheet.absoluteFill}
-          />
-        </>
-      )}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            opacity: storeAnim,
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={['rgba(5,10,17,0.82)', 'rgba(5,10,17,0.42)', 'rgba(5,10,17,0.06)', 'rgba(5,10,17,0.24)']}
+          locations={[0, 0.38, 0.73, 1]}
+          start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          colors={['rgba(5,10,17,0.42)', 'rgba(5,10,17,0)', 'rgba(5,10,17,0.16)', 'rgba(5,10,17,0.96)']}
+          locations={[0, 0.28, 0.48, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            opacity: storeAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, 0],
+            }),
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={['rgba(8,12,18,0.92)', 'rgba(8,12,18,0.58)', 'rgba(8,12,18,0.18)', 'rgba(8,12,18,0.44)']}
+          locations={[0, 0.47, 0.76, 1]}
+          start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          colors={['rgba(8,12,18,0.58)', 'rgba(8,12,18,0.08)', 'rgba(8,12,18,0.80)']}
+          locations={[0, 0.33, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
     </View>
+  );
+}
+
+/**
+ * Nền tab PC: hình hoa xanh kiểu desktop Windows 11, vẽ bằng gradient nên không cần ảnh.
+ * Phủ kín trên ảnh game và mờ dần vào/ra khi đổi tab.
+ */
+export function PcWallpaper({ visible }: { visible: boolean }) {
+  const { width, height } = useUi();
+  const [anim] = useState(() => new Animated.Value(visible ? 1 : 0));
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: visible ? 1 : 0,
+      duration: 320,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [visible, anim]);
+
+  const petal = (
+    size: number, left: number, top: number, rotate: string, colors: [string, string],
+  ) => (
+    <LinearGradient
+      colors={colors}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={{
+        position: 'absolute',
+        width: size,
+        height: size * 0.56,
+        left,
+        top,
+        borderRadius: size,
+        transform: [{ rotate }],
+      }}
+    />
+  );
+
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]} pointerEvents="none">
+      <LinearGradient
+        colors={['#020b24', '#06265f', '#0a4fb8']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      {petal(width * 0.62, width * 0.44, -height * 0.18, '-24deg', ['rgba(0,120,255,0.85)', 'rgba(0,70,190,0.15)'])}
+      {petal(width * 0.5, width * 0.6, height * 0.12, '38deg', ['rgba(120,200,255,0.9)', 'rgba(20,110,235,0.2)'])}
+      {petal(width * 0.46, width * 0.3, height * 0.34, '-52deg', ['rgba(0,90,230,0.8)', 'rgba(0,40,130,0.1)'])}
+      {petal(width * 0.34, width * 0.7, height * 0.5, '12deg', ['rgba(170,225,255,0.75)', 'rgba(40,130,240,0.1)'])}
+      <LinearGradient
+        colors={['rgba(2,8,22,0.86)', 'rgba(2,8,22,0.4)', 'rgba(2,8,22,0.08)', 'rgba(2,8,22,0.32)']}
+        locations={[0, 0.4, 0.74, 1]}
+        start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={['rgba(2,8,22,0.4)', 'rgba(2,8,22,0)', 'rgba(2,8,22,0.78)']}
+        locations={[0, 0.3, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+    </Animated.View>
   );
 }
 

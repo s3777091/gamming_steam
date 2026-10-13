@@ -106,6 +106,7 @@ export type SteamNewsItem = {
   summary: string | null;
   feedLabel: string | null;
   publishedAt: string | null;
+  imageUrl?: string | null;
 };
 
 export type NewsResponse = {
@@ -115,7 +116,10 @@ export type NewsResponse = {
   error?: string;
 };
 
-export type StoreTab = 'games' | 'store';
+export type StoreTab = 'games' | 'store' | 'pc';
+
+/** Thứ tự tab từ trái sang phải: dùng cho hướng trượt và LB/RB. */
+export const STORE_TAB_ORDER: readonly StoreTab[] = ['games', 'store', 'pc'];
 
 export type SteamStoreItem = {
   appId: number;

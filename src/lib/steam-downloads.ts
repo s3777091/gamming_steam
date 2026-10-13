@@ -40,6 +40,17 @@ export type InstallFlow = {
   updatedAt: number;
 };
 
+export type UninstallPhase = 'starting' | 'uninstalling' | 'uninstalled' | 'failed';
+
+/** Tiến trình gỡ do chính Steam client thực hiện trên PC. */
+export type UninstallFlow = {
+  appid: number;
+  name: string | null;
+  phase: UninstallPhase;
+  error: string | null;
+  updatedAt: number;
+};
+
 export type ActiveDownload = {
   appid: number;
   name: string | null;
@@ -77,6 +88,8 @@ export type DownloadsState = {
   active: ActiveDownload | null;
   queue: QueueItem[];
   installs: InstallFlow[];
+  /** Agent cũ chưa có trường này; app coi như không có lượt gỡ nào. */
+  uninstalls?: UninstallFlow[];
   controllers: string[];
 };
 
@@ -101,6 +114,7 @@ function isState(value: unknown): value is DownloadsState {
     && data.v === 1
     && Array.isArray(data.queue)
     && Array.isArray(data.installs)
+    && (data.uninstalls === undefined || Array.isArray(data.uninstalls))
     && Array.isArray(data.controllers),
   );
 }
@@ -144,6 +158,39 @@ export type GameDownload = {
   eulas: SteamEula[] | null;
   config: InstallConfig | null;
 };
+
+export type GameUninstall = {
+  appid: number;
+  name: string | null;
+  status: UninstallPhase;
+  label: string;
+  /** Mốc tiến trình theo bước của Steam, không giả lập phần trăm byte đã xóa. */
+  progress: number;
+  error: string | null;
+};
+
+export function uninstallForApp(state: DownloadsState | null, appid: number | null): GameUninstall | null {
+  if (!state || !appid) return null;
+  const flow = state.uninstalls?.find((entry) => entry.appid === appid);
+  if (!flow) return null;
+  if (flow.phase === 'starting') {
+    return { appid, name: flow.name, status: flow.phase, label: 'Đang mở Steam trên máy tính', progress: 12, error: null };
+  }
+  if (flow.phase === 'uninstalling') {
+    return { appid, name: flow.name, status: flow.phase, label: 'Steam đang gỡ cài đặt', progress: 62, error: null };
+  }
+  if (flow.phase === 'uninstalled') {
+    return { appid, name: flow.name, status: flow.phase, label: 'Đã gỡ khỏi máy tính', progress: 100, error: null };
+  }
+  return {
+    appid,
+    name: flow.name,
+    status: 'failed',
+    label: 'Không gỡ được trò chơi',
+    progress: 62,
+    error: flow.error,
+  };
+}
 
 // update_state của Steam (chuỗi nội bộ). Ngoài 'Downloading', các bước đều là
 // việc trên ổ đĩa nên gộp thành nhãn dễ hiểu.

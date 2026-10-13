@@ -56,9 +56,10 @@ export const PENDING_GAME_LAUNCH_MAX_AGE_MS = 3 * 60_000;
 /** Launcher with no game process for this long: Steam is probably waiting on a dialog. */
 export const LAUNCH_REVEAL_AFTER_MS = 60_000;
 /**
- * Game process alive but its window never took the foreground. Launcher riêng
- * (Where Winds Meet, ...) đợi người chơi bấm "Enter Game" nên không bao giờ lên
- * foreground như một game: đừng che nó quá lâu.
+ * Game process alive but its window never took the foreground. Một số game khác
+ * vẫn có launcher/hộp thoại cần thao tác nên không bao giờ lên foreground như
+ * một game: đừng che nó quá lâu. Where Winds Meet được PC agent mở thẳng game,
+ * không đi qua launcher "Enter Game".
  */
 export const STARTING_REVEAL_AFTER_MS = 25_000;
 /** Loading screen đã che chừng này mà chưa tan thì hiện nút "Xem màn hình máy tính". */

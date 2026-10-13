@@ -46,6 +46,7 @@ async function readCachedLibrary(): Promise<Snapshot> {
 export type LaunchResult = { sessionId: string | null; resumed: boolean };
 /** `error` null khi bỏ qua vì đang có lượt cài khác. */
 export type InstallResult = { ok: boolean; error: string | null };
+export type UninstallResult = { ok: boolean; error: string | null };
 
 /** Game cài sẵn (hoặc cài được) trên PC, cộng thao tác mở/cài và achievement của game đang chọn. */
 export function usePcLibrary() {
@@ -59,6 +60,7 @@ export function usePcLibrary() {
   const [steamProfile, setSteamProfile] = useState<SteamProfile | null>(null);
   const [launchingId, setLaunchingId] = useState<string | null>(null);
   const [installingId, setInstallingId] = useState<string | null>(null);
+  const [uninstallingId, setUninstallingId] = useState<string | null>(null);
   const [installOpenedId, setInstallOpenedId] = useState<string | null>(null);
   const achievementCache = useRef(new Map<number, AchievementResponse>());
   const mounted = useRef(true);
@@ -181,6 +183,32 @@ export function usePcLibrary() {
     [installGame, selected],
   );
 
+  /** Nhờ Steam client trên PC gỡ game; tiến trình tiếp tục đi qua download agent. */
+  const uninstallGame = useCallback(async (id: string): Promise<UninstallResult> => {
+    if (uninstallingId || installingId || launchingId) return { ok: false, error: null };
+    setUninstallingId(id);
+    setError(null);
+    try {
+      await pcPostJson<{ ok?: boolean; error?: string; downloadAgent?: boolean }>(
+        PC_ROUTES.gameUninstall,
+        { id },
+        'Không bắt đầu gỡ cài đặt được.',
+      );
+      return { ok: true, error: null };
+    } catch (uninstallError) {
+      const message = uninstallError instanceof Error ? uninstallError.message : 'Không bắt đầu gỡ cài đặt được.';
+      if (mounted.current) setError(message);
+      return { ok: false, error: message };
+    } finally {
+      if (mounted.current) setUninstallingId(null);
+    }
+  }, [installingId, launchingId, uninstallingId]);
+
+  const uninstallSelected = useCallback(
+    async (): Promise<UninstallResult> => (selected ? uninstallGame(selected.id) : { ok: false, error: null }),
+    [selected, uninstallGame],
+  );
+
   return {
     games,
     selected,
@@ -194,10 +222,13 @@ export function usePcLibrary() {
     reload: loadGames,
     launchingId,
     installingId,
+    uninstallingId,
     installOpenedId,
     launchSelected,
     installSelected,
     installGame,
+    uninstallSelected,
+    uninstallGame,
     achievements,
     achievementCache,
   };

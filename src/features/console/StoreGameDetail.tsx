@@ -12,7 +12,7 @@ import {
   Play, ShoppingCart, SquarePen, ThumbsDown, ThumbsUp, Trophy, X,
 } from 'lucide-react-native';
 
-import { useBack } from '@/features/gamepad/hooks';
+import { useBack, useGamepadTabs } from '@/features/gamepad/hooks';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import type { DetailSheet, DetailView, SteamStoreGameDetail, StoreDetailItem } from '@/features/library/detail-types';
 import { formatCompact, formatNumber, formatRelative } from '@/features/library/format';
@@ -388,26 +388,233 @@ function Para({ children, strong }: { children: ReactNode; strong?: boolean }) {
   return <T size={strong ? 12.4 : 11.6} weight={strong ? 'medium' : 'regular'} color={strong ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.7)'} leading={1.7} style={{ marginTop: strong ? 0 : s(12) }}>{children}</T>;
 }
 
-function ScreenshotViewer({ view, index, onIndex }: { view: DetailView; index: number; onIndex: (index: number) => void }) {
-  const { s } = useUi();
+function ScreenshotModal({
+  view,
+  index,
+  onIndex,
+  onClose,
+}: {
+  view: DetailView;
+  index: number;
+  onIndex: (index: number) => void;
+  onClose: () => void;
+}) {
+  const { s, width, height } = useUi();
+  const [fitMode, setFitMode] = useState<'cover' | 'contain'>('cover');
   const shots = view.detail.screenshots;
   const shot = shots[index];
+
+  useBack(onClose);
+  useGamepadTabs((direction) => {
+    if (direction === -1 && index > 0) {
+      playUiSound('navigate');
+      onIndex(index - 1);
+      return true;
+    }
+    if (direction === 1 && index < shots.length - 1) {
+      playUiSound('navigate');
+      onIndex(index + 1);
+      return true;
+    }
+  });
+
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
   if (!shot) return null;
+
   return (
-    <View>
-      <View style={{ width: '100%', aspectRatio: 16 / 9, maxHeight: s(300), alignSelf: 'center', borderRadius: s(12), overflow: 'hidden', backgroundColor: '#05080d' }}>
-        <Img source={{ uri: shot.full }} style={{ width: '100%', height: '100%' }} contentFit="contain" />
+    <FocusLayer>
+      <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: s(16), zIndex: 60, elevation: 60 }]}>
+        <Pressable
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.76)' }]}
+          onPress={() => {
+            playUiSound('back');
+            onClose();
+          }}
+        />
+        <View
+          style={{
+            width: Math.min(s(896), width - s(32)),
+            height: height - s(32),
+            borderRadius: s(22),
+            overflow: 'hidden',
+            borderWidth: 1,
+            borderColor: colors.line,
+            backgroundColor: '#05080d',
+          }}
+          onTouchStart={(e) => {
+            touchStartX.current = e.nativeEvent.pageX;
+            touchStartY.current = e.nativeEvent.pageY;
+          }}
+          onTouchEnd={(e) => {
+            if (touchStartX.current !== null && touchStartY.current !== null) {
+              const dx = e.nativeEvent.pageX - touchStartX.current;
+              const dy = e.nativeEvent.pageY - touchStartY.current;
+              touchStartX.current = null;
+              touchStartY.current = null;
+              if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 35) {
+                if (dx > 0 && index > 0) {
+                  playUiSound('navigate');
+                  onIndex(index - 1);
+                } else if (dx < 0 && index < shots.length - 1) {
+                  playUiSound('navigate');
+                  onIndex(index + 1);
+                }
+              }
+            }
+          }}
+        >
+          {/* Ảnh toàn khung modal (chỗ khoanh vàng) */}
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => {
+              setFitMode((prev) => (prev === 'cover' ? 'contain' : 'cover'));
+            }}
+          >
+            <Img
+              source={{ uri: shot.full }}
+              placeholder={{ uri: shot.thumbnail }}
+              style={StyleSheet.absoluteFill}
+              contentFit={fitMode}
+              priority="high"
+            />
+          </Pressable>
+
+          {/* Dấu (x) đóng ở góc như cũ đè lên ảnh */}
+          <Press
+            onPress={onClose}
+            sound="back"
+            accessibilityLabel="Đóng xem trước"
+            style={{
+              position: 'absolute',
+              top: s(12),
+              right: s(12),
+              zIndex: 20,
+              width: s(34),
+              height: s(34),
+              borderRadius: s(17),
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(10, 16, 26, 0.72)',
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.18)',
+            }}
+          >
+            <X size={s(17)} color="#fff" />
+          </Press>
+
+          {/* Nút lùi ảnh bên trái */}
+          {index > 0 ? (
+            <Press
+              onPress={() => onIndex(index - 1)}
+              sound="navigate"
+              accessibilityLabel="Ảnh trước"
+              style={{
+                position: 'absolute',
+                left: s(12),
+                top: '50%',
+                marginTop: -s(20),
+                zIndex: 20,
+                width: s(40),
+                height: s(40),
+                borderRadius: s(20),
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(10, 16, 26, 0.72)',
+                borderWidth: 1,
+                borderColor: 'rgba(255, 255, 255, 0.18)',
+              }}
+            >
+              <ChevronLeft size={s(20)} color="#fff" />
+            </Press>
+          ) : null}
+
+          {/* Nút tiến ảnh bên phải */}
+          {index < shots.length - 1 ? (
+            <Press
+              onPress={() => onIndex(index + 1)}
+              sound="navigate"
+              accessibilityLabel="Ảnh kế tiếp"
+              style={{
+                position: 'absolute',
+                right: s(12),
+                top: '50%',
+                marginTop: -s(20),
+                zIndex: 20,
+                width: s(40),
+                height: s(40),
+                borderRadius: s(20),
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(10, 16, 26, 0.72)',
+                borderWidth: 1,
+                borderColor: 'rgba(255, 255, 255, 0.18)',
+              }}
+            >
+              <ChevronRight size={s(20)} color="#fff" />
+            </Press>
+          ) : null}
+
+          {/* Thanh số thứ tự ảnh ở dưới giữa */}
+          <View
+            style={{
+              position: 'absolute',
+              bottom: s(12),
+              alignSelf: 'center',
+              zIndex: 20,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: s(10),
+              paddingHorizontal: s(12),
+              paddingVertical: s(6),
+              borderRadius: s(16),
+              backgroundColor: 'rgba(10, 16, 26, 0.72)',
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.18)',
+            }}
+          >
+            <Press
+              disabled={index === 0}
+              onPress={() => onIndex(index - 1)}
+              sound="navigate"
+              accessibilityLabel="Ảnh trước"
+              style={{
+                opacity: index === 0 ? 0.35 : 1,
+                width: s(26),
+                height: s(26),
+                borderRadius: s(13),
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255,255,255,0.08)',
+              }}
+            >
+              <ChevronLeft size={s(15)} color="#fff" />
+            </Press>
+            <T size={11} color="rgba(255, 255, 255, 0.9)" weight="semibold" tabular>
+              {index + 1} / {shots.length}
+            </T>
+            <Press
+              disabled={index === shots.length - 1}
+              onPress={() => onIndex(index + 1)}
+              sound="navigate"
+              accessibilityLabel="Ảnh kế tiếp"
+              style={{
+                opacity: index === shots.length - 1 ? 0.35 : 1,
+                width: s(26),
+                height: s(26),
+                borderRadius: s(13),
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255,255,255,0.08)',
+              }}
+            >
+              <ChevronRight size={s(15)} color="#fff" />
+            </Press>
+          </View>
+        </View>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: s(16), marginTop: s(12) }}>
-        <Press disabled={index === 0} onPress={() => onIndex(index - 1)} style={{ opacity: index === 0 ? 0.35 : 1, width: s(36), height: s(36), borderRadius: s(18), alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' }}>
-          <ChevronLeft size={s(18)} color={colors.text2} />
-        </Press>
-        <T size={11} color={colors.text3} tabular>{index + 1} / {shots.length}</T>
-        <Press disabled={index === shots.length - 1} onPress={() => onIndex(index + 1)} style={{ opacity: index === shots.length - 1 ? 0.35 : 1, width: s(36), height: s(36), borderRadius: s(18), alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' }}>
-          <ChevronRight size={s(18)} color={colors.text2} />
-        </Press>
-      </View>
-    </View>
+    </FocusLayer>
   );
 }
 
@@ -494,9 +701,12 @@ function SheetView({ sheet, view, onClose }: { sheet: DetailSheet; view: DetailV
     }
     case 'screenshots':
       return (
-        <DetailModal title="Xem trước" subtitle={name} onClose={onClose} wide>
-          <ScreenshotViewer view={view} index={sheet.index} onIndex={(index) => openSheet({ kind: 'screenshots', index })} />
-        </DetailModal>
+        <ScreenshotModal
+          view={view}
+          index={sheet.index}
+          onIndex={(index) => openSheet({ kind: 'screenshots', index })}
+          onClose={onClose}
+        />
       );
     case 'languages':
       return (

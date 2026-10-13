@@ -8,12 +8,6 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const output = resolve(root, 'assets', 'sounds');
 mkdirSync(output, { recursive: true });
 
-let seed = 0x51f15e;
-const noise = () => {
-  seed = (seed * 1_664_525 + 1_013_904_223) >>> 0;
-  return (seed / 0xffff_ffff) * 2 - 1;
-};
-
 const clamp = (value) => Math.max(-1, Math.min(1, value));
 const smooth = (edge0, edge1, value) => {
   const x = clamp((value - edge0) / (edge1 - edge0));
@@ -48,43 +42,38 @@ function writeWav(name, duration, render) {
   writeFileSync(resolve(output, name), wav);
 }
 
-// Original, deliberately restrained cues: glassy partials and filtered air share one sonic palette.
-writeWav('ui-focus.wav', 0.068, (t, d) => {
-  const body = sine(1180, t) * 0.16 + sine(2360, t, 0.35) * 0.055;
-  return body * fade(t, d, 0.002, 0.052) * Math.exp(-t * 24);
+// Original, deliberately restrained one-shot cues with a shared glassy palette.
+writeWav('ui-focus.wav', 0.052, (t, d) => {
+  const body = sine(1120, t) * 0.14 + sine(2240, t, 0.35) * 0.035;
+  return body * fade(t, d, 0.002, 0.038) * Math.exp(-t * 30);
 });
 
-writeWav('ui-navigate.wav', 0.112, (t, d) => {
+writeWav('ui-navigate.wav', 0.078, (t, d) => {
   const p = t / d;
-  const chirp = sine(620 + 520 * p, t) * 0.13 + sine(1320 + 420 * p, t, 0.6) * 0.035;
-  const air = (noise() - noise() * 0.55) * 0.025 * smooth(0, 0.025, t);
-  return (chirp + air) * fade(t, d, 0.003, 0.07) * Math.exp(-t * 8);
+  const chirp = sine(650 + 340 * p, t) * 0.12 + sine(1300 + 220 * p, t, 0.55) * 0.025;
+  return chirp * fade(t, d, 0.002, 0.052) * Math.exp(-t * 13);
 });
 
-writeWav('ui-select.wav', 0.086, (t, d) => {
-  const click = sine(940, t) * 0.18 + sine(1880, t, 0.25) * 0.06;
-  return click * fade(t, d, 0.0015, 0.064) * Math.exp(-t * 17);
+writeWav('ui-select.wav', 0.064, (t, d) => {
+  const click = sine(880, t) * 0.16 + sine(1760, t, 0.25) * 0.04;
+  return click * fade(t, d, 0.0015, 0.046) * Math.exp(-t * 22);
 });
 
-writeWav('ui-confirm.wav', 0.232, (t, d) => {
-  const first = sine(740, t) * Math.exp(-t * 18) * 0.12;
-  const delay = Math.max(0, t - 0.062);
-  const secondEnvelope = t < 0.062 ? 0 : Math.exp(-delay * 13) * smooth(0, 0.008, delay);
-  const second = (sine(1110, delay) * 0.13 + sine(1665, delay, 0.2) * 0.045) * secondEnvelope;
-  return (first + second) * fade(t, d, 0.003, 0.075);
+writeWav('ui-confirm.wav', 0.112, (t, d) => {
+  const bell = sine(920, t) * 0.14 + sine(1380, t, 0.25) * 0.045;
+  return bell * fade(t, d, 0.002, 0.078) * Math.exp(-t * 15);
 });
 
-writeWav('ui-back.wav', 0.158, (t, d) => {
+writeWav('ui-back.wav', 0.096, (t, d) => {
   const p = t / d;
-  const descending = sine(520 - 190 * p, t) * 0.14 + sine(780 - 250 * p, t, 0.5) * 0.035;
-  return descending * fade(t, d, 0.004, 0.085) * Math.exp(-t * 7);
+  const descending = sine(520 - 150 * p, t) * 0.13 + sine(780 - 190 * p, t, 0.5) * 0.025;
+  return descending * fade(t, d, 0.003, 0.064) * Math.exp(-t * 11);
 });
 
-writeWav('ui-transition.wav', 0.224, (t, d) => {
+writeWav('ui-transition.wav', 0.128, (t, d) => {
   const p = t / d;
-  const tone = (sine(390 + 250 * p, t) * 0.055 + sine(980 + 560 * p, t, 0.8) * 0.025);
-  const air = (noise() - noise() * 0.72) * 0.035 * smooth(0, 0.055, t);
-  return (tone + air) * fade(t, d, 0.012, 0.11) * (0.72 + p * 0.28);
+  const tone = sine(430 + 180 * p, t) * 0.065 + sine(860 + 260 * p, t, 0.8) * 0.018;
+  return tone * fade(t, d, 0.008, 0.082) * (0.78 + p * 0.22);
 });
 
 console.log(`Generated UI sounds in ${output}`);

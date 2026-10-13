@@ -13,7 +13,13 @@ import type {
 } from './types';
 
 const LAST_READ_KEY = 'jetsona:notifications:last_read:v1';
+const CLEARED_KEY = 'jetsona:notifications:cleared_v1';
 const MAX_GAMES_NEWS = 6;
+
+type ClearedState = {
+  ids?: string[];
+  clearedAt?: number;
+};
 
 export function useNotifications(games: PcGame[]) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -34,8 +40,20 @@ export function useNotifications(games: PcGame[]) {
     setError(null);
 
     try {
-      const lastReadStr = await AsyncStorage.getItem(LAST_READ_KEY).catch(() => null);
+      const [lastReadStr, clearedRaw] = await Promise.all([
+        AsyncStorage.getItem(LAST_READ_KEY).catch(() => null),
+        AsyncStorage.getItem(CLEARED_KEY).catch(() => null),
+      ]);
       const lastReadTime = lastReadStr ? Number(lastReadStr) : 0;
+
+      let clearedState: ClearedState = { ids: [] };
+      if (clearedRaw) {
+        try {
+          clearedState = JSON.parse(clearedRaw);
+        } catch {}
+      }
+      const clearedIds = new Set(clearedState.ids || []);
+      const clearedAt = clearedState.clearedAt || 0;
 
       // 1. Tải danh sách giảm giá Steam Store
       let storeData: StoreResponse | null = null;
@@ -54,27 +72,32 @@ export function useNotifications(games: PcGame[]) {
 
       if (storeData?.featured?.discounted && storeData.featured.discountPercent > 0) {
         const item = storeData.featured;
-        seenAppIds.add(item.appId);
-        discounts.push({
-          id: `discount-${item.appId}`,
-          type: 'discount',
-          appId: item.appId,
-          gameTitle: item.name,
-          discountPercent: item.discountPercent,
-          originalPrice: item.originalPrice,
-          finalPrice: item.finalPrice,
-          currency: item.currency,
-          imageUrl: item.headerImage || item.largeImage || item.smallImage,
-          storeItem: item,
-        });
+        const notifId = `discount-${item.appId}`;
+        if (!clearedIds.has(notifId)) {
+          seenAppIds.add(item.appId);
+          discounts.push({
+            id: notifId,
+            type: 'discount',
+            appId: item.appId,
+            gameTitle: item.name,
+            discountPercent: item.discountPercent,
+            originalPrice: item.originalPrice,
+            finalPrice: item.finalPrice,
+            currency: item.currency,
+            imageUrl: item.headerImage || item.largeImage || item.smallImage,
+            storeItem: item,
+          });
+        }
       }
 
       if (storeData?.specials) {
         for (const item of storeData.specials) {
           if (seenAppIds.has(item.appId)) continue;
+          const notifId = `discount-${item.appId}`;
+          if (clearedIds.has(notifId)) continue;
           seenAppIds.add(item.appId);
           discounts.push({
-            id: `discount-${item.appId}`,
+            id: notifId,
             type: 'discount',
             appId: item.appId,
             gameTitle: item.name,
@@ -117,8 +140,13 @@ export function useNotifications(games: PcGame[]) {
 
         // Lấy tối đa 2 tin mới nhất cho mỗi game
         for (const item of items.slice(0, 2)) {
+          const notifId = `news-${item.id}`;
+          const itemTime = item.publishedAt ? Date.parse(item.publishedAt) : 0;
+          if (clearedIds.has(notifId)) continue;
+          if (clearedAt > 0 && itemTime <= clearedAt) continue;
+
           updates.push({
-            id: `news-${item.id}`,
+            id: notifId,
             type: 'update',
             appId,
             gameTitle: game.title,
@@ -149,8 +177,7 @@ export function useNotifications(games: PcGame[]) {
 
       // Tính số lượng chưa đọc:
       if (lastReadTime === 0) {
-        // Lần đầu mở app: báo số lượng các thông báo có sẵn (tối đa 5 để không bị ngợp)
-        setUnreadCount(Math.min(all.length, 5));
+        setUnreadCount(all.length);
       } else {
         // Đã từng đọc: đếm số tin mới hơn thời điểm đọc lần trước
         const newItems = all.filter((item) => {
@@ -186,6 +213,50 @@ export function useNotifications(games: PcGame[]) {
     await AsyncStorage.setItem(LAST_READ_KEY, String(Date.now())).catch(() => {});
   }, []);
 
+  const clearNotification = useCallback(async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    setUnreadCount((prev) => Math.max(0, prev - 1));
+    try {
+      const raw = await AsyncStorage.getItem(CLEARED_KEY).catch(() => null);
+      const state: ClearedState = raw ? JSON.parse(raw) : { ids: [] };
+      const set = new Set(state.ids || []);
+      set.add(id);
+      state.ids = Array.from(set);
+      await AsyncStorage.setItem(CLEARED_KEY, JSON.stringify(state));
+    } catch {}
+  }, []);
+
+  const clearAll = useCallback(async (category: 'all' | 'discounts' | 'updates' = 'all') => {
+    const now = Date.now();
+    let removedIds: string[] = [];
+    setNotifications((prev) => {
+      const keep = prev.filter((n) => {
+        if (category === 'all') return false;
+        if (category === 'discounts' && n.type === 'discount') return false;
+        if (category === 'updates' && n.type === 'update') return false;
+        return true;
+      });
+      removedIds = prev.filter((n) => !keep.includes(n)).map((n) => n.id);
+      return keep;
+    });
+
+    if (category === 'all') {
+      setUnreadCount(0);
+    } else {
+      setUnreadCount((prev) => Math.max(0, prev - removedIds.length));
+    }
+
+    try {
+      const raw = await AsyncStorage.getItem(CLEARED_KEY).catch(() => null);
+      const state: ClearedState = raw ? JSON.parse(raw) : { ids: [] };
+      state.ids = Array.from(new Set([...(state.ids || []), ...removedIds]));
+      if (category === 'all' || category === 'updates') {
+        state.clearedAt = Math.max(state.clearedAt || 0, now);
+      }
+      await AsyncStorage.setItem(CLEARED_KEY, JSON.stringify(state));
+    } catch {}
+  }, []);
+
   const discounts = notifications.filter((n): n is GameDiscountNotification => n.type === 'discount');
   const updates = notifications.filter((n): n is GameUpdateNotification => n.type === 'update');
 
@@ -198,5 +269,7 @@ export function useNotifications(games: PcGame[]) {
     error,
     reload: loadNotifications,
     markAllAsRead,
+    clearNotification,
+    clearAll,
   };
 }

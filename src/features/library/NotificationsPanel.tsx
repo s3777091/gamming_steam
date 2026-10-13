@@ -7,6 +7,8 @@ import {
   Download,
   Newspaper,
   Tag,
+  Trash2,
+  X,
 } from 'lucide-react-native';
 
 import { colors } from '@/theme';
@@ -18,7 +20,7 @@ import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 import { DownloadNotificationCard, type DownloadItem } from './DownloadNotificationCard';
-import { formatRelative, formatShortDate, formatStorePrice } from './format';
+import { cleanSteamText, formatRelative, formatShortDate, formatStorePrice } from './format';
 import type {
   AppNotification,
   GameDiscountNotification,
@@ -64,7 +66,7 @@ function ArticleDetailView({
       </Press>
       <View style={[styles.card, { marginTop: s(10), padding: s(16), borderRadius: s(16) }]}>
         <T size={16} weight="semibold" leading={1.3} tracking={-0.02}>
-          {item.title}
+          {cleanSteamText(item.title) || item.title}
         </T>
         {meta ? (
           <T size={10} color={colors.text4} style={{ marginTop: s(8) }}>
@@ -72,7 +74,7 @@ function ArticleDetailView({
           </T>
         ) : null}
         <T size={11.5} color={colors.text3} leading={1.65} style={{ marginTop: s(16) }}>
-          {item.summary || 'Bài cập nhật này chưa có nội dung tóm tắt.'}
+          {cleanSteamText(item.summary) || 'Bài cập nhật này chưa có nội dung tóm tắt.'}
         </T>
         {item.url ? (
           <SteamLink href={item.url} style={{ marginTop: s(16) }}>
@@ -87,9 +89,11 @@ function ArticleDetailView({
 function DiscountNotificationCard({
   item,
   onPress,
+  onDismiss,
 }: {
   item: GameDiscountNotification;
   onPress: () => void;
+  onDismiss?: () => void;
 }) {
   const { s } = useUi();
   const originalPriceFormatted = item.originalPrice && item.currency
@@ -98,106 +102,136 @@ function DiscountNotificationCard({
   const finalPriceFormatted = formatStorePrice({ finalPrice: item.finalPrice, currency: item.currency });
 
   return (
-    <Press
-      onPress={onPress}
-      pressScale={0.98}
-      accessibilityLabel={`Xem game giảm giá ${item.gameTitle}`}
-      style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(14), gap: s(12) }]}
-    >
-      <View style={[styles.imageBox, { width: s(96), height: s(54), borderRadius: s(8) }]}>
-        <Img source={{ uri: item.imageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-        <View style={[styles.discountTag, { top: s(4), left: s(4), borderRadius: s(4), paddingHorizontal: s(4), paddingVertical: s(1.5) }]}>
-          <T size={8.5} weight="bold" color="#fff" tabular>
-            -{item.discountPercent}%
-          </T>
-        </View>
-      </View>
-
-      <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
-          <View style={[styles.pillBadge, { borderRadius: s(4), paddingHorizontal: s(5), paddingVertical: s(1.5) }]}>
-            <Tag size={s(9)} color={colors.accent} strokeWidth={2} />
-            <T size={8.5} weight="semibold" color={colors.accent}>
-              GIẢM GIÁ STEAM
+    <View style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(14), gap: s(8) }]}>
+      <Press
+        onPress={onPress}
+        pressScale={0.98}
+        accessibilityLabel={`Xem game giảm giá ${item.gameTitle}`}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(12) }}
+      >
+        <View style={[styles.imageBox, { width: s(96), height: s(54), borderRadius: s(8) }]}>
+          <Img source={{ uri: item.imageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+          <View style={[styles.discountTag, { top: s(4), left: s(4), borderRadius: s(4), paddingHorizontal: s(4), paddingVertical: s(1.5) }]}>
+            <T size={8.5} weight="bold" color="#fff" tabular>
+              -{item.discountPercent}%
             </T>
           </View>
         </View>
 
-        <T size={12} weight="semibold" color={colors.text} numberOfLines={1} style={{ marginTop: s(4) }}>
-          {item.gameTitle}
-        </T>
+        <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
+            <View style={[styles.pillBadge, { borderRadius: s(4), paddingHorizontal: s(5), paddingVertical: s(1.5) }]}>
+              <Tag size={s(9)} color={colors.accent} strokeWidth={2} />
+              <T size={8.5} weight="semibold" color={colors.accent}>
+                GIẢM GIÁ STEAM
+              </T>
+            </View>
+          </View>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8), marginTop: s(3) }}>
-          {originalPriceFormatted && originalPriceFormatted !== finalPriceFormatted ? (
-            <T size={9.5} color={colors.text4} style={{ textDecorationLine: 'line-through' }}>
-              {originalPriceFormatted}
-            </T>
-          ) : null}
-          <T size={10.5} weight="semibold" color={colors.accent} tabular>
-            {finalPriceFormatted}
+          <T size={12} weight="semibold" color={colors.text} numberOfLines={1} style={{ marginTop: s(4) }}>
+            {item.gameTitle}
           </T>
-        </View>
-      </View>
 
-      <ChevronRight size={s(16)} color={colors.text4} strokeWidth={1.8} style={{ alignSelf: 'center' }} />
-    </Press>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8), marginTop: s(3) }}>
+            {originalPriceFormatted && originalPriceFormatted !== finalPriceFormatted ? (
+              <T size={9.5} color={colors.text4} style={{ textDecorationLine: 'line-through' }}>
+                {originalPriceFormatted}
+              </T>
+            ) : null}
+            <T size={10.5} weight="semibold" color={colors.accent} tabular>
+              {finalPriceFormatted}
+            </T>
+          </View>
+        </View>
+
+        <ChevronRight size={s(16)} color={colors.text4} strokeWidth={1.8} style={{ alignSelf: 'center' }} />
+      </Press>
+
+      {onDismiss ? (
+        <Press
+          onPress={onDismiss}
+          sound="confirm"
+          pressScale={0.92}
+          accessibilityLabel={`Xóa thông báo ${item.gameTitle}`}
+          style={[styles.dismissBtn, { width: s(28), height: s(28), borderRadius: s(14) }]}
+        >
+          <X size={s(13)} color={colors.text3} strokeWidth={2} />
+        </Press>
+      ) : null}
+    </View>
   );
 }
 
 function UpdateNotificationCard({
   item,
   onPress,
+  onDismiss,
 }: {
   item: GameUpdateNotification;
   onPress: () => void;
+  onDismiss?: () => void;
 }) {
   const { s } = useUi();
   const timeAgo = formatRelative(item.publishedAt);
 
   return (
-    <Press
-      onPress={onPress}
-      pressScale={0.98}
-      accessibilityLabel={`Xem cập nhật ${item.gameTitle}: ${item.title}`}
-      style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(14), gap: s(12) }]}
-    >
-      <View style={[styles.imageBox, { width: s(96), height: s(54), borderRadius: s(8) }]}>
-        <Img source={{ uri: item.gameImageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-      </View>
+    <View style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(14), gap: s(8) }]}>
+      <Press
+        onPress={onPress}
+        pressScale={0.98}
+        accessibilityLabel={`Xem cập nhật ${item.gameTitle}: ${item.title}`}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(12) }}
+      >
+        <View style={[styles.imageBox, { width: s(96), height: s(54), borderRadius: s(8) }]}>
+          <Img source={{ uri: item.gameImageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+        </View>
 
-      <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(6) }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6), flex: 1, minWidth: 0 }}>
-            <View style={[styles.pillBadgeNews, { borderRadius: s(4), paddingHorizontal: s(5), paddingVertical: s(1.5) }]}>
-              <Newspaper size={s(9)} color="#8dc0ff" strokeWidth={2} />
-              <T size={8.5} weight="semibold" color="#8dc0ff" numberOfLines={1}>
-                {item.feedLabel || 'BẢN CẬP NHẬT'}
+        <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(6) }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6), flex: 1, minWidth: 0 }}>
+              <View style={[styles.pillBadgeNews, { borderRadius: s(4), paddingHorizontal: s(5), paddingVertical: s(1.5) }]}>
+                <Newspaper size={s(9)} color="#8dc0ff" strokeWidth={2} />
+                <T size={8.5} weight="semibold" color="#8dc0ff" numberOfLines={1}>
+                  {item.feedLabel || 'BẢN CẬP NHẬT'}
+                </T>
+              </View>
+              <T size={9.5} color={colors.text3} numberOfLines={1} style={{ flexShrink: 1 }}>
+                {item.gameTitle}
               </T>
             </View>
-            <T size={9.5} color={colors.text3} numberOfLines={1} style={{ flexShrink: 1 }}>
-              {item.gameTitle}
-            </T>
+            {timeAgo ? (
+              <T size={9} color={colors.text4} tabular>
+                {timeAgo}
+              </T>
+            ) : null}
           </View>
-          {timeAgo ? (
-            <T size={9} color={colors.text4} tabular>
-              {timeAgo}
+
+          <T size={11.5} weight="semibold" color={colors.text} numberOfLines={1} style={{ marginTop: s(4) }}>
+            {cleanSteamText(item.title) || item.title}
+          </T>
+
+          {item.summary ? (
+            <T size={10} color={colors.text3} numberOfLines={2} leading={1.35} style={{ marginTop: s(2) }}>
+              {cleanSteamText(item.summary)}
             </T>
           ) : null}
         </View>
 
-        <T size={11.5} weight="semibold" color={colors.text} numberOfLines={1} style={{ marginTop: s(4) }}>
-          {item.title}
-        </T>
+        <ChevronRight size={s(16)} color={colors.text4} strokeWidth={1.8} style={{ alignSelf: 'center' }} />
+      </Press>
 
-        {item.summary ? (
-          <T size={10} color={colors.text3} numberOfLines={2} leading={1.35} style={{ marginTop: s(2) }}>
-            {item.summary}
-          </T>
-        ) : null}
-      </View>
-
-      <ChevronRight size={s(16)} color={colors.text4} strokeWidth={1.8} style={{ alignSelf: 'center' }} />
-    </Press>
+      {onDismiss ? (
+        <Press
+          onPress={onDismiss}
+          sound="confirm"
+          pressScale={0.92}
+          accessibilityLabel={`Xóa thông báo ${item.title}`}
+          style={[styles.dismissBtn, { width: s(28), height: s(28), borderRadius: s(14) }]}
+        >
+          <X size={s(13)} color={colors.text3} strokeWidth={2} />
+        </Press>
+      ) : null}
+    </View>
   );
 }
 
@@ -224,6 +258,8 @@ export function NotificationsPanel({
   onPauseDownload,
   onResumeDownload,
   onOpenDownloadPrompt,
+  onClearAll,
+  onClearNotification,
   onClose,
 }: {
   notifications: AppNotification[];
@@ -237,6 +273,8 @@ export function NotificationsPanel({
   onPauseDownload: (appid: number) => void;
   onResumeDownload: (appid: number) => void;
   onOpenDownloadPrompt: (appid: number) => void;
+  onClearAll?: (category?: 'all' | 'discounts' | 'updates') => void;
+  onClearNotification?: (id: string) => void;
   onClose: () => void;
 }) {
   const { s } = useUi();
@@ -256,11 +294,56 @@ export function NotificationsPanel({
   const downloadRows = tab === 'all' || tab === 'downloads' ? downloads : [];
   const nothing = !downloadRows.length && !feedItems.length;
 
+  const hasClearable = tab === 'all'
+    ? notifications.length > 0
+    : tab === 'discounts'
+    ? discounts.length > 0
+    : tab === 'updates'
+    ? updates.length > 0
+    : false;
+
+  const handleClear = () => {
+    if (!onClearAll) return;
+    if (tab === 'discounts') onClearAll('discounts');
+    else if (tab === 'updates') onClearAll('updates');
+    else onClearAll('all');
+  };
+
+  const clearHeaderAction = hasClearable && onClearAll ? (
+    <Press
+      onPress={handleClear}
+      sound="confirm"
+      pressScale={0.96}
+      accessibilityLabel={
+        tab === 'discounts'
+          ? 'Xóa tất cả thông báo giảm giá'
+          : tab === 'updates'
+          ? 'Xóa tất cả thông báo cập nhật'
+          : 'Xóa tất cả thông báo tin nhắn'
+      }
+      style={[
+        styles.clearButton,
+        {
+          height: s(28),
+          paddingHorizontal: s(10),
+          borderRadius: s(14),
+          gap: s(5),
+        },
+      ]}
+    >
+      <Trash2 size={s(12)} color="rgba(255,255,255,0.72)" strokeWidth={1.8} />
+      <T size={10} weight="medium" color="rgba(255,255,255,0.85)">
+        Xóa thông báo
+      </T>
+    </Press>
+  ) : null;
+
   return (
     <SidePanel
       title="Thông báo"
       subtitle="Tải xuống, ưu đãi Steam & cập nhật game đã cài"
       width={540}
+      action={clearHeaderAction}
       onClose={onClose}
     >
       {selectedNews ? (
@@ -272,28 +355,30 @@ export function NotificationsPanel({
       ) : (
         <View style={{ gap: s(12) }}>
           {/* Thanh chuyển tab phân loại */}
-          <View style={{ flexDirection: 'row', gap: s(8) }}>
-            {tabs.map((entry) => {
-              const on = tab === entry.id;
-              return (
-                <Press
-                  key={entry.id}
-                  onPress={() => setActiveTab(entry.id)}
-                  style={[
-                    styles.tabPill,
-                    {
-                      height: s(28),
-                      paddingHorizontal: s(10),
-                      borderRadius: s(14),
-                      backgroundColor: on ? 'rgba(102,168,255,0.18)' : 'rgba(255,255,255,0.06)',
-                      borderColor: on ? 'rgba(102,168,255,0.35)' : 'rgba(255,255,255,0.1)',
-                    },
-                  ]}
-                >
-                  <T size={10} weight="semibold" color={on ? colors.white : colors.text3}>{entry.label}</T>
-                </Press>
-              );
-            })}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(8) }}>
+            <View style={{ flexDirection: 'row', gap: s(8), flexWrap: 'wrap', flex: 1 }}>
+              {tabs.map((entry) => {
+                const on = tab === entry.id;
+                return (
+                  <Press
+                    key={entry.id}
+                    onPress={() => setActiveTab(entry.id)}
+                    style={[
+                      styles.tabPill,
+                      {
+                        height: s(28),
+                        paddingHorizontal: s(10),
+                        borderRadius: s(14),
+                        backgroundColor: on ? 'rgba(102,168,255,0.18)' : 'rgba(255,255,255,0.06)',
+                        borderColor: on ? 'rgba(102,168,255,0.35)' : 'rgba(255,255,255,0.1)',
+                      },
+                    ]}
+                  >
+                    <T size={10} weight="semibold" color={on ? colors.white : colors.text3}>{entry.label}</T>
+                  </Press>
+                );
+              })}
+            </View>
           </View>
 
           <View style={{ gap: s(8) }}>
@@ -314,6 +399,7 @@ export function NotificationsPanel({
                     key={item.id}
                     item={item}
                     onPress={() => onOpenStoreGame(item.storeItem)}
+                    onDismiss={onClearNotification ? () => onClearNotification(item.id) : undefined}
                   />
                 );
               }
@@ -322,6 +408,7 @@ export function NotificationsPanel({
                   key={item.id}
                   item={item}
                   onPress={() => setSelectedNews(item)}
+                  onDismiss={onClearNotification ? () => onClearNotification(item.id) : undefined}
                 />
               );
             })}
@@ -386,5 +473,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
+  },
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  dismissBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
 });

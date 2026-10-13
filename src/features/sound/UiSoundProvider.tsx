@@ -37,13 +37,15 @@ const SOUND_GAIN: Record<UiSound, number> = {
   transition: 0.7,
 };
 const MIN_INTERVAL_MS: Record<UiSound, number> = {
-  focus: 42,
-  navigate: 48,
-  select: 54,
+  focus: 50,
+  navigate: 65,
+  select: 70,
   confirm: 120,
   back: 100,
-  transition: 140,
+  transition: 120,
 };
+/** One physical action may update focus, open a layer, and change a route in the same frame. */
+const GLOBAL_MIN_INTERVAL_MS = 105;
 
 const UiSoundContext = createContext<UiSoundContextValue | null>(null);
 
@@ -64,6 +66,7 @@ export function UiSoundProvider({ children }: { children: ReactNode }) {
   const volumeRef = useRef(volume);
   const readyRef = useRef(false);
   const lastPlayed = useRef<Partial<Record<UiSound, number>>>({});
+  const lastPlayedAny = useRef(0);
 
   useEffect(() => { enabledRef.current = enabled; }, [enabled]);
   useEffect(() => { volumeRef.current = volume; }, [volume]);
@@ -121,9 +124,11 @@ export function UiSoundProvider({ children }: { children: ReactNode }) {
   const play = useCallback((sound: UiSound) => {
     if (!readyRef.current || !enabledRef.current || volumeRef.current <= 0) return;
     const now = Date.now();
+    if (now - lastPlayedAny.current < GLOBAL_MIN_INTERVAL_MS) return;
     if (now - (lastPlayed.current[sound] ?? 0) < MIN_INTERVAL_MS[sound]) return;
     const player = players.current[sound];
     if (!player) return;
+    lastPlayedAny.current = now;
     lastPlayed.current[sound] = now;
     player.volume = volumeRef.current * SOUND_GAIN[sound];
     if (player.currentTime > 0.005 || player.playing) {

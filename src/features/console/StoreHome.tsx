@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View, ScrollView } from 'react-native';
 import { FocusScroll } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronRight, Info } from 'lucide-react-native';
+import { ArrowUpRight, ChevronRight } from 'lucide-react-native';
+import Svg, { Path } from 'react-native-svg';
 
 import { formatStorePrice } from '@/features/library/format';
 import type { SteamPromotion, SteamStoreItem, StoreResponse } from '@/features/library/types';
@@ -12,9 +13,32 @@ import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
-const PREVIEW = { w: 212, h: 114 };
+const PREVIEW = { w: 220, h: 165 };
 const IDLE = { w: 125, h: 80 };
 const GAP = 10;
+const SHELF_DISC = 42;
+const SHELF_BLOCK = 52;
+const SHELF_FILLET = 18;
+const SHELF_SURFACE = '#060b13';
+
+function NotchFillet({ bottom, right }: { bottom: number; right: number }) {
+  const { s } = useUi();
+  const size = s(SHELF_FILLET);
+  return (
+    <Svg
+      pointerEvents="none"
+      width={size}
+      height={size}
+      viewBox={`0 0 ${SHELF_FILLET} ${SHELF_FILLET}`}
+      style={{ position: 'absolute', bottom: s(bottom), right: s(right) }}
+    >
+      <Path
+        d={`M ${SHELF_FILLET} 0 L ${SHELF_FILLET} ${SHELF_FILLET} L 0 ${SHELF_FILLET} A ${SHELF_FILLET} ${SHELF_FILLET} 0 0 0 ${SHELF_FILLET} 0 Z`}
+        fill={SHELF_SURFACE}
+      />
+    </Svg>
+  );
+}
 
 function DiscountBadge({ percent, size = 9 }: { percent: number; size?: number }) {
   const { s } = useUi();
@@ -29,7 +53,7 @@ function StorePreview({ item }: { item: SteamStoreItem }) {
   const { s, width } = useUi();
   const [failedLogo, setFailedLogo] = useState<string | null>(null);
   const logo = item.logo && item.logo.url !== failedLogo ? item.logo : null;
-  const enter = useRef(new Animated.Value(0)).current;
+  const [enter] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.timing(enter, { toValue: 1, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [enter]);
@@ -77,42 +101,66 @@ function ShelfCard({ item, previewing, onPreview, onOpen }: {
   onOpen: () => void;
 }) {
   const { s } = useUi();
-  const grow = useRef(new Animated.Value(previewing ? 1 : 0)).current;
+  const [grow] = useState(() => new Animated.Value(previewing ? 1 : 0));
   useEffect(() => {
     Animated.timing(grow, { toValue: previewing ? 1 : 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
   }, [previewing, grow]);
 
   return (
     <View>
-      <Press onPress={onPreview} onFocused={onPreview} autoFocus={previewing} focusRadius={s(12)} pressScale={0.98} accessibilityLabel={`Chọn ${item.name}`}>
+      <Press onPress={onPreview} onFocused={onPreview} autoFocus={previewing} focusRadius={s(previewing ? 20 : 12)} pressScale={0.98} accessibilityLabel={`Chọn ${item.name}`}>
         <Animated.View
           style={[
             styles.card,
             {
-              borderRadius: s(12),
+              borderRadius: grow.interpolate({ inputRange: [0, 1], outputRange: [s(12), s(20)] }),
               width: grow.interpolate({ inputRange: [0, 1], outputRange: [s(IDLE.w), s(PREVIEW.w)] }),
               height: grow.interpolate({ inputRange: [0, 1], outputRange: [s(IDLE.h), s(PREVIEW.h)] }),
               marginBottom: grow.interpolate({ inputRange: [0, 1], outputRange: [s(4), 0] }),
-              borderColor: grow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.14)', '#8bbcff'] }),
+              borderColor: grow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.14)', 'rgba(255,255,255,0)'] }),
               opacity: grow.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }),
             },
           ]}
         >
           <Img source={{ uri: item.largeImage }} style={StyleSheet.absoluteFill} contentFit="cover" />
-          <LinearGradient colors={['rgba(6,16,29,0)', 'rgba(6,16,29,0.88)']} style={StyleSheet.absoluteFill} />
           {previewing ? (
-            <View style={{ position: 'absolute', left: 0, right: s(54), bottom: 0, padding: s(10), gap: s(4) }}>
-              <T size={9.6} weight="semibold" color="rgba(255,255,255,0.92)" numberOfLines={1}>{item.name}</T>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
-                {item.discounted ? <DiscountBadge percent={item.discountPercent} size={8.6} /> : null}
-                <T size={10} weight="semibold" tabular color="rgba(255,255,255,0.88)" numberOfLines={1}>{formatStorePrice(item)}</T>
+            <>
+              <View pointerEvents="none" style={styles.selectedWash} />
+              <View pointerEvents="none" style={[styles.badgeSlot, { top: s(10), left: s(10), gap: s(5) }]}>
+                {item.discounted ? (
+                  <View style={[styles.saleBadge, { minHeight: s(24), paddingHorizontal: s(8), borderRadius: s(12) }]}>
+                    <T size={9} weight="bold" color={colors.onAccent} tabular>-{item.discountPercent}%</T>
+                  </View>
+                ) : null}
+                <View style={[styles.badge, { minHeight: s(24), paddingHorizontal: s(9), borderRadius: s(12) }]}>
+                  <T size={9.2} weight="semibold" color="rgba(255,255,255,0.96)" tabular>
+                    {formatStorePrice(item)}
+                  </T>
+                </View>
               </View>
-            </View>
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  bottom: 0,
+                  width: s(SHELF_BLOCK),
+                  height: s(SHELF_BLOCK),
+                  borderTopLeftRadius: s(SHELF_BLOCK - SHELF_DISC / 2),
+                  backgroundColor: SHELF_SURFACE,
+                }}
+              />
+              <NotchFillet bottom={SHELF_BLOCK} right={0} />
+              <NotchFillet bottom={0} right={SHELF_BLOCK} />
+            </>
           ) : (
-            <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: s(8), flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: s(8) }}>
-              <T size={9.3} weight="semibold" color="rgba(255,255,255,0.92)" numberOfLines={1} style={{ flex: 1 }}>{item.name}</T>
-              {item.discounted ? <DiscountBadge percent={item.discountPercent} size={8.3} /> : null}
-            </View>
+            <>
+              <LinearGradient colors={['rgba(6,16,29,0)', 'rgba(6,16,29,0.88)']} style={StyleSheet.absoluteFill} />
+              <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: s(8), flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: s(8) }}>
+                <T size={9.3} weight="semibold" color="rgba(255,255,255,0.92)" numberOfLines={1} style={{ flex: 1 }}>{item.name}</T>
+                {item.discounted ? <DiscountBadge percent={item.discountPercent} size={8.3} /> : null}
+              </View>
+            </>
           )}
         </Animated.View>
       </Press>
@@ -120,9 +168,10 @@ function ShelfCard({ item, previewing, onPreview, onOpen }: {
         <Press
           onPress={onOpen}
           accessibilityLabel={`Xem chi tiết ${item.name}`}
-          style={[styles.info, { width: s(36), height: s(36), borderRadius: s(18) }]}
+          focusRadius={s(SHELF_DISC / 2)}
+          style={[styles.openButton, { width: s(SHELF_DISC), height: s(SHELF_DISC), borderRadius: s(SHELF_DISC / 2) }]}
         >
-          <Info size={s(16)} color={colors.white} strokeWidth={1.9} />
+          <ArrowUpRight size={s(17)} color={colors.white} strokeWidth={1.9} />
         </Press>
       ) : null}
     </View>
@@ -209,7 +258,7 @@ export function StoreHome({ data, featured, preview, onPreview, onOpenGame, onOp
         horizontal
         showsHorizontalScrollIndicator={false}
         onLayout={(event) => { railWidth.current = event.nativeEvent.layout.width; center(false); }}
-        style={{ flexGrow: 0, height: s(138) }}
+        style={{ flexGrow: 0, height: s(PREVIEW.h + 18) }}
         contentContainerStyle={{ alignItems: 'flex-end', gap: s(GAP), paddingHorizontal: s(10), paddingTop: s(10), paddingBottom: s(12) }}
         decelerationRate="fast"
       >
@@ -238,19 +287,42 @@ export function StoreHome({ data, featured, preview, onPreview, onOpenGame, onOp
 const styles = StyleSheet.create({
   card: { overflow: 'hidden', borderWidth: 1, backgroundColor: colors.card },
   tile: { overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: colors.card },
-  info: {
+  selectedWash: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'rgba(4,8,13,0.12)',
+  },
+  badgeSlot: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  saleBadge: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accent,
+  },
+  badge: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.32)',
+    backgroundColor: 'rgba(18,20,24,0.68)',
+  },
+  openButton: {
     position: 'absolute',
     right: 0,
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: colors.cardRaised,
+    backgroundColor: '#202124',
     shadowColor: '#020812',
-    shadowOpacity: 0.45,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
+    shadowOpacity: 0.36,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 7,
   },
 });

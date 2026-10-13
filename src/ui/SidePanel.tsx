@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import { ArrowUpRight, X, type LucideIcon } from 'lucide-react-native';
@@ -16,17 +16,19 @@ import { T } from './Text';
  * Tương đương SidePanel.tsx của web.
  */
 export function SidePanel({
-  title, subtitle, onClose, width = 480, bodyStyle, children,
+  title, subtitle, onClose, width = 480, bodyStyle, action, headerExtension, children,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
   onClose: () => void;
   width?: number;
   bodyStyle?: StyleProp<ViewStyle>;
+  action?: ReactNode;
+  headerExtension?: ReactNode;
   children: ReactNode;
 }) {
   const { s, width: screenWidth, insets } = useUi();
-  const enter = useRef(new Animated.Value(0)).current;
+  const [enter] = useState(() => new Animated.Value(0));
   useBack(() => { onClose(); });
 
   useEffect(() => {
@@ -57,15 +59,19 @@ export function SidePanel({
             <T size={16} weight="semibold" numberOfLines={1} tracking={-0.025}>{title}</T>
             {subtitle ? <T size={10.5} color={colors.text3} numberOfLines={1} style={{ marginTop: s(2) }}>{subtitle}</T> : null}
           </View>
-          <Press
-            onPress={onClose}
-            sound="back"
-            accessibilityLabel="Đóng"
-            style={[styles.close, { width: s(32), height: s(32), borderRadius: s(16) }]}
-          >
-            <X size={s(16)} color={colors.text2} />
-          </Press>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8) }}>
+            {action}
+            <Press
+              onPress={onClose}
+              sound="back"
+              accessibilityLabel="Đóng"
+              style={[styles.close, { width: s(32), height: s(32), borderRadius: s(16) }]}
+            >
+              <X size={s(16)} color={colors.text2} />
+            </Press>
+          </View>
         </View>
+        {headerExtension}
         <FocusScroll
           style={{ flex: 1 }}
           contentContainerStyle={[{ paddingHorizontal: s(16), paddingVertical: s(16), paddingBottom: s(24) + insets.bottom }, bodyStyle]}

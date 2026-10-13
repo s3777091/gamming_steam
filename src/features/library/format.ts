@@ -86,3 +86,59 @@ export function formatCompact(value: number): string {
 export function isSteamAppId(value: string | null | undefined): value is string {
   return Boolean(value && /^\d+$/.test(value));
 }
+
+/** Trích xuất ảnh đầu tiên (nếu có) từ nội dung bản tin Steam thô */
+export function extractSteamImage(value: string | null | undefined): string | null {
+  if (!value || typeof value !== 'string') return null;
+  const clanMatch = value.match(/\{STEAM_CLAN_IMAGE\}\/([^\s"'\]]+)/i);
+  if (clanMatch) {
+    return `https://clan.akamai.steamstatic.com/images/${clanMatch[1]}`;
+  }
+  const urlMatch = value.match(/(?:\[img[^\]]*\]|<img[^>]+src=["']?)(https?:\/\/[^\s"'\]>]+)/i);
+  if (urlMatch) {
+    return urlMatch[1];
+  }
+  return null;
+}
+
+/**
+ * Làm sạch hoàn toàn văn bản bản tin Steam:
+ * Loại bỏ toàn bộ thẻ BBCode, HTML, mã ảnh lỗi như `[img src="`, clan images và ký tự thực thể.
+ */
+export function cleanSteamText(value: string | null | undefined): string {
+  if (!value || typeof value !== 'string') return '';
+  return value
+    // 1. Thẻ ảnh / video BBCode có cặp đóng mở
+    .replace(/\[(?:img|image|previewyoutube|youtube)(?:=[^\]]*)?\][\s\S]*?\[\/(?:img|image|previewyoutube|youtube)\]/gi, ' ')
+    // 2. Thẻ ảnh đơn [img ...], [image ...], <img ... />
+    .replace(/\[\/?(?:img|image)(?:\s+[^\]]*)?\]/gi, ' ')
+    .replace(/<img\b[^>]*\/?>/gi, ' ')
+    // 3. Xóa placeholder Clan image
+    .replace(/\{STEAM_CLAN_IMAGE\}\/\S+/gi, ' ')
+    // 4. Xóa các đoạn tag dở dang / cụt như `[img src="` hay `[img`
+    .replace(/\[img\s+src=["']?/gi, ' ')
+    .replace(/\[\/?img\b[^\]\n]*\]/gi, ' ')
+    // 5. Chuyển xuống dòng
+    .replace(/\[\/?(?:p|h1|h2|h3|quote|list|olist|table|tr)(?:=[^\]]*)?\]/gi, '\n')
+    .replace(/<br\s*\/?>|<\/p>|<\/div>|<\/li>/gi, '\n')
+    // 6. Xóa toàn bộ BBCode còn lại như [b], [/b], [url=...], [/url], [*]
+    .replace(/\[\/?[a-z0-9_*-]+(?:\s*=[^\]\n]*)?(?:\s+[^\]\n]*)?\]/gi, ' ')
+    // 7. Xóa toàn bộ thẻ HTML còn lại
+    .replace(/<[^>]+>/g, ' ')
+    // 8. Giải mã HTML entities
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#(?:39|x27);/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&[a-z0-9#]+;/gi, ' ')
+    // 9. Dấu câu và khoảng trắng
+    .replace(/[—–]/g, '-')
+    .replace(/\r/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+

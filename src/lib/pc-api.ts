@@ -36,6 +36,7 @@ export const PC_ROUTES = {
   gameNews: (appId: number) => `/games/${appId}/news`,
   gameLaunch: '/games/launch',
   gameInstall: '/games/install',
+  gameUninstall: '/games/uninstall',
   gameSession: '/games/session',
   gameRuntime: '/games/runtime',
   store: '/store',
