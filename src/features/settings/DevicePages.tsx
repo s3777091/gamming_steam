@@ -15,6 +15,7 @@ import { DEVICE_KIND_ORDER, KIND_LABEL, requestBluetoothPermission, useInputDevi
 import { KIND_ICONS } from '@/features/devices/kindIcons';
 import { DEFAULT_INPUT_SETTINGS, keyCodeLabel, type HostShortcutAction } from '@/lib/input-settings';
 import { colors } from '@/theme';
+import { useUiSounds } from '@/features/sound/UiSoundProvider';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -43,13 +44,22 @@ function deviceStatus(device: LocalDevice): string {
   return device.bluetooth ? 'Bluetooth' : 'Có dây / USB';
 }
 
+const DEVICE_COLORS: Record<string, string> = {
+  controller: '#ef4444',
+  keyboard: '#6366f1',
+  mouse: '#06b6d4',
+  headset: '#ec4899',
+  display: '#64748b',
+};
+
 function DeviceRow({ device }: { device: LocalDevice }) {
   const { s } = useUi();
   const Icon = KIND_ICONS[device.kind];
+  const bg = DEVICE_COLORS[device.kind] ?? '#64748b';
   return (
     <View style={{ minHeight: s(54), flexDirection: 'row', alignItems: 'center', gap: s(12), paddingHorizontal: s(12), paddingVertical: s(8) }}>
-      <View style={[styles.deviceIcon, { width: s(36), height: s(36), borderRadius: s(12) }]}>
-        <Icon size={s(18)} color="rgba(255,255,255,0.85)" strokeWidth={1.7} />
+      <View style={[styles.deviceIcon, { width: s(32), height: s(32), borderRadius: s(8), backgroundColor: bg, borderWidth: 0 }]}>
+        <Icon size={s(16)} color="#ffffff" strokeWidth={2.2} />
         <View style={[styles.onlineDot, { width: s(10), height: s(10), borderRadius: s(5), right: -s(2), bottom: -s(2) }]} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -88,6 +98,7 @@ export function DevicesPage({ notify }: { notify: Notify }) {
       >
         <ActionRow
           icon={Bluetooth}
+          iconBg="#2563eb"
           label={bluetooth.enabled ? 'Mở cài đặt Bluetooth' : 'Bluetooth đang tắt'}
           detail={!bluetooth.supported
             ? 'Máy này không có Bluetooth.'
@@ -267,7 +278,7 @@ export function ControllerPage({ input }: { input: InputSettingsState }) {
         {settings.vibrationEnabled ? (
           <SliderRow label="Độ mạnh" value={settings.vibrationStrength} min={0} max={100} step={5} format={(value) => `${value}%`} onChange={(value) => update('vibrationStrength', value)} />
         ) : null}
-        <ActionRow icon={Vibrate} label="Thử rung" detail={pads.some((pad) => pad.rumble) ? 'Rung tay cầm 0,4 giây' : 'Tay cầm này không báo hỗ trợ rung'} disabled={!pads.length} onPress={testRumble} />
+        <ActionRow icon={Vibrate} iconBg="#f97316" label="Thử rung" detail={pads.some((pad) => pad.rumble) ? 'Rung tay cầm 0,4 giây' : 'Tay cầm này không báo hỗ trợ rung'} disabled={!pads.length} onPress={testRumble} />
       </SettingsGroup>
 
       <SettingsGroup title="Vùng chết">
@@ -489,7 +500,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
             </View>
           </View>
         ) : (
-          <ActionRow icon={Plus} label="Thêm phím tắt" onPress={() => { setAdding(true); setOpenCode(null); }} />
+          <ActionRow icon={Plus} iconBg="#10b981" label="Thêm phím tắt" onPress={() => { setAdding(true); setOpenCode(null); }} />
         )}
       </SettingsGroup>
 
@@ -551,11 +562,33 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
 
 export function AudioPage({ input }: { input: InputSettingsState }) {
   const { s } = useUi();
+  const uiSounds = useUiSounds();
   const { settings, update } = input;
   const { devices } = useInputDevices();
   const headsets = devices.filter((device) => device.kind === 'headset');
   return (
     <>
+      <SettingsGroup title="Âm thanh giao diện">
+        <ToggleRow
+          label="Âm thanh điều hướng"
+          detail="Phản hồi âm thanh ngắn khi di chuyển, chọn, xác nhận và quay lại."
+          checked={uiSounds.enabled}
+          onChange={uiSounds.setEnabled}
+        />
+        <SliderRow
+          label="Âm lượng giao diện"
+          detail="Độc lập với âm lượng stream."
+          value={Math.round(uiSounds.volume * 100)}
+          min={0}
+          max={100}
+          step={5}
+          format={(value) => `${value}%`}
+          onChange={(value) => {
+            uiSounds.setVolume(value / 100);
+            setTimeout(() => uiSounds.play('confirm'), 0);
+          }}
+        />
+      </SettingsGroup>
       <SettingsGroup title="Âm thanh từ PC">
         <View style={{ minHeight: s(50), flexDirection: 'row', alignItems: 'center', gap: s(12), paddingHorizontal: s(12), paddingVertical: s(8) }}>
           <View style={[styles.deviceIcon, { width: s(32), height: s(32), borderRadius: s(8) }]}>

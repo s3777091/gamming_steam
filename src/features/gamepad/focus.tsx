@@ -18,6 +18,7 @@ import {
 import {
   pickFirst, pickNearest, pickNeighbor, revealDelta, type Candidate, type Direction, type Rect,
 } from './spatial';
+import { playUiSound } from '@/features/sound/UiSoundProvider';
 
 export type { Direction } from './spatial';
 
@@ -308,6 +309,7 @@ export function FocusLayer({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     layers.push(id);
+    playUiSound('transition');
     let settle: ReturnType<typeof setTimeout> | undefined;
     if (padActive) {
       setFocused(null, null);

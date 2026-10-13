@@ -33,6 +33,7 @@ import { StreamLoading } from './StreamLoading';
 import { useGameLaunchGate } from './useGameLaunchGate';
 import { createRumbleHandler, useInputBridge } from './useInputBridge';
 import { useStreamSession } from './useStreamSession';
+import { useWatchPartyHost } from './useWatchPartyHost';
 
 const TAP_THRESHOLD = 9;
 const VK_BACK = 8;
@@ -55,6 +56,7 @@ export default function StreamScreen() {
   const [launch] = useState<PendingGameLaunch | null>(() => readPendingGameLaunch());
   const [attempt, setAttempt] = useState(0);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [guideStatus, setGuideStatus] = useState<string | null>(null);
   const [hasFrame, setHasFrame] = useState(false);
   const [barVisible, setBarVisible] = useState(true);
   const [hint, setHint] = useState<string | null>(null);
@@ -62,6 +64,8 @@ export default function StreamScreen() {
   const [keyboardValue, setKeyboardValue] = useState(KEYBOARD_SENTINEL);
   const inputRef = useRef<TextInput | null>(null);
   const exitingRef = useRef(false);
+  const guideGenerationRef = useRef(0);
+  const resumeAfterPendingPauseRef = useRef(true);
   const stageRef = useRef(stage);
   stageRef.current = stage;
 
@@ -74,7 +78,7 @@ export default function StreamScreen() {
   const session = useStreamSession({ userId, attempt, onBackground: exit });
   const {
     phase, status, progress, streamURL, videoSize, inputReady, audioReady, errorDetail,
-    streamSettings, moonlightSettings, loadingThemeId, client, clientRef, inputSettingsRef, rumbleRef, persistSettings,
+    streamSettings, moonlightSettings, loadingThemeId, client, clientRef, sessionId, inputSettingsRef, rumbleRef, persistSettings,
   } = session;
   const live = phase === 'live';
   const gate = useGameLaunchGate(launch, live);
@@ -103,20 +107,63 @@ export default function StreamScreen() {
     if (gate.notice) flashHint(gate.notice);
   }, [flashHint, gate.notice]);
 
+  const gameRuntimeAction = useCallback(async (
+    action: 'pause' | 'resume',
+  ): Promise<boolean> => {
+    const response = await pcFetch(PC_ROUTES.gameRuntime, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, gameId: '' }),
+    });
+    const data = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+    if (response.status === 404) return false;
+    if (!response.ok || !data?.ok) throw new Error(data?.error || 'Máy tính không nhận lệnh điều khiển game.');
+    return true;
+  }, []);
+
+  const closeGuide = useCallback((resumeGame = true) => {
+    guideGenerationRef.current += 1;
+    resumeAfterPendingPauseRef.current = resumeGame;
+    setGuideOpen(false);
+    setGuideStatus(null);
+    if (resumeGame) {
+      void gameRuntimeAction('resume').catch((error) => {
+        flashHint((error as Error).message || 'Không tự tiếp tục được game.');
+      });
+    }
+  }, [flashHint, gameRuntimeAction]);
+
   const openGuide = useCallback(() => {
     if (!live) return;
+    const generation = guideGenerationRef.current + 1;
+    guideGenerationRef.current = generation;
+    resumeAfterPendingPauseRef.current = true;
     // Giữ khung hình TRƯỚC khi menu che mất để còn chụp ảnh được.
+    setHasFrame(false);
     void grabFrame().then(setHasFrame);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setGuideStatus('Đang pause game...');
     setGuideOpen(true);
-  }, [live]);
-  const closeGuide = useCallback(() => setGuideOpen(false), []);
+    void gameRuntimeAction('pause')
+      .then((paused) => {
+        if (generation !== guideGenerationRef.current) {
+          if (resumeAfterPendingPauseRef.current) void gameRuntimeAction('resume').catch(() => {});
+          return;
+        }
+        setGuideStatus(paused ? 'Game đã tự pause.' : 'Không có game đang chạy để pause.');
+      })
+      .catch((error) => {
+        if (generation === guideGenerationRef.current) {
+          setGuideStatus((error as Error).message || 'Không tự pause được game.');
+        }
+      });
+  }, [gameRuntimeAction, live]);
   useBack(() => { if (guideOpen) closeGuide(); else return true; }, live);
 
   const reload = useCallback(() => {
-    setGuideOpen(false);
+    closeGuide(true);
     setAttempt((value) => value + 1);
-  }, []);
+  }, [closeGuide]);
 
   const persistHud = useCallback((enabled: boolean) => {
     void persistSettings({ hud_enabled: enabled });
@@ -242,6 +289,12 @@ export default function StreamScreen() {
     () => ({ name: profile.displayName, avatarUrl: profile.avatarUrl }),
     [profile.avatarUrl, profile.displayName],
   );
+  const watchParty = useWatchPartyHost({
+    sessionId,
+    client,
+    userId,
+    name: controller.name,
+  });
 
   return (
     <View
@@ -296,11 +349,13 @@ export default function StreamScreen() {
         open={live && guideOpen}
         profile={controller}
         hasFrame={hasFrame}
-        onClose={closeGuide}
-        onHome={() => { closeGuide(); exit(); }}
+        status={guideStatus}
+        watchParty={watchParty}
+        onClose={() => closeGuide(true)}
+        onHome={() => { closeGuide(false); exit(); }}
         onReload={reload}
-        onSwitched={() => { closeGuide(); flashHint('Đã chuyển sang game đã chọn'); }}
-        onExitGame={() => { closeGuide(); exit(); }}
+        onSwitched={() => { closeGuide(false); flashHint('Đã chuyển sang game đã chọn'); }}
+        onExitGame={() => { closeGuide(false); exit(); }}
       />
 
       {hint && live ? (

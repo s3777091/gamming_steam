@@ -149,16 +149,25 @@ export function usePcLibrary() {
     }
   }, [launchingId, selected]);
 
-  const installSelected = useCallback(async () => {
-    if (!selected || installingId) return;
+  /** true khi PC đã nhận lệnh cài. */
+  const installSelected = useCallback(async (): Promise<boolean> => {
+    if (!selected || installingId) return false;
     setInstallingId(selected.id);
     setInstallOpenedId(null);
     setError(null);
     try {
-      await pcPostJson(PC_ROUTES.gameInstall, { id: selected.id }, 'Không mở được trình cài đặt Steam.');
-      if (mounted.current) setInstallOpenedId(selected.id);
+      const result = await pcPostJson<{ ok?: boolean; error?: string; downloadAgent?: boolean }>(
+        PC_ROUTES.gameInstall,
+        { id: selected.id },
+        'Không mở được trình cài đặt Steam.',
+      );
+      // Có agent tải game: tiến trình đi thẳng về qua DataChannel. Không có (PC cũ)
+      // thì Steam mở hộp thoại trên máy tính như trước.
+      if (mounted.current && !result.downloadAgent) setInstallOpenedId(selected.id);
+      return true;
     } catch (installError) {
       if (mounted.current) setError(installError instanceof Error ? installError.message : 'Không mở được trình cài đặt Steam.');
+      return false;
     } finally {
       if (mounted.current) setInstallingId(null);
     }

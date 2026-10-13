@@ -5,7 +5,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import * as SplashScreen from 'expo-splash-screen';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setImmersive } from 'jetsona-input';
@@ -15,6 +15,7 @@ import { deactivateFocus } from '@/features/gamepad/focus';
 import GamepadNavigator from '@/features/gamepad/GamepadNavigator';
 import { useHardwareBack } from '@/features/gamepad/hooks';
 import LoginScreen from '@/features/login/LoginScreen';
+import { playUiSound, UiSoundProvider } from '@/features/sound/UiSoundProvider';
 import { colors } from '@/theme';
 import { UiProvider } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -24,7 +25,13 @@ void SplashScreen.preventAutoHideAsync();
 function Gate() {
   const auth = useAuth();
   const pathname = usePathname();
+  const previousPathname = useRef(pathname);
   useHardwareBack();
+
+  useEffect(() => {
+    if (previousPathname.current !== pathname) playUiSound('transition');
+    previousPathname.current = pathname;
+  }, [pathname]);
 
   useEffect(() => {
     if (auth.status !== 'loading') void SplashScreen.hideAsync();
@@ -67,10 +74,12 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <UiProvider>
-        <AuthProvider>
-          <StatusBar hidden />
-          <Gate />
-        </AuthProvider>
+        <UiSoundProvider>
+          <AuthProvider>
+            <StatusBar hidden />
+            <Gate />
+          </AuthProvider>
+        </UiSoundProvider>
       </UiProvider>
     </SafeAreaProvider>
   );

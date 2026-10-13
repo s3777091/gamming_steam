@@ -2,6 +2,8 @@
 // Bên web các thành phần nghe CustomEvent trên window; native không có window
 // nên dùng một ngăn xếp: thành phần mở sau cùng được hỏi trước.
 
+import { playUiSound } from '@/features/sound/UiSoundProvider';
+
 type Handler = () => boolean | void;
 
 const backStack: Handler[] = [];
@@ -21,7 +23,10 @@ export function pushBack(handler: Handler): () => void {
 export function dispatchBack(): boolean {
   for (let index = backStack.length - 1; index >= 0; index -= 1) {
     const result = backStack[index]();
-    if (result !== true) return true;
+    if (result !== true) {
+      playUiSound('back');
+      return true;
+    }
   }
   return false;
 }
@@ -36,6 +41,7 @@ export function dispatchTab(direction: -1 | 1): boolean {
   tabHandlers.forEach((handler) => {
     if (handler(direction) !== false) handled = true;
   });
+  if (handled) playUiSound('navigate');
   return handled;
 }
 

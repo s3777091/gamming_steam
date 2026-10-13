@@ -119,7 +119,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
   // Client sống ngoài state để đường nhập liệu đọc mà không kéo theo render.
   const clientRef = useRef<NativeMoonlightClient | null>(null);
   const [client, setClient] = useState<NativeMoonlightClient | null>(null);
-  const sessionIdRef = useRef<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   // Màn stream gắn xử lý rung (slot tay cầm -> thiết bị thật) sau khi dựng cầu nhập liệu.
   const rumbleRef = useRef<((rumble: { slot: number; low: number; high: number }) => void) | null>(null);
   const inputSettingsRef = useRef<InputSettings>(DEFAULT_INPUT_SETTINGS);
@@ -165,7 +165,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
     setStreamSettings(null);
     setMoonlightSettings(null);
     setHostDisplay(null);
-    sessionIdRef.current = null;
+    setSessionId(null);
 
     const release = async (handle: (LeaseHandle & { clientDeviceId: string }) | null, reason: string) => {
       if (!handle || releasing) return;
@@ -174,6 +174,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       heartbeatTimer = null;
       activeHandle = null;
+      setSessionId(null);
       unwatchRelease?.();
       unwatchRelease = null;
       await Promise.allSettled([
@@ -325,7 +326,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
         const handle = await claimLeaseSession();
         if (disposed) return;
         activeHandle = { ...handle, clientDeviceId };
-        sessionIdRef.current = activeHandle.sessionId;
+        setSessionId(activeHandle.sessionId);
         onSessionChangedRef.current?.();
 
         // Revalidate lease trước khi Moonlight: có thể đã bị thiết bị khác cướp.
@@ -433,7 +434,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
   return {
     phase, status, progress, streamURL, videoSize, inputReady, audioReady, errorDetail,
     streamSettings, moonlightSettings, hostDisplay, loadingThemeId,
-    client, clientRef, sessionIdRef, inputSettingsRef, rumbleRef, persistSettings,
+    client, clientRef, sessionId, inputSettingsRef, rumbleRef, persistSettings,
   };
 }
 

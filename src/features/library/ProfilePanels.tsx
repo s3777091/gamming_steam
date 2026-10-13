@@ -1,4 +1,5 @@
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import { Clock3, Gamepad2, LockKeyhole, Play, Trophy, Users, X, ArrowUpRight } from 'lucide-react-native';
 
@@ -10,8 +11,8 @@ import { PanelMessage, SidePanel, SteamLink } from '@/ui/SidePanel';
 import { Skeleton } from '@/ui/Skeleton';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
-import { Pressable } from 'react-native';
 import { useBack } from '@/features/gamepad/hooks';
+import { playUiSound } from '@/features/sound/UiSoundProvider';
 
 import { PERSONA_STATE_LABEL, formatHours, formatNumber, formatStorePrice } from './format';
 import type { ProfileAchievement, SteamPromotion, SteamStoreItem, SteamUserDetails } from './types';
@@ -223,15 +224,33 @@ export function PromotionPanel({ promotion, specials, onOpenGame, onClose }: {
 }) {
   const { s, width, height, insets } = useUi();
   useBack(() => { onClose(); });
+  const enter = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(enter, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [enter]);
+
   const panelWidth = Math.min(s(560), width * 0.78);
   const items = specials.slice(0, 8);
   const rows: SteamStoreItem[][] = [];
   for (let index = 0; index < items.length; index += 2) rows.push(items.slice(index, index + 2));
   return (
     <FocusLayer>
-    <View style={StyleSheet.absoluteFill}>
-      <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,12,18,0.76)' }]} onPress={onClose} />
-      <View style={[styles.promoPanel, { width: panelWidth + insets.right, paddingRight: insets.right }]}>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,12,18,0.76)', opacity: enter }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => { playUiSound('back'); onClose(); }} accessibilityLabel="Đóng" />
+      </Animated.View>
+      <Animated.View
+        style={[
+          styles.promoPanel,
+          {
+            width: panelWidth + insets.right,
+            paddingRight: insets.right,
+            transform: [{ translateX: enter.interpolate({ inputRange: [0, 1], outputRange: [panelWidth * 0.4, 0] }) }],
+            opacity: enter,
+          },
+        ]}
+      >
         <View style={{ height: Math.max(s(120), height * 0.33), backgroundColor: colors.card }}>
           <Img source={{ uri: promotion.image }} style={StyleSheet.absoluteFill} contentFit="cover" />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(7,16,28,0.5)' }]} />
@@ -239,7 +258,7 @@ export function PromotionPanel({ promotion, specials, onOpenGame, onClose }: {
             <T size={9.5} weight="semibold" color="#8bbdff">Khuyến mãi Steam</T>
             <T size={22} weight="semibold" tracking={-0.035} leading={1.1} numberOfLines={2} style={{ marginTop: s(4) }}>{promotion.name}</T>
           </View>
-          <Press onPress={onClose} accessibilityLabel="Đóng khuyến mãi" style={[styles.promoClose, { top: s(12), right: s(12), width: s(32), height: s(32), borderRadius: s(16) }]}>
+          <Press onPress={onClose} sound="back" accessibilityLabel="Đóng khuyến mãi" style={[styles.promoClose, { top: s(12), right: s(12), width: s(32), height: s(32), borderRadius: s(16) }]}>
             <X size={s(16)} color={colors.text2} />
           </Press>
         </View>
@@ -266,7 +285,7 @@ export function PromotionPanel({ promotion, specials, onOpenGame, onClose }: {
             ))}
           </View>
         </FocusScroll>
-      </View>
+      </Animated.View>
     </View>
     </FocusLayer>
   );

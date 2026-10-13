@@ -2,16 +2,21 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, ScrollView } from 'react-native';
 import { FocusScroll } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Download, Ellipsis, Info, Monitor, Newspaper, Play, ShoppingBag, Trophy, type LucideIcon } from 'lucide-react-native';
+import { Download, Ellipsis, FileText, Info, Monitor, Newspaper, Pause, Play, ShoppingBag, Trophy, type LucideIcon } from 'lucide-react-native';
 
+import { isSteamAppId } from '@/features/library/format';
 import type { LibraryPanel, PcGame } from '@/features/library/types';
 import type { PcLibrary } from '@/features/library/usePcLibrary';
+import type { SteamDownloads } from '@/features/library/useSteamDownloads';
 import { openExternal } from '@/lib/open-external';
+import { type GameDownload, downloadForApp, primaryDownload } from '@/lib/steam-downloads';
 import { colors } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
+
+import { DownloadStatusLine, ProgressRing, downloadInProgress } from './DownloadViews';
 
 function GameTitle({ game }: { game: PcGame }) {
   const { s, width } = useUi();
@@ -53,18 +58,25 @@ function GameTitle({ game }: { game: PcGame }) {
   );
 }
 
-function PrimaryAction({ library, onPlay, onInstall, reachable }: {
+function PrimaryAction({ library, download, canControl, onPlay, onInstall, onDownloadPress, reachable }: {
   library: PcLibrary;
+  download: GameDownload | null;
+  canControl: boolean;
   onPlay: () => void;
   onInstall: () => void;
+  onDownloadPress: () => void;
   reachable: boolean;
 }) {
   const { s } = useUi();
   const { selected, launchingId, installingId } = library;
   const installed = selected?.installed !== false;
-  const label = !reachable ? 'Mở máy tính' : installed ? (launchingId ? 'Đang mở' : 'Play') : installingId ? 'Đang mở Steam' : 'Cài đặt';
+  // Đang tải: nút thành vòng tiến trình; bấm để tạm dừng/tiếp tục hoặc xem điều khoản.
+  const tracking = reachable && !installed && downloadInProgress(download) ? download : null;
+  const label = tracking ? tracking.label
+    : !reachable ? 'Mở máy tính' : installed ? (launchingId ? 'Đang mở' : 'Play') : installingId ? 'Đang mở Steam' : 'Cài đặt';
   const pulse = useRef(new Animated.Value(1)).current;
-  const busy = Boolean(launchingId || installingId);
+  const busy = Boolean(launchingId || installingId)
+    || Boolean(tracking && ['preparing', 'working', 'queued', 'installed'].includes(tracking.status));
   useEffect(() => {
     if (!busy) { pulse.setValue(1); return; }
     const loop = Animated.loop(Animated.sequence([
@@ -78,14 +90,20 @@ function PrimaryAction({ library, onPlay, onInstall, reachable }: {
   const size = s(44);
   return (
     <Press
-      onPress={!reachable || installed ? onPlay : onInstall}
-      disabled={busy}
+      onPress={tracking ? onDownloadPress : !reachable || installed ? onPlay : onInstall}
+      sound="confirm"
+      disabled={tracking ? false : busy}
       autoFocus
       accessibilityLabel={label}
       style={[styles.play, { width: size, height: size, borderRadius: size / 2 }]}
     >
+      {tracking ? <ProgressRing size={size} percent={tracking.percent} /> : null}
       <Animated.View style={{ opacity: pulse }}>
-        {!reachable ? (
+        {tracking ? (
+          tracking.status === 'eula' ? <FileText size={s(17)} color={colors.white} />
+            : tracking.status === 'downloading' && canControl ? <Pause size={s(16)} color={colors.white} fill={colors.white} />
+              : <Download size={s(16)} color={colors.white} />
+        ) : !reachable ? (
           <Monitor size={s(18)} color={colors.white} />
         ) : installed ? (
           <Play size={s(18)} color={colors.white} fill={colors.white} style={{ marginLeft: s(2) }} />
@@ -192,17 +210,39 @@ function GameCard({ game, active, achievements, onSelect }: {
 }
 
 /** Tab Games: logo + nút của game đang chọn, phía dưới là kệ mọi game trên PC. */
-export function GamesView({ library, reachable, menuOpen, onMenuOpenChange, onSelectGame, onOpenPanel, onPlay }: {
+export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenChange, onSelectGame, onOpenPanel, onPlay, onOpenEula }: {
   library: PcLibrary;
+  downloads: SteamDownloads;
   reachable: boolean;
   menuOpen: boolean;
   onMenuOpenChange: (open: boolean) => void;
   onSelectGame: (id: string) => void;
   onOpenPanel: (panel: LibraryPanel) => void;
   onPlay: () => void;
+  onOpenEula: () => void;
 }) {
   const { s } = useUi();
   const { games, selected, error, installOpenedId } = library;
+  const selectedAppId = isSteamAppId(selected?.steamAppId) ? Number(selected.steamAppId) : null;
+  const tracked = downloadForApp(downloads.state, selectedAppId);
+  // PC đã nhận lệnh cài nhưng agent chưa kịp báo: hiện "đang chuẩn bị" ngay.
+  const download: GameDownload | null = tracked ?? (selectedAppId && downloads.expectedAppId === selectedAppId ? {
+    appid: selectedAppId, name: selected?.title ?? null, status: 'preparing', label: 'Đang chuẩn bị cài đặt',
+    percent: null, downloaded: 0, total: 0, bytesPerSec: 0, etaSec: null, error: null, eulas: null,
+  } : null);
+  const elsewhere = download ? null : primaryDownload(downloads.state);
+  const showDownload = Boolean(download && selected?.installed === false);
+
+  const install = async () => {
+    if (await library.installSelected() && selectedAppId) downloads.expect(selectedAppId);
+  };
+  const onDownloadPress = () => {
+    if (!download) return;
+    if (download.status === 'eula') onOpenEula();
+    else if (!downloads.canControl) return;
+    else if (download.status === 'downloading') downloads.pause(download.appid);
+    else if (download.status === 'paused') downloads.resume(download.appid);
+  };
   const rail = useRef<ScrollView>(null);
   const railWidth = useRef(0);
   const selectedIndex = Math.max(0, games.findIndex((game) => game.id === selected?.id));
@@ -229,7 +269,15 @@ export function GamesView({ library, reachable, menuOpen, onMenuOpenChange, onSe
         <View pointerEvents="box-none" style={{ flexDirection: 'row', alignItems: 'flex-end', gap: s(28) }}>
           {selected ? <GameTitle key={selected.id} game={selected} /> : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10), zIndex: 40 }}>
-            <PrimaryAction library={library} onPlay={onPlay} onInstall={() => void library.installSelected()} reachable={reachable} />
+            <PrimaryAction
+              library={library}
+              download={download}
+              canControl={downloads.canControl}
+              onPlay={onPlay}
+              onInstall={() => void install()}
+              onDownloadPress={onDownloadPress}
+              reachable={reachable}
+            />
             {selected ? <GameMenu game={selected} open={menuOpen} onOpenChange={onMenuOpenChange} onOpenPanel={onOpenPanel} /> : null}
           </View>
         </View>
@@ -239,7 +287,18 @@ export function GamesView({ library, reachable, menuOpen, onMenuOpenChange, onSe
             <T size={10.4} color="#fee2e2" leading={1.5}>{error}</T>
           </View>
         ) : null}
-        {!error && selected && installOpenedId === selected.id ? (
+        {!error && showDownload && download ? (
+          <DownloadStatusLine download={download} canControl={downloads.canControl} onOpenEula={onOpenEula} />
+        ) : null}
+        {!error && !showDownload && elsewhere && downloadInProgress(elsewhere) ? (
+          <T size={10.4} weight="medium" color="rgba(255,255,255,0.6)" tabular numberOfLines={1} style={{ marginTop: s(10) }}>
+            {[`${elsewhere.label} ${elsewhere.name ?? 'một game'}`, elsewhere.percent !== null ? `${elsewhere.percent}%` : null].filter(Boolean).join(' · ')}
+          </T>
+        ) : null}
+        {!error && downloads.notice ? (
+          <T size={10} color={colors.text3} style={{ marginTop: s(6) }}>{downloads.notice}</T>
+        ) : null}
+        {!error && !download && selected && installOpenedId === selected.id ? (
           <T size={10.4} weight="medium" color="rgba(255,255,255,0.66)" style={{ marginTop: s(10) }}>
             Steam đã mở bước chọn ổ đĩa và xác nhận cài đặt.
           </T>
@@ -251,8 +310,8 @@ export function GamesView({ library, reachable, menuOpen, onMenuOpenChange, onSe
         horizontal
         showsHorizontalScrollIndicator={false}
         onLayout={(event) => { railWidth.current = event.nativeEvent.layout.width; centerSelected(false); }}
-        style={{ flexGrow: 0, height: s(122) }}
-        contentContainerStyle={{ alignItems: 'flex-end', gap: s(GAP), paddingHorizontal: s(2), paddingBottom: s(2) }}
+        style={{ flexGrow: 0, height: s(142) }}
+        contentContainerStyle={{ alignItems: 'flex-end', gap: s(GAP), paddingHorizontal: s(10), paddingTop: s(10), paddingBottom: s(12) }}
         decelerationRate="fast"
         accessibilityRole="list"
       >

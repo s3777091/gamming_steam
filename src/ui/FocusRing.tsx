@@ -1,27 +1,86 @@
-import { View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, View } from 'react-native';
 
-const RING = 3;
+const RING = 2;
+const GAP = 3;
 
 /**
- * Viền tiêu điểm của tay cầm: trắng, bo theo phần tử, phát sáng nhẹ. Đặt làm
- * con CUỐI của phần tử được chọn; nó tràn ra ngoài RING px nên không đổi bố cục.
+ * Viền tiêu điểm của tay cầm, kiểu PS5: một nét trắng mảnh bao ngoài phần tử, bên
+ * ngoài là quầng sáng mờ dần thở nhẹ. Không dùng shadow/elevation của Android vì
+ * nó vẽ một khối đen đục ngay dưới phần tử bán trong suốt.
+ *
+ * - `card`: ảnh, thẻ, nút tròn — chỉ có viền và quầng sáng, không phủ màu lên nội dung.
+ * - `row`: hàng cài đặt, nút dài — thêm một lớp sáng nhẹ để thấy rõ cả hàng đang chọn.
+ *
+ * Đặt làm con CUỐI của phần tử được chọn; nó tràn ra ngoài nên không đổi bố cục.
+ * `visible` về false thì mờ đi rồi gọi `onHidden` để cha gỡ nó khỏi cây.
  */
-export function FocusRing({ radius }: { radius: number }) {
+export function FocusRing({ radius, variant = 'card', visible = true, onHidden }: {
+  radius: number;
+  variant?: 'card' | 'row';
+  visible?: boolean;
+  onHidden?: () => void;
+}) {
+  const appear = useRef(new Animated.Value(0)).current;
+  const breathe = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animation = Animated.timing(appear, {
+      toValue: visible ? 1 : 0,
+      duration: visible ? 170 : 120,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start(({ finished }) => { if (finished && !visible) onHidden?.(); });
+    return () => animation.stop();
+  }, [appear, onHidden, visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(breathe, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      Animated.timing(breathe, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [breathe, visible]);
+
+  const band = (inset: number, width: number, alpha: number, extra: number) => ({
+    position: 'absolute' as const,
+    top: -inset, left: -inset, right: -inset, bottom: -inset,
+    borderRadius: radius + inset,
+    borderWidth: width,
+    borderColor: `rgba(255,255,255,${alpha})`,
+    opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 1 - extra] }),
+  });
+
   return (
-    <View
+    <Animated.View
       pointerEvents="none"
       style={{
-        position: 'absolute',
-        top: -RING - 1, left: -RING - 1, right: -RING - 1, bottom: -RING - 1,
-        borderRadius: radius + RING + 1,
-        borderWidth: RING,
-        borderColor: '#ffffff',
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        shadowColor: '#ffffff',
-        shadowOpacity: 0.55,
-        shadowRadius: 10,
-        elevation: 8,
+        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        opacity: appear,
       }}
-    />
+    >
+      {/* Quầng sáng: hai dải mờ dần ra ngoài. */}
+      <Animated.View pointerEvents="none" style={band(GAP + RING + 7, 4, 0.05, 0.5)} />
+      <Animated.View pointerEvents="none" style={band(GAP + RING + 3, 4, 0.12, 0.35)} />
+      {variant === 'row' ? (
+        <View
+          pointerEvents="none"
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius, backgroundColor: 'rgba(255,255,255,0.09)' }}
+        />
+      ) : null}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: -GAP - RING, left: -GAP - RING, right: -GAP - RING, bottom: -GAP - RING,
+          borderRadius: radius + GAP + RING,
+          borderWidth: RING,
+          borderColor: 'rgba(255,255,255,0.96)',
+        }}
+      />
+    </Animated.View>
   );
 }

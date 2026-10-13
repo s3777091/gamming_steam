@@ -13,6 +13,7 @@ import {
 } from 'lucide-react-native';
 
 import { useBack } from '@/features/gamepad/hooks';
+import { playUiSound } from '@/features/sound/UiSoundProvider';
 import type { DetailSheet, DetailView, SteamStoreGameDetail, StoreDetailItem } from '@/features/library/detail-types';
 import { formatCompact, formatNumber, formatRelative } from '@/features/library/format';
 import { openExternal } from '@/lib/open-external';
@@ -358,12 +359,12 @@ function DetailModal({ title, subtitle, onClose, onBack, wide, children }: {
   useBack(() => { if (onBack) onBack(); else onClose(); });
   return (
     <FocusLayer>
-    <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: s(16), zIndex: 60 }]}>
-      <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.72)' }]} onPress={onClose} />
+    <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: s(16), zIndex: 60, elevation: 60 }]}>
+      <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.72)' }]} onPress={() => { playUiSound('back'); onClose(); }} />
       <View style={{ width: Math.min(s(wide ? 896 : 544), width - s(32)), maxHeight: height - s(32), borderRadius: s(22), overflow: 'hidden', borderWidth: 1, borderColor: colors.line, backgroundColor: '#101924' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8), paddingLeft: s(12), paddingRight: s(10), paddingVertical: s(10), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' }}>
           {onBack ? (
-            <Press onPress={onBack} accessibilityLabel="Quay lại" style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center' }}>
+            <Press onPress={onBack} sound="back" accessibilityLabel="Quay lại" style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center' }}>
               <ChevronLeft size={s(18)} color={colors.text2} />
             </Press>
           ) : null}
@@ -371,7 +372,7 @@ function DetailModal({ title, subtitle, onClose, onBack, wide, children }: {
             <T size={14} weight="bold" numberOfLines={1}>{title}</T>
             {subtitle ? <T size={10} color="rgba(255,255,255,0.44)" numberOfLines={1}>{subtitle}</T> : null}
           </View>
-          <Press onPress={onClose} accessibilityLabel="Đóng" style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' }}>
+          <Press onPress={onClose} sound="back" accessibilityLabel="Đóng" style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' }}>
             <X size={s(16)} color={colors.text2} />
           </Press>
         </View>
@@ -608,7 +609,7 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, onCl
   return (
     <FocusLayer>
     <Animated.View
-      style={[StyleSheet.absoluteFill, { backgroundColor: PAGE_BG, zIndex: 50, opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }]}
+      style={[StyleSheet.absoluteFill, { backgroundColor: PAGE_BG, zIndex: 50, elevation: 50, opacity: enter, transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }]}
     >
       <FocusScroll ref={scroller} onScroll={onScroll} scrollEventThrottle={32} showsVerticalScrollIndicator={false}>
         <View>
@@ -686,7 +687,7 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, onCl
           borderBottomWidth: compact ? StyleSheet.hairlineWidth : 0, borderBottomColor: 'rgba(255,255,255,0.08)',
         }}
       >
-        <Press onPress={onClose} accessibilityLabel="Quay lại cửa hàng" style={[styles.navButton, { width: s(36), height: s(36), borderRadius: s(18) }]}>
+        <Press onPress={onClose} sound="back" accessibilityLabel="Quay lại cửa hàng" style={[styles.navButton, { width: s(36), height: s(36), borderRadius: s(18) }]}>
           <ChevronLeft size={s(18)} color="rgba(255,255,255,0.86)" strokeWidth={2.2} />
         </Press>
         {compact ? (

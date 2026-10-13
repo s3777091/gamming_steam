@@ -8,6 +8,7 @@ import { FocusLayer } from '@/features/gamepad/focus';
 import { Check, Monitor, Power, X } from 'lucide-react-native';
 
 import { useBack } from '@/features/gamepad/hooks';
+import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { useDeviceStatus } from '@/features/devices/useDeviceStatus';
 import { apiFetch } from '@/lib/api';
 import { friendlyMessage } from '@/lib/friendly';
@@ -81,10 +82,10 @@ export function PcPowerSheet({ onClose, onReady }: { onClose: () => void; onRead
 
   return (
     <FocusLayer>
-    <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', zIndex: 70 }]}>
-      <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.74)' }]} onPress={onClose} />
+    <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', zIndex: 70, elevation: 70 }]}>
+      <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.74)' }]} onPress={() => { playUiSound('back'); onClose(); }} />
       <View style={[styles.card, { width: Math.min(s(400), width - s(48)), borderRadius: s(22), padding: s(22) }]}>
-        <Press onPress={onClose} accessibilityLabel="Đóng" style={[styles.close, { top: s(10), right: s(10), width: s(30), height: s(30), borderRadius: s(15) }]}>
+        <Press onPress={onClose} sound="back" accessibilityLabel="Đóng" style={[styles.close, { top: s(10), right: s(10), width: s(30), height: s(30), borderRadius: s(15) }]}>
           <X size={s(14)} color={colors.text3} />
         </Press>
         <View style={{ alignItems: 'center' }}>
@@ -95,7 +96,7 @@ export function PcPowerSheet({ onClose, onReady }: { onClose: () => void; onRead
           <T size={16} weight="semibold" style={{ marginTop: s(14), textAlign: 'center' }}>{title}</T>
           <T size={11.4} color={phase === 'failed' ? '#fecaca' : colors.text3} leading={1.55} style={{ marginTop: s(6), textAlign: 'center' }}>{detail}</T>
           {phase === 'idle' || phase === 'failed' ? (
-            <Press onPress={() => void wake()} style={[styles.button, { marginTop: s(18), height: s(42), paddingHorizontal: s(22), borderRadius: s(21), gap: s(8) }]}>
+            <Press onPress={() => void wake()} sound="confirm" style={[styles.button, { marginTop: s(18), height: s(42), paddingHorizontal: s(22), borderRadius: s(21), gap: s(8) }]}>
               <Power size={s(15)} color="#0a111c" />
               <T size={12.4} weight="semibold" color="#0a111c">{phase === 'failed' ? 'Thử bật lại' : 'Bật máy tính'}</T>
             </Press>

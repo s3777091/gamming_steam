@@ -87,10 +87,81 @@ const PROFILE = {
 
 const ACHIEVEMENTS = { ok: true, appId: 2277560, supported: true, total: 67, unlocked: 10, achievements: [] };
 
+const DEMO_NEWS: Record<number, { id: string; title: string; url: string; author: string; summary: string; feedLabel: string; publishedAt: string }[]> = {
+  457140: [
+    {
+      id: 'oni-1',
+      title: 'Bản cập nhật The Frosty Planet Pack & Cải thiện hiệu năng',
+      url: 'https://store.steampowered.com/news/app/457140',
+      author: 'Klei Entertainment',
+      summary: 'Quần xã sinh vật băng giá mới, các sinh vật thích nghi lạnh và cải thiện hiệu năng mô phỏng chất lỏng trong căn cứ.',
+      feedLabel: 'Bản cập nhật lớn',
+      publishedAt: '2026-10-09T14:00:00Z',
+    },
+    {
+      id: 'oni-2',
+      title: 'Hotfix 542110: Sửa lỗi lưu game tự động và lưu chuyển đường ống khí',
+      url: 'https://store.steampowered.com/news/app/457140',
+      author: 'Klei Entertainment',
+      summary: 'Khắc phục sự cố khựng khung hình khi lưu bản đồ lớn và tối ưu hóa hệ thống kiểm tra áp suất khí.',
+      feedLabel: 'Bản vá sửa lỗi',
+      publishedAt: '2026-10-03T09:30:00Z',
+    },
+  ],
+  1091500: [
+    {
+      id: 'cp-1',
+      title: 'Bản vá 2.13: Bổ sung hỗ trợ FSR 3 và Intel XeSS thế hệ mới',
+      url: 'https://store.steampowered.com/news/app/1091500',
+      author: 'CD PROJEKT RED',
+      summary: 'Tối ưu độ trễ đầu vào khi bật Frame Generation và cải thiện độ ổn định hình ảnh khi lái xe tốc độ cao.',
+      feedLabel: 'Bản cập nhật',
+      publishedAt: '2026-09-29T16:00:00Z',
+    },
+  ],
+  1174180: [
+    {
+      id: 'rdr2-1',
+      title: 'Red Dead Online: Thưởng gấp ba RDO$ & XP các nhiệm vụ săn tiền thưởng',
+      url: 'https://store.steampowered.com/news/app/1174180',
+      author: 'Rockstar Games',
+      summary: 'Ưu đãi đặc biệt trong tuần cho các thợ săn tiền thưởng kỳ cựu và giảm giá trang phục tại tiệm may.',
+      feedLabel: 'Sự kiện cộng đồng',
+      publishedAt: '2026-10-06T12:00:00Z',
+    },
+  ],
+  2277560: [
+    {
+      id: 'wwm-1',
+      title: 'Thông báo thử nghiệm Closed Beta đợt 2 và tối ưu đồ hoạ',
+      url: 'https://store.steampowered.com/news/app/2277560',
+      author: 'Everstone Studio',
+      summary: 'Cập nhật hệ thống khinh công mới, mở rộng bản đồ Giang Nam và nâng cấp engine đổ bóng thời gian thực.',
+      feedLabel: 'Thông báo',
+      publishedAt: '2026-10-10T10:00:00Z',
+    },
+  ],
+};
+
 /** Trả dữ liệu mẫu cho một đường dẫn của API máy tính, hoặc null khi không có mẫu. */
 export function demoResponse(path: string): unknown | null {
   if (path.startsWith('/games/') && path.endsWith('/achievements')) return ACHIEVEMENTS;
-  if (path.startsWith('/games/') && path.endsWith('/news')) return { ok: true, items: [] };
+  if (path.startsWith('/games/') && path.endsWith('/news')) {
+    const match = path.match(/\/games\/(\d+)\/news/);
+    const appId = match ? Number(match[1]) : 0;
+    const items = DEMO_NEWS[appId] || [
+      {
+        id: `news-${appId}-1`,
+        title: 'Bản cập nhật tối ưu hiệu năng và sửa lỗi mới nhất',
+        url: `https://store.steampowered.com/news/app/${appId}`,
+        author: 'Nhà phát triển',
+        summary: 'Bản cập nhật cải thiện tính tương thích với tay cầm và tăng tốc độ tải màn chơi.',
+        feedLabel: 'Bản cập nhật',
+        publishedAt: '2026-10-08T10:00:00Z',
+      },
+    ];
+    return { ok: true, items };
+  }
   if (path === '/games') return { ok: true, games: GAMES, steamProfile: PROFILE.profile };
   if (path === '/store') return STORE;
   if (path.startsWith('/store/search')) return { ok: true, total: 8, items: [...STORE.specials, ...STORE.topSellers] };

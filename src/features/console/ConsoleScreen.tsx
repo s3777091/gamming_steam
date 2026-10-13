@@ -6,19 +6,25 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
+import { useSignedInUser } from '@/features/auth';
 import { useBack, useGamepadTabs } from '@/features/gamepad/hooks';
 import { useCaptureMode } from '@/features/gamepad/captureMode';
 import { formatStorePrice, isSteamAppId } from '@/features/library/format';
 import { GameAchievementsPanel, GameInfoPanel, GameNewsPanel } from '@/features/library/GamePanels';
+import { NotificationsPanel } from '@/features/library/NotificationsPanel';
 import { PromotionPanel, SteamProfilePanel } from '@/features/library/ProfilePanels';
 import type { LibraryPanel, SteamPromotion, SteamStoreItem, StoreTab } from '@/features/library/types';
+import { useNotifications } from '@/features/library/useNotifications';
 import { usePcLibrary } from '@/features/library/usePcLibrary';
+import { useSteamDownloads } from '@/features/library/useSteamDownloads';
 import { useSteamProfile } from '@/features/library/useSteamProfile';
 import { useSteamStore, useStoreGameDetail, useStoreSearch } from '@/features/library/useSteamStore';
 import ConsoleSettings, { type SettingsCategory } from '@/features/settings/ConsoleSettings';
 import { savePendingGameLaunch } from '@/lib/game-launch';
+import { downloadForApp } from '@/lib/steam-downloads';
 import { useUi } from '@/ui/scale';
 
+import { EulaSheet } from './DownloadViews';
 import { GamesView } from './GamesView';
 import { LibraryHeader } from './LibraryHeader';
 import { LibraryBackdrop, LibraryEmpty, LibrarySkeleton, StoreError, StoreLoading } from './LibraryStates';
@@ -46,12 +52,24 @@ export default function ConsoleScreen() {
   // Ở màn thư viện, tay cầm điều hướng giao diện (không phải PC).
   useCaptureMode('ui');
 
+  const { userId } = useSignedInUser();
   const library = usePcLibrary();
   const { selected } = library;
+  // Tiến trình tải đi thẳng từ PC qua WebRTC; tải xong thì đọc lại thư viện để hiện Play.
+  const downloads = useSteamDownloads(userId, () => void library.reload(true));
+  // Điều khoản Steam đang chờ: tự mở cho người bấm Tải; đóng thì mở lại từ nút "Xem điều khoản".
+  const [eulaClosedFor, setEulaClosedFor] = useState<number | null>(null);
+  const pendingEulaAppId = downloads.canControl
+    ? downloads.state?.installs.find((flow) => flow.phase === 'eula')?.appid ?? null
+    : null;
+  const eulaDownload = pendingEulaAppId && eulaClosedFor !== pendingEulaAppId
+    ? downloadForApp(downloads.state, pendingEulaAppId)
+    : null;
   const profile = useSteamProfile(library.games, library.achievementCache);
   const store = useSteamStore(activeTab === 'store');
   const storeSearch = useStoreSearch(storeQuery, storeSearchOpen);
   const storeDetail = useStoreGameDetail(selectedStoreItem);
+  const notifications = useNotifications(library.games);
 
   const storeFeatured = store.data?.featured || null;
   const storePreview = storePreviewItem || storeFeatured;
@@ -108,6 +126,14 @@ export default function ConsoleScreen() {
     setMenuOpen(false);
     setPanel('profile');
     void profile.load();
+  };
+
+  const openNotifications = () => {
+    setMenuOpen(false);
+    setPanel('notifications');
+    setSettingsCategory(null);
+    setStoreSearchOpen(false);
+    void notifications.markAllAsRead();
   };
 
   const openSettings = (category: SettingsCategory) => {
@@ -167,12 +193,14 @@ export default function ConsoleScreen() {
   ) : library.games.length ? (
     <GamesView
       library={library}
+      downloads={downloads}
       reachable={library.reachable}
       menuOpen={menuOpen}
       onMenuOpenChange={setMenuOpen}
       onSelectGame={selectGame}
       onOpenPanel={setPanel}
       onPlay={() => void play()}
+      onOpenEula={() => setEulaClosedFor(null)}
     />
   ) : (
     <LibraryEmpty
@@ -191,6 +219,7 @@ export default function ConsoleScreen() {
       <View
         style={{
           flex: 1,
+          zIndex: 1,
           paddingLeft: s(22) + insets.left,
           paddingRight: s(22) + insets.right,
           paddingTop: s(10) + insets.top,
@@ -203,6 +232,8 @@ export default function ConsoleScreen() {
           steamProfile={library.steamProfile}
           onOpenProfile={openProfile}
           onOpenSettings={openSettings}
+          onOpenNotifications={openNotifications}
+          unreadCount={notifications.unreadCount}
           search={(
             <StoreSearchField
               open={storeSearchOpen}
@@ -233,6 +264,18 @@ export default function ConsoleScreen() {
         <PromotionPanel promotion={selectedPromotion} specials={store.data?.specials || []} onOpenGame={openStoreGame} onClose={closeStoreDetail} />
       ) : null}
 
+      {panel === 'notifications' ? (
+        <NotificationsPanel
+          notifications={notifications.notifications}
+          discounts={notifications.discounts}
+          updates={notifications.updates}
+          loading={notifications.loading}
+          error={notifications.error}
+          onOpenStoreGame={openStoreGame}
+          onClose={() => setPanel(null)}
+        />
+      ) : null}
+
       {panel === 'profile' ? <SteamProfilePanel state={profile} onClose={() => setPanel(null)} /> : null}
       {panel === 'info' && selected ? <GameInfoPanel game={selected} onClose={() => setPanel(null)} /> : null}
       {panel === 'news' && selected && selectedAppId !== null ? (
@@ -250,6 +293,17 @@ export default function ConsoleScreen() {
 
       {settingsCategory ? (
         <ConsoleSettings initialCategory={settingsCategory} backdropUrl={backdropUrl} onClose={() => setSettingsCategory(null)} />
+      ) : null}
+
+      {eulaDownload ? (
+        <EulaSheet
+          download={eulaDownload}
+          onClose={() => setEulaClosedFor(eulaDownload.appid)}
+          onAnswer={(accept) => {
+            downloads.answerEula(eulaDownload.appid, accept);
+            setEulaClosedFor(eulaDownload.appid);
+          }}
+        />
       ) : null}
 
       {powerOpen ? (

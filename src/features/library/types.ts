@@ -168,4 +168,36 @@ export type StoreDetailResponse = {
 };
 
 /** Side panels over the library; only one is open at a time. */
-export type LibraryPanel = 'info' | 'news' | 'achievements' | 'profile';
+export type LibraryPanel = 'info' | 'news' | 'achievements' | 'profile' | 'notifications';
+
+export type GameDiscountNotification = {
+  id: string;
+  type: 'discount';
+  appId: number;
+  gameTitle: string;
+  discountPercent: number;
+  originalPrice: number | null;
+  finalPrice: number | null;
+  currency: string | null;
+  imageUrl: string;
+  storeItem: SteamStoreItem;
+  createdAt?: string;
+};
+
+export type GameUpdateNotification = {
+  id: string;
+  type: 'update';
+  appId: number;
+  gameTitle: string;
+  gameImageUrl: string;
+  title: string;
+  summary: string | null;
+  feedLabel: string | null;
+  author: string | null;
+  url: string | null;
+  publishedAt: string | null;
+  rawNews: SteamNewsItem;
+};
+
+export type AppNotification = GameDiscountNotification | GameUpdateNotification;
+

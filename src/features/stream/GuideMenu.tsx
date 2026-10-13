@@ -1,27 +1,30 @@
 // Menu Guide: mở bằng nút Home của tay cầm (hoặc nút trên thanh stream).
-// Tab game đang chạy, thiết bị đã nối, tài khoản; hành động: Home, chụp ảnh,
-// sao chép (clipboard hai chiều với PC), tải lại, thoát game. Bản native của
+// Tab game đang chạy, phòng xem, thiết bị đã nối, tài khoản; hành động: Home,
+// chụp ảnh, sao chép (clipboard hai chiều với PC), tải lại, thoát game. Bản native của
 // components/StreamGuideMenu.tsx.
 //
 // Tay cầm điều khiển menu này bằng D-pad/A/B (PC nhận trạng thái trung tính khi
 // menu mở), chuột/cảm ứng dùng như thường.
 
 import * as Clipboard from 'expo-clipboard';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, ScrollView, StyleSheet, View } from 'react-native';
 import {
-  Bluetooth, Camera, Check, ClipboardCopy, Copy, Gamepad2, Headphones, Home, Layers3, LogOut, RotateCw, UserRound, X, type LucideIcon,
+  Bluetooth, Camera, Check, ClipboardCopy, Copy, Gamepad2, Headphones, Home, Layers3, LogOut, Radio, RotateCw, Square, UserRound, Users, X, type LucideIcon,
 } from 'lucide-react-native';
 import { addListener, exportFrame, releaseFrame } from 'jetsona-input';
 
 import { KIND_LABEL, useInputDevices } from '@/features/devices/useInputDevices';
 import { KIND_ICONS } from '@/features/devices/kindIcons';
+import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { PC_ROUTES, pcFetch, pcPostJson } from '@/lib/pc-api';
 import { colors } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
+
+import type { WatchPartyState } from './useWatchPartyHost';
 
 export type RunningGame = {
   id: string;
@@ -34,7 +37,7 @@ export type RunningGame = {
   processCount: number;
 };
 
-type Section = 'games' | 'devices' | 'profile';
+type Section = 'games' | 'streaming' | 'devices' | 'profile';
 type Action = { id: string; label: string; icon: LucideIcon; section?: Section; danger?: boolean; run?: () => void };
 
 async function gameRuntime(action: 'focus' | 'quit', gameId: string | null) {
@@ -42,12 +45,14 @@ async function gameRuntime(action: 'focus' | 'quit', gameId: string | null) {
 }
 
 export function GuideMenu({
-  open, profile, hasFrame, onClose, onHome, onReload, onSwitched, onExitGame,
+  open, profile, hasFrame, status, watchParty, onClose, onHome, onReload, onSwitched, onExitGame,
 }: {
   open: boolean;
   profile: { name: string; avatarUrl: string | null } | null;
   /** Đã giữ được một khung hình để chụp (grabFrame lúc mở menu). */
   hasFrame: boolean;
+  status?: string | null;
+  watchParty: WatchPartyState;
   onClose: () => void;
   onHome: () => void;
   onReload: () => void;
@@ -142,19 +147,24 @@ export function GuideMenu({
     setMessage('Đã gửi clipboard lên máy tính.');
   });
 
+  const toggleStreaming = () => {
+    if (watchParty.live) watchParty.stop();
+    else void watchParty.start();
+  };
+
   const activeGame = games.find((game) => game.active) ?? null;
-  const actions: Action[] = useMemo(() => [
+  const actions: Action[] = [
     { id: 'home', label: 'Home', icon: Home, run: onHome },
     { id: 'games', label: 'Tab game', icon: Layers3, section: 'games' },
     { id: 'shot', label: 'Chụp ảnh', icon: Camera, run: takeScreenshot },
     { id: 'pull', label: 'Lấy clipboard', icon: ClipboardCopy, run: pullClipboard },
     { id: 'push', label: 'Gửi clipboard', icon: Copy, run: pushClipboard },
+    { id: 'stream', label: 'Streaming', icon: Radio, section: 'streaming' },
     { id: 'devices', label: 'Thiết bị', icon: Gamepad2, section: 'devices' },
     { id: 'reload', label: 'Tải lại', icon: RotateCw, run: onReload },
     { id: 'profile', label: 'Tài khoản', icon: UserRound, section: 'profile' },
     { id: 'exit', label: 'Thoát game', icon: LogOut, danger: true, run: () => setConfirmExit(true) },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [hasFrame, onHome, onReload, busy]);
+  ];
 
   const switchGame = (game: RunningGame) => void run(`game:${game.id}`, async () => {
     await gameRuntime('focus', game.id);
@@ -172,35 +182,47 @@ export function GuideMenu({
   };
 
   // Điều khiển bằng tay cầm.
-  const stateRef = useRef({ row, focus, section, games, actions, confirmExit, shot });
-  stateRef.current = { row, focus, section, games, actions, confirmExit, shot };
+  const stateRef = useRef({ row, focus, section, games, actions, confirmExit, shot, activate, switchGame, exitGame, toggleStreaming });
+  stateRef.current = { row, focus, section, games, actions, confirmExit, shot, activate, switchGame, exitGame, toggleStreaming };
   useEffect(() => {
     if (!open) return;
+    playUiSound('transition');
     return addListener('onGamepadButton', (event) => {
       if (!event.down) return;
       const current = stateRef.current;
-      if (event.button === 'b' || event.button === 'guide') {
+      // Guide/Start+Select is handled once by useInputBridge; handling it here too
+      // would close the menu twice and issue two resume requests.
+      if (event.button === 'b') {
+        playUiSound('back');
         if (current.shot) setShot(null);
         else if (current.confirmExit) setConfirmExit(false);
         else onClose();
         return;
       }
       if (current.confirmExit) {
-        if (event.button === 'a') exitGame();
+        if (event.button === 'a') { playUiSound('confirm'); current.exitGame(); }
         return;
       }
-      const count = current.row === 1 ? current.actions.length : current.games.length;
-      if (event.button === 'left') setFocus((value) => Math.max(0, value - 1));
-      else if (event.button === 'right') setFocus((value) => Math.min(Math.max(0, count - 1), value + 1));
-      else if (event.button === 'up' && current.section === 'games') { setRow(0); setFocus(0); }
-      else if (event.button === 'down') { setRow(1); setFocus(0); }
+      const count = current.row === 1
+        ? current.actions.length
+        : current.section === 'games'
+          ? current.games.length
+          : current.section === 'streaming' ? 1 : 0;
+      if (event.button === 'left') { playUiSound('navigate'); setFocus((value) => Math.max(0, value - 1)); }
+      else if (event.button === 'right') { playUiSound('navigate'); setFocus((value) => Math.min(Math.max(0, count - 1), value + 1)); }
+      else if (event.button === 'up' && (current.section === 'games' || current.section === 'streaming')) { playUiSound('navigate'); setRow(0); setFocus(0); }
+      else if (event.button === 'down') { playUiSound('navigate'); setRow(1); setFocus(0); }
       else if (event.button === 'a') {
+        playUiSound('select');
         if (current.row === 1) {
           const action = current.actions[current.focus];
-          if (action) activate(action);
+          if (action) current.activate(action);
         } else {
-          const game = current.games[current.focus];
-          if (game) switchGame(game);
+          if (current.section === 'streaming') current.toggleStreaming();
+          else {
+            const game = current.games[current.focus];
+            if (game) current.switchGame(game);
+          }
         }
       }
     });
@@ -213,6 +235,7 @@ export function GuideMenu({
     <Animated.View style={[StyleSheet.absoluteFill, styles.root, { opacity: fade }]} accessibilityViewIsModal>
       <Press
         onPress={onClose}
+        sound="back"
         accessibilityLabel="Đóng menu và tiếp tục game"
         style={[styles.close, { top: s(12) + insets.top, right: s(16) + insets.right, width: s(36), height: s(36), borderRadius: s(18) }]}
       >
@@ -270,6 +293,36 @@ export function GuideMenu({
                 )}
               </ScrollView>
             </View>
+          ) : section === 'streaming' ? (
+            <View style={[styles.deviceRow, { alignSelf: 'center', maxWidth: s(520), width: '100%', borderRadius: s(16), padding: s(20), flexDirection: 'column', alignItems: 'center' }]}>
+              <View style={{ width: s(52), height: s(52), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: watchParty.live ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.08)' }}>
+                <Radio size={s(23)} color={watchParty.live ? colors.success : colors.text3} />
+              </View>
+              <T size={18} weight="semibold" style={{ marginTop: s(12) }}>Streaming cho người xem</T>
+              <T size={11.4} color="rgba(255,255,255,0.48)" leading={1.5} style={{ marginTop: s(5), textAlign: 'center' }}>
+                {watchParty.live
+                  ? `${watchParty.viewers.length} người đang xem. Luồng game vẫn tiếp tục trên thiết bị này.`
+                  : 'Mở phòng xem bằng đúng luồng streaming hiện tại, không khởi động lại game.'}
+              </T>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8), marginTop: s(10) }}>
+                <Users size={s(14)} color={colors.text3} />
+                <T size={10.5} color={colors.text3} tabular>{watchParty.viewers.length} người xem</T>
+                {watchParty.relayAvailable !== null ? (
+                  <T size={10.5} color={watchParty.relayAvailable ? colors.success : colors.warning}>
+                    {watchParty.relayAvailable ? 'TURN sẵn sàng' : 'Chỉ kết nối trực tiếp'}
+                  </T>
+                ) : null}
+              </View>
+              <Press
+                disabled={watchParty.busy}
+                onPress={toggleStreaming}
+                pressScale={0.98}
+                style={{ minWidth: s(164), height: s(40), marginTop: s(14), paddingHorizontal: s(16), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: s(8), borderRadius: s(12), borderWidth: row === 0 ? 2 : 0, borderColor: colors.white, backgroundColor: watchParty.live ? 'rgba(248,113,113,0.18)' : colors.primary }}
+              >
+                {watchParty.busy ? <ActivityIndicator size="small" color={colors.white} /> : watchParty.live ? <Square size={s(13)} color="#fca5a5" /> : <Radio size={s(14)} color={colors.white} />}
+                <T size={11.4} weight="semibold" color={watchParty.live ? '#fca5a5' : colors.white}>{watchParty.live ? 'Dừng streaming' : 'Bật streaming'}</T>
+              </Press>
+            </View>
           ) : section === 'devices' ? (
             <View>
               <T size={22} weight="semibold" tracking={-0.02}>Thiết bị đã kết nối</T>
@@ -307,9 +360,9 @@ export function GuideMenu({
           )}
         </View>
 
-        {message ? (
+        {message || watchParty.message || status ? (
           <View style={[styles.toast, { alignSelf: 'center', marginTop: s(8), borderRadius: s(12), paddingHorizontal: s(12), paddingVertical: s(6) }]}>
-            <T size={11} color="rgba(255,255,255,0.62)" style={{ textAlign: 'center' }}>{message}</T>
+            <T size={11} color="rgba(255,255,255,0.62)" style={{ textAlign: 'center' }}>{message || watchParty.message || status}</T>
           </View>
         ) : null}
       </View>
@@ -320,6 +373,7 @@ export function GuideMenu({
             const Icon = action.icon;
             const selected = action.section === section;
             const focused = row === 1 && focus === index;
+            const streaming = action.id === 'stream' && watchParty.live;
             return (
               <Press
                 key={action.id}
@@ -333,9 +387,9 @@ export function GuideMenu({
                 }}
               >
                 {busy === action.id ? <ActivityIndicator size="small" color={colors.text2} /> : (
-                  <Icon size={s(16)} color={action.danger ? 'rgba(252,165,165,0.78)' : selected ? colors.white : 'rgba(255,255,255,0.52)'} />
+                  <Icon size={s(16)} color={action.danger ? 'rgba(252,165,165,0.78)' : streaming ? colors.success : selected ? colors.white : 'rgba(255,255,255,0.52)'} />
                 )}
-                <T size={9} weight="medium" color={action.danger ? 'rgba(252,165,165,0.78)' : selected ? colors.white : 'rgba(255,255,255,0.52)'} numberOfLines={1}>{action.label}</T>
+                <T size={9} weight="medium" color={action.danger ? 'rgba(252,165,165,0.78)' : streaming ? colors.success : selected ? colors.white : 'rgba(255,255,255,0.52)'} numberOfLines={1}>{action.label}</T>
               </Press>
             );
           })}
@@ -348,7 +402,7 @@ export function GuideMenu({
             <Img source={{ uri: `data:image/png;base64,${shot}` }} style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: 'rgba(0,0,0,0.4)' }} contentFit="contain" transition={0} />
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(12), padding: s(12) }}>
               <T size={11} color="rgba(255,255,255,0.55)" style={{ flex: 1 }}>Ảnh được giữ cho tới khi đóng menu.</T>
-              <Press onPress={() => setShot(null)} style={{ height: s(36), paddingHorizontal: s(12), justifyContent: 'center', borderRadius: s(12) }}>
+              <Press onPress={() => setShot(null)} sound="back" style={{ height: s(36), paddingHorizontal: s(12), justifyContent: 'center', borderRadius: s(12) }}>
                 <T size={11} color="rgba(255,255,255,0.6)">Đóng</T>
               </Press>
               <Press

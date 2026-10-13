@@ -82,8 +82,9 @@ chụp khi mở kênh, và một dây an toàn đọc **một lần** nếu PC c
   qua kênh `controllers`/`controllerN` của moonlight-web (đúng định dạng client web),
   rung từ game được chuyển ngược về tay cầm. Chuột dùng pointer-capture (chuyển động
   tương đối). Phím Host (mặc định Ctrl phải) + phím = phím tắt của app.
-- **Nút Home/Guide của tay cầm** (hoặc **giữ Start + Select** ~0,6 giây) mở menu: tab game đang chạy, chụp ảnh, sao chép
-  clipboard hai chiều với PC, thiết bị, tải lại, thoát game. Một số tay cầm Bluetooth gửi
+- **Nút Home/Guide của tay cầm** (hoặc **giữ Start + Select** ~0,6 giây) pause game và mở menu: tab game đang chạy,
+  phòng Streaming cho người xem, chụp và sao chép ảnh, clipboard hai chiều với PC, thiết bị, tải lại, thoát game.
+  Home trong menu chỉ trở về màn hình chính của app, không đóng game. Một số tay cầm Bluetooth gửi
   Home thành phím HOME của Android: hệ thống thoát ra màn hình chính trước khi app thấy
   phím đó (không app nào chặn được), nên dùng tổ hợp Start + Select thay thế.
 - **Ảnh Steam** (steamstatic.com...) bị chặn ở Việt Nam nên `Img` tải qua proxy ảnh

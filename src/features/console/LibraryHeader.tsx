@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Gamepad2, MonitorSmartphone, Settings } from 'lucide-react-native';
+import { Gamepad2, Megaphone, MonitorSmartphone, Settings } from 'lucide-react-native';
 
 import { DEVICE_KIND_ORDER, useInputDevices, type DeviceKind } from '@/features/devices/useInputDevices';
 import { KIND_ICONS } from '@/features/devices/kindIcons';
@@ -107,7 +107,16 @@ function HeaderClock() {
   return <T size={12.8} weight="medium" color="rgba(255,255,255,0.88)" tabular style={{ minWidth: s(40), textAlign: 'right' }}>{clock}</T>;
 }
 
-export function LibraryHeader({ activeTab, onTabChange, search, steamProfile, onOpenProfile, onOpenSettings }: {
+export function LibraryHeader({
+  activeTab,
+  onTabChange,
+  search,
+  steamProfile,
+  onOpenProfile,
+  onOpenSettings,
+  onOpenNotifications,
+  unreadCount = 0,
+}: {
   activeTab: StoreTab;
   onTabChange: (tab: StoreTab) => void;
   /** Ô tìm kiếm Store, chỉ hiện ở tab Store. */
@@ -115,6 +124,8 @@ export function LibraryHeader({ activeTab, onTabChange, search, steamProfile, on
   steamProfile: SteamProfile | null;
   onOpenProfile: () => void;
   onOpenSettings: (category: 'quality' | 'devices') => void;
+  onOpenNotifications?: () => void;
+  unreadCount?: number;
 }) {
   const { s, width } = useUi();
   return (
@@ -126,20 +137,21 @@ export function LibraryHeader({ activeTab, onTabChange, search, steamProfile, on
           contentFit="cover"
           transition={0}
         />
-        <View style={{ flexDirection: 'row', height: s(48), gap: s(20) }} accessibilityRole="tablist">
+        <View style={{ flexDirection: 'row', height: s(48), gap: s(8), alignItems: 'center' }} accessibilityRole="tablist">
           {TABS.map((tab) => {
             const active = activeTab === tab.id;
             return (
               <Press
                 key={tab.id}
+                sound="navigate"
                 pressScale={0.97}
                 onPress={() => onTabChange(tab.id)}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
-                style={{ height: s(48), justifyContent: 'center' }}
+                style={{ height: s(34), paddingHorizontal: s(14), borderRadius: s(17), alignSelf: 'center', justifyContent: 'center' }}
               >
                 <T size={12.2} weight="semibold" color={active ? colors.white : 'rgba(255,255,255,0.48)'}>{tab.label}</T>
-                {active ? <View style={[styles.tabLine, { height: s(2), borderRadius: s(1) }]} /> : null}
+                {active ? <View style={[styles.tabLine, { left: s(14), right: s(14), bottom: s(2), height: s(2), borderRadius: s(1) }]} /> : null}
               </Press>
             );
           })}
@@ -149,6 +161,19 @@ export function LibraryHeader({ activeTab, onTabChange, search, steamProfile, on
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(12), height: s(32) }}>
         {activeTab === 'store' ? search : null}
         <DeviceStatusButton onPress={() => onOpenSettings('devices')} />
+        <Press
+          onPress={onOpenNotifications}
+          sound="navigate"
+          accessibilityLabel="Thông báo"
+          style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Megaphone size={s(16)} color="rgba(255,255,255,0.66)" strokeWidth={1.8} />
+          {unreadCount > 0 ? (
+            <View style={[styles.badge, { minWidth: s(14), height: s(14), borderRadius: s(7), top: -s(1), right: -s(2) }]}>
+              <T size={8} weight="semibold" tabular>{unreadCount > 9 ? '9+' : unreadCount}</T>
+            </View>
+          ) : null}
+        </Press>
         <Press
           onPress={() => onOpenSettings('quality')}
           accessibilityLabel="Cài đặt"
@@ -176,6 +201,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.07)',
   },
   count: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+    backgroundColor: colors.primary,
+  },
+  badge: {
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',

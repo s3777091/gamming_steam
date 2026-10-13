@@ -4,6 +4,7 @@ import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import { ArrowUpRight, X, type LucideIcon } from 'lucide-react-native';
 
 import { useBack } from '@/features/gamepad/hooks';
+import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { openExternal } from '@/lib/open-external';
 import { colors } from '@/theme';
 import { Press } from './Press';
@@ -36,9 +37,9 @@ export function SidePanel({
 
   return (
     <FocusLayer>
-    <View style={StyleSheet.absoluteFill}>
+    <View style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]}>
       <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, { opacity: enter }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Đóng" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => { playUiSound('back'); onClose(); }} accessibilityLabel="Đóng" />
       </Animated.View>
       <Animated.View
         style={[
@@ -58,6 +59,7 @@ export function SidePanel({
           </View>
           <Press
             onPress={onClose}
+            sound="back"
             accessibilityLabel="Đóng"
             style={[styles.close, { width: s(32), height: s(32), borderRadius: s(16) }]}
           >

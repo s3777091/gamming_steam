@@ -8,6 +8,7 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { Check, ChevronDown, ChevronRight, Loader, type LucideIcon } from 'lucide-react-native';
 
 import { useFocusable } from '@/features/gamepad/focus';
+import { playUiSound, type UiSound } from '@/features/sound/UiSoundProvider';
 import { colors } from '@/theme';
 import { FocusRing } from '@/ui/FocusRing';
 import { Press } from '@/ui/Press';
@@ -160,6 +161,7 @@ export function SliderRow({ label, detail, value, min, max, step, format, onChan
       const next = Math.min(max, Math.max(min, localRef.current + direction * unit));
       localRef.current = next;
       setLocal(next);
+      playUiSound('focus');
       clearTimeout(commit.current);
       commit.current = setTimeout(() => onChange(next), 350);
       return true;
@@ -167,7 +169,7 @@ export function SliderRow({ label, detail, value, min, max, step, format, onChan
   });
   return (
     <View ref={hostRef} style={rowStyle(s)}>
-      {focused ? <FocusRing radius={s(8)} /> : null}
+      {focused ? <FocusRing radius={s(8)} variant="row" /> : null}
       <RowText label={label} detail={detail} />
       <View style={{ width: Math.min(s(224), width * 0.3), flexDirection: 'row', alignItems: 'center', gap: s(8) }}>
         <Slider
@@ -189,9 +191,9 @@ export function SliderRow({ label, detail, value, min, max, step, format, onChan
   );
 }
 
-export function ActionRow({ icon: Icon, label, detail, onPress, disabled = false, busy = false, tone = 'default', trailing }: {
+export function ActionRow({ icon: Icon, label, detail, onPress, disabled = false, busy = false, tone = 'default', trailing, iconBg, iconColor, sound }: {
   icon?: LucideIcon; label: string; detail?: string; onPress: () => void; disabled?: boolean; busy?: boolean;
-  tone?: 'default' | 'accent' | 'danger'; trailing?: ReactNode;
+  tone?: 'default' | 'accent' | 'danger'; trailing?: ReactNode; iconBg?: string; iconColor?: string; sound?: UiSound | false;
 }) {
   const { s } = useUi();
   const spin = useRef(new Animated.Value(0)).current;
@@ -201,17 +203,17 @@ export function ActionRow({ icon: Icon, label, detail, onPress, disabled = false
     loop.start();
     return () => loop.stop();
   }, [busy, spin]);
-  const bg = tone === 'accent' ? 'rgba(31,111,235,0.22)' : tone === 'danger' ? 'rgba(248,113,113,0.12)' : 'rgba(255,255,255,0.08)';
-  const fg = tone === 'accent' ? '#8fbcff' : tone === 'danger' ? '#fecaca' : 'rgba(255,255,255,0.7)';
+  const bg = iconBg ?? (tone === 'accent' ? '#2563eb' : tone === 'danger' ? '#ef4444' : 'rgba(255,255,255,0.12)');
+  const fg = iconColor ?? (tone === 'accent' || tone === 'danger' || iconBg ? colors.white : 'rgba(255,255,255,0.85)');
   return (
-    <Press onPress={onPress} disabled={disabled || busy} pressScale={0.995} style={rowStyle(s, { opacity: disabled ? 0.45 : 1 })}>
+    <Press onPress={onPress} sound={sound} disabled={disabled || busy} pressScale={0.995} style={rowStyle(s, { opacity: disabled ? 0.45 : 1 })}>
       {Icon ? (
-        <View style={{ width: s(32), height: s(32), borderRadius: s(8), alignItems: 'center', justifyContent: 'center', backgroundColor: bg }}>
+        <View style={{ width: s(30), height: s(30), borderRadius: s(8), alignItems: 'center', justifyContent: 'center', backgroundColor: bg }}>
           {busy ? (
             <Animated.View style={{ transform: [{ rotate: spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
               <Loader size={s(16)} color={fg} />
             </Animated.View>
-          ) : <Icon size={s(16)} color={fg} strokeWidth={1.8} />}
+          ) : <Icon size={s(16)} color={fg} strokeWidth={2.2} />}
         </View>
       ) : null}
       <RowText label={label} detail={detail} />
@@ -231,14 +233,17 @@ export function InfoRow({ label, detail, value }: { label: string; detail?: stri
 }
 
 /** Hành động hai nhịp: chạm lần đầu chỉ lên đạn. */
-export function ConfirmActionRow({ icon, label, confirmLabel, detail, onConfirm, disabled, busy, tone = 'default' }: {
+export function ConfirmActionRow({ icon, label, confirmLabel, detail, onConfirm, disabled, busy, tone = 'default', iconBg, iconColor }: {
   icon: LucideIcon; label: string; confirmLabel: string; detail?: string; onConfirm: () => void;
-  disabled?: boolean; busy?: boolean; tone?: 'default' | 'danger';
+  disabled?: boolean; busy?: boolean; tone?: 'default' | 'danger'; iconBg?: string; iconColor?: string;
 }) {
   const [armed, setArmed] = useState(false);
   return (
     <ActionRow
       icon={icon}
+      sound={armed ? 'confirm' : 'select'}
+      iconBg={armed ? '#ef4444' : (iconBg ?? '#f59e0b')}
+      iconColor={iconColor ?? colors.white}
       tone={armed ? 'danger' : tone}
       label={armed ? confirmLabel : label}
       detail={armed ? 'Bấm lần nữa để xác nhận' : detail}

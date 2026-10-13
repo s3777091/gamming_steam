@@ -2,11 +2,13 @@
 // giới thiệu bên trái, thẻ đăng nhập bên phải.
 
 import * as Haptics from 'expo-haptics';
+import { Eye, EyeOff } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { supabaseConfigured } from '@/lib/config';
+import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { createClient } from '@/lib/supabase';
 import { colors, fonts } from '@/theme';
 import { Img } from '@/ui/Img';
@@ -20,6 +22,7 @@ export default function LoginScreen() {
   const { s, insets, width } = useUi();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -43,6 +46,7 @@ export default function LoginScreen() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       return;
     }
+    playUiSound('confirm');
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
@@ -100,20 +104,38 @@ export default function LoginScreen() {
                     selectionColor={colors.accent}
                     style={field}
                   />
-                  <TextInput
-                    ref={passwordRef}
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="Mật khẩu"
-                    placeholderTextColor="rgba(255,255,255,0.38)"
-                    secureTextEntry
-                    autoCapitalize="none"
-                    textContentType="password"
-                    returnKeyType="go"
-                    onSubmitEditing={() => void signIn()}
-                    selectionColor={colors.accent}
-                    style={field}
-                  />
+                  <View style={styles.passwordField}>
+                    <TextInput
+                      ref={passwordRef}
+                      value={password}
+                      onChangeText={setPassword}
+                      placeholder="Mật khẩu"
+                      placeholderTextColor="rgba(255,255,255,0.38)"
+                      secureTextEntry={!passwordVisible}
+                      autoCapitalize="none"
+                      autoComplete="current-password"
+                      textContentType="password"
+                      returnKeyType="go"
+                      onSubmitEditing={() => void signIn()}
+                      selectionColor={colors.accent}
+                      style={[field, { paddingRight: s(48) }]}
+                    />
+                    <Press
+                      accessibilityRole="button"
+                      accessibilityLabel={passwordVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                      accessibilityHint="Thay đổi cách hiển thị nội dung ô mật khẩu"
+                      onPress={() => setPasswordVisible((visible) => !visible)}
+                      pressScale={0.9}
+                      focusRadius={s(10)}
+                      style={[styles.passwordToggle, { width: s(44), height: s(44), borderRadius: s(10) }]}
+                    >
+                      {passwordVisible ? (
+                        <EyeOff size={s(18)} color={colors.text3} strokeWidth={1.8} />
+                      ) : (
+                        <Eye size={s(18)} color={colors.text3} strokeWidth={1.8} />
+                      )}
+                    </Press>
+                  </View>
                 </View>
                 {error ? <T size={11.2} color="#fecaca" leading={1.5} style={{ marginTop: s(10) }}>{error}</T> : null}
                 <Press onPress={() => void signIn()} disabled={busy} style={[styles.submit, { marginTop: s(16), height: s(46), borderRadius: s(23) }]}>
@@ -138,5 +160,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.14)',
     backgroundColor: 'rgba(255,255,255,0.06)',
   },
+  passwordField: { position: 'relative' },
+  passwordToggle: { position: 'absolute', right: 0, top: 0, alignItems: 'center', justifyContent: 'center' },
   submit: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
 });

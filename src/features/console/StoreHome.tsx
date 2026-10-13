@@ -209,8 +209,8 @@ export function StoreHome({ data, featured, preview, onPreview, onOpenGame, onOp
         horizontal
         showsHorizontalScrollIndicator={false}
         onLayout={(event) => { railWidth.current = event.nativeEvent.layout.width; center(false); }}
-        style={{ flexGrow: 0, height: s(118) }}
-        contentContainerStyle={{ alignItems: 'flex-end', gap: s(GAP), paddingHorizontal: s(2), paddingBottom: s(2) }}
+        style={{ flexGrow: 0, height: s(138) }}
+        contentContainerStyle={{ alignItems: 'flex-end', gap: s(GAP), paddingHorizontal: s(10), paddingTop: s(10), paddingBottom: s(12) }}
         decelerationRate="fast"
       >
         {shelfItems.map((item) => (

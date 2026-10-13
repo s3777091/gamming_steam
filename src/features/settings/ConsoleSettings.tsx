@@ -30,17 +30,17 @@ export type SettingsCategory =
 type Tone = 'error' | 'success' | 'info';
 type Notice = { id: number; tone: Tone; title: string; detail?: string };
 
-const CATEGORIES: Array<{ id: SettingsCategory; label: string; detail: string; icon: LucideIcon; stream: boolean }> = [
-  { id: 'quality', label: 'Chất lượng stream', detail: 'Chọn profile hợp với cách bạn chơi', icon: Sparkles, stream: true },
-  { id: 'video', label: 'Hình ảnh', detail: 'Độ phân giải, FPS, codec và bitrate', icon: MonitorPlay, stream: true },
-  { id: 'latency', label: 'Độ trễ & độ mượt', detail: 'Bộ đệm, frame pacing và V-Sync', icon: Gauge, stream: true },
-  { id: 'network', label: 'Mạng', detail: 'Khu vực và kiểm tra đường truyền', icon: Wifi, stream: true },
-  { id: 'overlay', label: 'Trong lúc stream', detail: 'HUD, viền phát và màn hình chờ', icon: Layers, stream: true },
-  { id: 'devices', label: 'Thiết bị', detail: 'Thiết bị đang nối với máy này', icon: Monitor, stream: false },
-  { id: 'controller', label: 'Tay cầm', detail: 'Bố cục nút, rung và vùng chết', icon: Gamepad2, stream: false },
-  { id: 'mouse', label: 'Chuột', detail: 'Tốc độ con trỏ và cuộn', icon: Mouse, stream: false },
-  { id: 'keyboard', label: 'Bàn phím', detail: 'Phím tắt và đổi phím', icon: Keyboard, stream: false },
-  { id: 'audio', label: 'Âm thanh', detail: 'Đầu ra và âm lượng stream', icon: Volume2, stream: false },
+const CATEGORIES: Array<{ id: SettingsCategory; label: string; detail: string; icon: LucideIcon; stream: boolean; color: string }> = [
+  { id: 'quality', label: 'Chất lượng stream', detail: 'Chọn profile hợp với cách bạn chơi', icon: Sparkles, stream: true, color: '#8b5cf6' },
+  { id: 'video', label: 'Hình ảnh', detail: 'Độ phân giải, FPS, codec và bitrate', icon: MonitorPlay, stream: true, color: '#0ea5e9' },
+  { id: 'latency', label: 'Độ trễ & độ mượt', detail: 'Bộ đệm, frame pacing và V-Sync', icon: Gauge, stream: true, color: '#f97316' },
+  { id: 'network', label: 'Mạng', detail: 'Khu vực và kiểm tra đường truyền', icon: Wifi, stream: true, color: '#3b82f6' },
+  { id: 'overlay', label: 'Trong lúc stream', detail: 'HUD, viền phát và màn hình chờ', icon: Layers, stream: true, color: '#10b981' },
+  { id: 'devices', label: 'Thiết bị', detail: 'Thiết bị đang nối với máy này', icon: Monitor, stream: false, color: '#64748b' },
+  { id: 'controller', label: 'Tay cầm', detail: 'Bố cục nút, rung và vùng chết', icon: Gamepad2, stream: false, color: '#ef4444' },
+  { id: 'mouse', label: 'Chuột', detail: 'Tốc độ con trỏ và cuộn', icon: Mouse, stream: false, color: '#06b6d4' },
+  { id: 'keyboard', label: 'Bàn phím', detail: 'Phím tắt và đổi phím', icon: Keyboard, stream: false, color: '#6366f1' },
+  { id: 'audio', label: 'Âm thanh', detail: 'Đầu ra và âm lượng stream', icon: Volume2, stream: false, color: '#ec4899' },
 ];
 
 function SaveStatus({ saving, saved, failed }: { saving: boolean; saved: boolean; failed: boolean }) {
@@ -132,7 +132,7 @@ export default function ConsoleSettings({ initialCategory = 'quality', backdropU
 
   return (
     <FocusLayer>
-    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#05080e', opacity: enter, zIndex: 60 }]}>
+    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#05080e', opacity: enter, zIndex: 60, elevation: 60 }]}>
       {backdropUrl ? <Img source={{ uri: backdropUrl }} style={[StyleSheet.absoluteFill, { opacity: 0.35 }]} contentFit="cover" blurRadius={24} /> : null}
       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(5,8,14,0.82)' }]} />
 
@@ -140,6 +140,7 @@ export default function ConsoleSettings({ initialCategory = 'quality', backdropU
         <View style={{ height: s(48), flexDirection: 'row', alignItems: 'center', gap: s(12) }}>
           <Press
             onPress={onClose}
+            sound="back"
             accessibilityLabel="Đóng cài đặt"
             style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)' }}
           >
@@ -164,12 +165,23 @@ export default function ConsoleSettings({ initialCategory = 'quality', backdropU
                     pressScale={0.985}
                     accessibilityState={{ selected: active }}
                     style={{
-                      height: s(40), flexDirection: 'row', alignItems: 'center', gap: s(12), paddingHorizontal: s(12), borderRadius: s(8), borderWidth: 1,
-                      borderColor: active ? 'rgba(255,255,255,0.7)' : 'transparent', backgroundColor: active ? 'rgba(255,255,255,0.1)' : 'transparent',
+                      height: s(40), flexDirection: 'row', alignItems: 'center', gap: s(10), paddingHorizontal: s(10), borderRadius: s(8), borderWidth: 1,
+                      borderColor: active ? 'rgba(255,255,255,0.16)' : 'transparent', backgroundColor: active ? 'rgba(255,255,255,0.12)' : 'transparent',
                     }}
                   >
-                    <Icon size={s(18)} color={active ? colors.white : 'rgba(255,255,255,0.7)'} strokeWidth={1.6} />
-                    <T size={12.8} color={active ? colors.white : 'rgba(255,255,255,0.7)'} numberOfLines={1} style={{ flex: 1 }}>{entry.label}</T>
+                    <View
+                      style={{
+                        width: s(26),
+                        height: s(26),
+                        borderRadius: s(7),
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: entry.color,
+                      }}
+                    >
+                      <Icon size={s(15)} color="#ffffff" strokeWidth={2.2} />
+                    </View>
+                    <T size={12.6} weight={active ? 'medium' : 'regular'} color={active ? colors.white : 'rgba(255,255,255,0.72)'} numberOfLines={1} style={{ flex: 1 }}>{entry.label}</T>
                   </Press>
                 </View>
               );
@@ -178,9 +190,23 @@ export default function ConsoleSettings({ initialCategory = 'quality', backdropU
 
           <FocusScroll ref={content} style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: s(24) }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <View key={category} style={{ maxWidth: s(640) }}>
-              <View style={{ marginBottom: s(12), paddingHorizontal: s(12) }}>
-                <T size={15.2} weight="medium" tracking={-0.01}>{meta.label}</T>
-                <T size={10.6} color="rgba(255,255,255,0.45)" style={{ marginTop: s(2) }}>{meta.detail}</T>
+              <View style={{ marginBottom: s(14), paddingHorizontal: s(12), flexDirection: 'row', alignItems: 'center', gap: s(10) }}>
+                <View
+                  style={{
+                    width: s(32),
+                    height: s(32),
+                    borderRadius: s(8),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: meta.color,
+                  }}
+                >
+                  <meta.icon size={s(18)} color="#ffffff" strokeWidth={2.2} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <T size={15.2} weight="medium" tracking={-0.01}>{meta.label}</T>
+                  <T size={10.6} color="rgba(255,255,255,0.45)" style={{ marginTop: s(2) }}>{meta.detail}</T>
+                </View>
               </View>
               {page}
             </View>
