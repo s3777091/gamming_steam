@@ -197,7 +197,6 @@ export function usePcLibrary() {
       return { ok: true, error: null };
     } catch (uninstallError) {
       const message = uninstallError instanceof Error ? uninstallError.message : 'Không bắt đầu gỡ cài đặt được.';
-      if (mounted.current) setError(message);
       return { ok: false, error: message };
     } finally {
       if (mounted.current) setUninstallingId(null);

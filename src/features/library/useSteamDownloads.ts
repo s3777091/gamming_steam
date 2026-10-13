@@ -12,6 +12,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RTCPeerConnection, RTCSessionDescription } from 'react-native-webrtc';
 
+import { PC_ROUTES, pcFetchJson, pcPostJson } from '@/lib/pc-api';
 import { realtimeChannelInstance } from '@/lib/realtime-channels';
 import {
   type AppCommand,
@@ -165,6 +166,7 @@ export function useSteamDownloads(
   const [notice, setNotice] = useState<string | null>(null);
   const [expectedAppId, setExpectedAppId] = useState<number | null>(null);
   const [expectedUninstallAppId, setExpectedUninstallAppId] = useState<number | null>(null);
+  const [reconnectNonce, setReconnectNonce] = useState(0);
   const linkRef = useRef<Link | null>(null);
   const installedRef = useRef(new Set<number>());
   const uninstalledRef = useRef(new Set<number>());
@@ -176,8 +178,16 @@ export function useSteamDownloads(
 
   const send = useCallback((command: AppCommand) => {
     const channel = linkRef.current?.channel;
-    if (channel?.readyState === 'open') channel.send(JSON.stringify(command));
-    else setNotice('Chưa nối được tới máy tính.');
+    if (channel?.readyState === 'open') {
+      channel.send(JSON.stringify(command));
+      return;
+    }
+    if (command.type === 'pause' || command.type === 'resume') {
+      void pcPostJson(PC_ROUTES.gameDownloads, { action: command.type, appid: command.appid }, 'Không thực hiện được thao tác.')
+        .catch(() => setNotice('Chưa nối được tới máy tính.'));
+      return;
+    }
+    setNotice('Chưa nối được tới máy tính.');
   }, []);
 
   const applyState = useCallback((next: DownloadsState) => {
@@ -216,6 +226,44 @@ export function useSteamDownloads(
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, []);
+
+  // HTTP polling fallback khi WebRTC DataChannel chưa mở hoặc bị rớt
+  useEffect(() => {
+    let disposed = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const poll = async () => {
+      if (disposed) return;
+      if (!connected) {
+        try {
+          const resp = await pcFetchJson<{ ok?: boolean; state?: DownloadsState | null }>(
+            PC_ROUTES.gameDownloads,
+            'Không đọc được tiến trình tải',
+          );
+          if (!disposed && resp.ok && resp.state) {
+            applyState(resp.state);
+          }
+        } catch {
+          // PC agent chưa phản hồi
+        }
+      }
+
+      if (disposed) return;
+      const hasActive = Boolean(
+        expectedAppId
+        || expectedUninstallAppId
+        || (state && (state.active || state.queue.length > 0 || state.installs.length > 0))
+      );
+      const nextDelay = connected ? 15_000 : hasActive ? 2_500 : 8_000;
+      pollTimer = setTimeout(() => void poll(), nextDelay);
+    };
+
+    void poll();
+    return () => {
+      disposed = true;
+      if (pollTimer) clearTimeout(pollTimer);
+    };
+  }, [connected, expectedAppId, expectedUninstallAppId, state, applyState]);
 
   // Nối thẳng tới agent khi nó có mặt; rớt thì nối lại vài lần.
   useEffect(() => {
@@ -288,7 +336,7 @@ export function useSteamDownloads(
       const link = linkRef.current;
       if (link) drop(link);
     };
-  }, [agentOnline, applyState, userId]);
+  }, [agentOnline, applyState, userId, reconnectNonce]);
 
   // Agent không lên sau khi bấm Tải (máy chưa cài agent): thôi chờ.
   useEffect(() => {
@@ -307,19 +355,21 @@ export function useSteamDownloads(
     installedRef.current.delete(appid);
     setNotice(null);
     setExpectedAppId(appid);
+    setReconnectNonce((n) => n + 1);
   }, []);
 
   const expectUninstall = useCallback((appid: number) => {
     uninstalledRef.current.delete(appid);
     setNotice(null);
     setExpectedUninstallAppId(appid);
+    setReconnectNonce((n) => n + 1);
   }, []);
 
   return {
     state,
     agentOnline,
     connected,
-    canControl: Boolean(state?.controllers.includes(userId)),
+    canControl: Boolean(!state?.controllers.length || state?.controllers.includes(userId)),
     notice,
     expect,
     expectedAppId,

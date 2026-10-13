@@ -1,5 +1,5 @@
-// Năm trang cài đặt stream theo ngôn ngữ thiết kế Apple:
-// Chất lượng, Hình ảnh, Độ trễ & độ mượt, Mạng, Trong lúc stream.
+// Bốn trang cài đặt stream theo ngôn ngữ thiết kế Apple:
+// Chất lượng, Hình ảnh (gồm lớp phủ màn hình), Độ trễ & độ mượt, Mạng.
 // Thẻ Inset Grouped bo tròn viền xám mỏng, nền trắng, chữ đen, dấu tích xanh #007AFF.
 
 import { useEffect, useState } from 'react';
@@ -122,6 +122,11 @@ export function QualityPage({ draft, settings }: PageProps) {
 export function VideoPage({ draft, settings }: PageProps) {
   const copy = streamSettingsCopy(draft.deviceClass);
   const fps = frameRateChoice(settings);
+  const [border, setBorder] = useState(true);
+
+  useEffect(() => {
+    void getLiveBorderEnabled().then(setBorder);
+  }, []);
 
   return (
     <>
@@ -189,6 +194,26 @@ export function VideoPage({ draft, settings }: PageProps) {
         />
       </SettingsGroup>
 
+      <SettingsGroup
+        title="Lớp phủ màn hình"
+        footer="Các thông số hỗ trợ và viền thông báo hiển thị trực tiếp đè lên khung stream."
+      >
+        <ToggleRow
+          label="Performance HUD"
+          detail="RTT, jitter, mất gói, codec, bitrate và tốc độ khung hình"
+          checked={settings.hud_enabled}
+          onChange={(checked) => draft.update('hud_enabled', checked)}
+        />
+        <ToggleRow
+          label="Viền báo đang phát"
+          detail="Viền mỏng quanh màn hình khi đang có người cùng xem"
+          checked={border}
+          onChange={(checked) => {
+            setBorder(checked);
+            void setLiveBorderEnabled(checked);
+          }}
+        />
+      </SettingsGroup>
     </>
   );
 }
@@ -327,9 +352,9 @@ export function NetworkPage({ draft, settings, notify }: PageProps & { notify: N
               marginTop: s(10),
               padding: s(14),
               borderRadius: s(10),
-              backgroundColor: '#F0F7FF',
+              backgroundColor: 'rgba(31, 111, 235, 0.12)',
               borderWidth: StyleSheet.hairlineWidth,
-              borderColor: '#CCE3FD',
+              borderColor: 'rgba(102, 168, 255, 0.28)',
               flexDirection: 'row',
               alignItems: 'center',
               gap: s(12),
@@ -358,39 +383,6 @@ export function NetworkPage({ draft, settings, notify }: PageProps & { notify: N
           </View>
         </View>
       ) : null}
-    </>
-  );
-}
-
-export function OverlayPage({ draft, settings }: PageProps) {
-  const [border, setBorder] = useState(true);
-
-  useEffect(() => {
-    void getLiveBorderEnabled().then(setBorder);
-  }, []);
-
-  return (
-    <>
-      <SettingsGroup
-        title="Lớp phủ màn hình"
-        footer="Các thông số hỗ trợ và viền thông báo hiển thị trực tiếp đè lên khung stream."
-      >
-        <ToggleRow
-          label="Performance HUD"
-          detail="RTT, jitter, mất gói, codec, bitrate và tốc độ khung hình"
-          checked={settings.hud_enabled}
-          onChange={(checked) => draft.update('hud_enabled', checked)}
-        />
-        <ToggleRow
-          label="Viền báo đang phát"
-          detail="Viền mỏng quanh màn hình khi đang có người cùng xem"
-          checked={border}
-          onChange={(checked) => {
-            setBorder(checked);
-            void setLiveBorderEnabled(checked);
-          }}
-        />
-      </SettingsGroup>
     </>
   );
 }

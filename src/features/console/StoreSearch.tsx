@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react';
 import { Animated, Easing, StyleSheet, TextInput, View } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { FocusScroll } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Search, WifiOff, X, type LucideIcon } from 'lucide-react-native';
@@ -8,6 +9,7 @@ import { formatStorePrice } from '@/features/library/format';
 import type { SteamStoreItem } from '@/features/library/types';
 import type { useStoreSearch } from '@/features/library/useSteamStore';
 import { colors, fonts } from '@/theme';
+import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { Skeleton } from '@/ui/Skeleton';
@@ -23,7 +25,7 @@ const KEYBOARD_ROWS = [
 
 type SearchState = ReturnType<typeof useStoreSearch>;
 
-/** Nút tròn mở rộng thành ô nhập tìm kiếm Steam trên header. */
+/** Nút tròn mở rộng thành ô nhập tìm kiếm Steam trên header với hiệu ứng Liquid Glass. */
 export function StoreSearchField({ open, query, inputRef, onOpen, onQueryChange, onSubmit, onClose }: {
   open: boolean;
   query: string;
@@ -48,11 +50,12 @@ export function StoreSearchField({ open, query, inputRef, onOpen, onQueryChange,
           height: s(36),
           borderRadius: s(18),
           width: grow.interpolate({ inputRange: [0, 1], outputRange: [s(36), openWidth] }),
-          borderColor: grow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.14)', 'rgba(102,168,255,0.6)'] }),
-          backgroundColor: grow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(10,17,28,0.48)', 'rgba(10,17,28,0.86)'] }),
+          borderColor: grow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.18)', 'rgba(102,168,255,0.7)'] }),
+          backgroundColor: grow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(12,20,32,0.5)', 'rgba(10,18,30,0.88)'] }),
         },
       ]}
     >
+      <GlassBackdrop material="control" intensity={40} radius={s(18)} />
       <Press
         onPress={() => (open ? inputRef.current?.focus() : onOpen())}
         accessibilityLabel={open ? 'Ô tìm kiếm' : 'Mở tìm kiếm Steam'}
@@ -123,22 +126,51 @@ function SearchResultCard({ item, onOpen }: { item: SteamStoreItem; onOpen: () =
   const { s, width } = useUi();
   const cardWidth = Math.min(s(106), Math.max(s(86), width * 0.11));
   return (
-    <Press onPress={onOpen} pressScale={0.98} accessibilityLabel={item.name} style={[styles.result, { width: cardWidth, borderRadius: s(12) }]}>
+    <Press onPress={onOpen} pressScale={0.97} accessibilityLabel={item.name} style={[styles.result, { width: cardWidth, borderRadius: s(14) }]}>
       <Img
         source={{ uri: item.portraitImage || item.smallImage || item.largeImage }}
         style={StyleSheet.absoluteFill}
         contentFit="cover"
         recyclingKey={String(item.appId)}
       />
-      <LinearGradient colors={['rgba(6,16,29,0.04)', 'rgba(6,16,29,0)', 'rgba(6,16,29,0.96)']} locations={[0, 0.4, 1]} style={StyleSheet.absoluteFill} />
+      {/* Liquid glass light refraction gradient */}
+      <LinearGradient
+        colors={['rgba(255,255,255,0.12)', 'rgba(6,16,29,0.08)', 'rgba(6,16,29,0.5)', 'rgba(6,16,29,0.97)']}
+        locations={[0, 0.35, 0.7, 1]}
+        style={StyleSheet.absoluteFill}
+      />
+      {/* Specular top rim highlight */}
+      <LinearGradient
+        colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0.04)', 'transparent']}
+        locations={[0, 0.45, 1]}
+        style={[StyleSheet.absoluteFill, { height: '35%' }]}
+        pointerEvents="none"
+      />
       {item.discounted ? (
-        <View style={{ position: 'absolute', left: s(6), top: s(6), backgroundColor: colors.accent, borderRadius: s(6), paddingHorizontal: s(6), paddingVertical: s(2) }}>
+        <View
+          style={{
+            position: 'absolute',
+            left: s(6),
+            top: s(6),
+            backgroundColor: colors.accent,
+            borderRadius: s(7),
+            paddingHorizontal: s(6),
+            paddingVertical: s(2),
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: 'rgba(255,255,255,0.4)',
+            shadowColor: '#66a8ff',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.5,
+            shadowRadius: 6,
+            elevation: 4,
+          }}
+        >
           <T size={7.4} weight="bold" color={colors.onAccent} tabular>-{item.discountPercent}%</T>
         </View>
       ) : null}
       <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: s(8) }}>
-        <T size={9} weight="semibold" leading={1.2} numberOfLines={2}>{item.name}</T>
-        <T size={7.7} weight="medium" color="rgba(255,255,255,0.56)" style={{ marginTop: s(4) }}>{formatStorePrice(item)}</T>
+        <T size={9.2} weight="semibold" leading={1.22} numberOfLines={2}>{item.name}</T>
+        <T size={7.8} weight="medium" color="rgba(255,255,255,0.6)" style={{ marginTop: s(4) }}>{formatStorePrice(item)}</T>
       </View>
     </Press>
   );
@@ -153,7 +185,7 @@ function SearchResults({ query, search, onOpenGame }: { query: string; search: S
     const cardWidth = Math.min(s(106), Math.max(s(86), width * 0.11));
     return (
       <View style={{ flex: 1, flexDirection: 'row', gap: s(8), overflow: 'hidden' }}>
-        {Array.from({ length: 8 }, (_, index) => <Skeleton key={index} width={cardWidth} height={s(150)} radius={s(12)} tone={0.07} style={{ alignSelf: 'stretch', height: undefined }} />)}
+        {Array.from({ length: 8 }, (_, index) => <Skeleton key={index} width={cardWidth} height={s(150)} radius={s(14)} tone={0.07} style={{ alignSelf: 'stretch', height: undefined }} />)}
       </View>
     );
   }
@@ -174,18 +206,40 @@ function Key({ label, onPress, flex = 1, accent = false, disabled = false }: {
     <Press
       onPress={onPress}
       disabled={disabled}
-      pressScale={0.94}
+      pressScale={0.93}
       accessibilityLabel={label}
       style={[
         styles.key,
         {
-          flex, height: s(30), borderRadius: s(8),
-          backgroundColor: accent ? (disabled ? 'rgba(255,255,255,0.1)' : colors.accent) : 'rgba(255,255,255,0.055)',
-          borderColor: accent ? 'transparent' : 'rgba(255,255,255,0.1)',
+          flex,
+          height: s(31),
+          borderRadius: s(9),
+          backgroundColor: accent
+            ? (disabled ? 'rgba(255,255,255,0.1)' : colors.accent)
+            : 'rgba(255,255,255,0.065)',
+          borderColor: accent
+            ? (disabled ? 'transparent' : 'rgba(255,255,255,0.4)')
+            : 'rgba(255,255,255,0.13)',
+          shadowColor: accent && !disabled ? '#66a8ff' : '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: accent && !disabled ? 0.35 : 0.2,
+          shadowRadius: 3,
         },
       ]}
     >
-      <T size={accent || label.length > 1 ? 9.2 : 9.6} weight={accent ? 'bold' : 'semibold'} color={accent ? (disabled ? 'rgba(255,255,255,0.28)' : '#07111d') : 'rgba(255,255,255,0.82)'}>
+      {/* Specular rim on top of key */}
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: StyleSheet.hairlineWidth,
+          backgroundColor: 'rgba(255,255,255,0.22)',
+        }}
+        pointerEvents="none"
+      />
+      <T size={accent || label.length > 1 ? 9.2 : 9.8} weight={accent ? 'bold' : 'semibold'} color={accent ? (disabled ? 'rgba(255,255,255,0.28)' : '#07111d') : 'rgba(255,255,255,0.88)'}>
         {label}
       </T>
     </Press>
@@ -200,10 +254,18 @@ function StoreKeyboard({ canSubmit, onKey, onErase, onSubmit }: {
 }) {
   const { s } = useUi();
   return (
-    <View style={[styles.keyboard, { padding: s(10), borderRadius: s(16) }]}>
+    <View style={[styles.keyboard, { padding: s(10), borderRadius: s(18) }]}>
+      <BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFill} />
+      {/* Specular top rim */}
+      <LinearGradient
+        colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.02)', 'transparent']}
+        locations={[0, 0.3, 1]}
+        style={[StyleSheet.absoluteFill, { height: '30%' }]}
+        pointerEvents="none"
+      />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: s(4), marginBottom: s(6) }}>
-        <T size={10} weight="semibold" color="rgba(255,255,255,0.72)">Bàn phím</T>
-        <T size={8} color="rgba(255,255,255,0.34)">Chọn phím để nhập</T>
+        <T size={10} weight="semibold" color="rgba(255,255,255,0.76)">Bàn phím</T>
+        <T size={8} color="rgba(255,255,255,0.38)">Chọn phím để nhập</T>
       </View>
       <View style={{ gap: s(4) }}>
         {KEYBOARD_ROWS.map((row) => (
@@ -233,12 +295,20 @@ export function StoreSearchPanel({ query, search, onOpenGame, onKey, onErase, on
   const trimmed = query.trim();
   return (
     <View style={{ flex: 1, gap: s(8), paddingTop: s(8) }}>
-      <View style={[styles.results, { flex: 1, padding: s(10), borderRadius: s(16) }]}>
+      <View style={[styles.results, { flex: 1, padding: s(10), borderRadius: s(18) }]}>
+        <BlurView intensity={35} tint="dark" style={StyleSheet.absoluteFill} />
+        {/* Specular top rim */}
+        <LinearGradient
+          colors={['rgba(255,255,255,0.16)', 'rgba(255,255,255,0.02)', 'transparent']}
+          locations={[0, 0.25, 1]}
+          style={[StyleSheet.absoluteFill, { height: '30%' }]}
+          pointerEvents="none"
+        />
         <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', paddingHorizontal: s(4), paddingBottom: s(8) }}>
           <T size={14} weight="semibold" tracking={-0.02} numberOfLines={1} style={{ flex: 1 }}>
             {trimmed.length >= 2 ? `Kết quả cho “${trimmed}”` : 'Tìm game của bạn'}
           </T>
-          <T size={9} weight="medium" color="rgba(255,255,255,0.46)" tabular>
+          <T size={9} weight="medium" color="rgba(255,255,255,0.5)" tabular>
             {search.loading ? 'Đang tìm...' : trimmed.length >= 2 ? `${search.total} game` : ''}
           </T>
         </View>
@@ -252,30 +322,61 @@ export function StoreSearchPanel({ query, search, onOpenGame, onKey, onErase, on
 }
 
 const styles = StyleSheet.create({
-  field: { overflow: 'hidden', borderWidth: 1, justifyContent: 'center' },
+  field: {
+    overflow: 'hidden',
+    borderWidth: 1,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
+  },
   accentIcon: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: 'rgba(255,255,255,0.055)',
+    borderColor: 'rgba(102,168,255,0.3)',
+    backgroundColor: 'rgba(102,168,255,0.1)',
   },
   result: {
     overflow: 'hidden',
     alignSelf: 'stretch',
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.card,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(12,20,32,0.8)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 5,
   },
-  key: { alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  key: {
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   keyboard: {
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: 'rgba(8,17,29,0.9)',
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(10,18,30,0.82)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 10,
   },
   results: {
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: 'rgba(8,17,29,0.82)',
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(10,18,30,0.76)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 10,
   },
 });

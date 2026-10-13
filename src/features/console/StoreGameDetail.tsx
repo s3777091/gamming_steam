@@ -17,7 +17,9 @@ import { playUiSound } from '@/features/sound/UiSoundProvider';
 import type { DetailSheet, DetailView, SteamStoreGameDetail, StoreDetailItem } from '@/features/library/detail-types';
 import { formatCompact, formatNumber, formatRelative } from '@/features/library/format';
 import { openExternal } from '@/lib/open-external';
-import { colors } from '@/theme';
+import { BlurView } from 'expo-blur';
+import { colors, glass, glassShadow, glassShadowSubtle } from '@/theme';
+import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { Skeleton } from '@/ui/Skeleton';
@@ -360,11 +362,14 @@ function DetailModal({ title, subtitle, onClose, onBack, wide, children }: {
   return (
     <FocusLayer>
     <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: s(16), zIndex: 60, elevation: 60 }]}>
-      <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.72)' }]} onPress={() => { playUiSound('back'); onClose(); }} />
-      <View style={{ width: Math.min(s(wide ? 896 : 544), width - s(32)), maxHeight: height - s(32), borderRadius: s(22), overflow: 'hidden', borderWidth: 1, borderColor: colors.line, backgroundColor: '#101924' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8), paddingLeft: s(12), paddingRight: s(10), paddingVertical: s(10), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' }}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => { playUiSound('back'); onClose(); }}>
+        <GlassBackdrop material="scrim" intensity={22} />
+      </Pressable>
+      <View style={{ width: Math.min(s(wide ? 896 : 544), width - s(32)), maxHeight: height - s(32), borderRadius: s(24), overflow: 'hidden', borderWidth: 1, borderColor: glass.panelBorder, backgroundColor: glass.modal, ...glassShadow }}>
+        <GlassBackdrop material="panel" intensity={36} radius={s(24)} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8), paddingLeft: s(12), paddingRight: s(10), paddingVertical: s(10), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: glass.border }}>
           {onBack ? (
-            <Press onPress={onBack} sound="back" accessibilityLabel="Quay lại" style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center' }}>
+            <Press onPress={onBack} sound="back" accessibilityLabel="Quay lại" style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: glass.surfaceRaised, borderWidth: 1, borderColor: glass.borderSpecular }}>
               <ChevronLeft size={s(18)} color={colors.text2} />
             </Press>
           ) : null}
@@ -372,7 +377,7 @@ function DetailModal({ title, subtitle, onClose, onBack, wide, children }: {
             <T size={14} weight="bold" numberOfLines={1}>{title}</T>
             {subtitle ? <T size={10} color="rgba(255,255,255,0.44)" numberOfLines={1}>{subtitle}</T> : null}
           </View>
-          <Press onPress={onClose} sound="back" accessibilityLabel="Đóng" style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' }}>
+          <Press onPress={onClose} sound="back" accessibilityLabel="Đóng" style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: glass.surfaceRaised, borderWidth: 1, borderColor: glass.borderSpecular }}>
             <X size={s(16)} color={colors.text2} />
           </Press>
         </View>
@@ -427,21 +432,25 @@ function ScreenshotModal({
     <FocusLayer>
       <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', padding: s(16), zIndex: 60, elevation: 60 }]}>
         <Pressable
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.76)' }]}
+          style={StyleSheet.absoluteFill}
           onPress={() => {
             playUiSound('back');
             onClose();
           }}
-        />
+        >
+          <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.72)' }]} />
+        </Pressable>
         <View
           style={{
             width: Math.min(s(896), width - s(32)),
             height: height - s(32),
-            borderRadius: s(22),
+            borderRadius: s(24),
             overflow: 'hidden',
             borderWidth: 1,
-            borderColor: colors.line,
+            borderColor: glass.borderSpecular,
             backgroundColor: '#05080d',
+            ...glassShadow,
           }}
           onTouchStart={(e) => {
             touchStartX.current = e.nativeEvent.pageX;
@@ -496,9 +505,9 @@ function ScreenshotModal({
               borderRadius: s(17),
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: 'rgba(10, 16, 26, 0.72)',
+              backgroundColor: glass.surfaceRaised,
               borderWidth: 1,
-              borderColor: 'rgba(255, 255, 255, 0.18)',
+              borderColor: glass.borderSpecular,
             }}
           >
             <X size={s(17)} color="#fff" />
@@ -521,9 +530,9 @@ function ScreenshotModal({
                 borderRadius: s(20),
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'rgba(10, 16, 26, 0.72)',
+                backgroundColor: glass.surfaceRaised,
                 borderWidth: 1,
-                borderColor: 'rgba(255, 255, 255, 0.18)',
+                borderColor: glass.borderSpecular,
               }}
             >
               <ChevronLeft size={s(20)} color="#fff" />
@@ -547,9 +556,9 @@ function ScreenshotModal({
                 borderRadius: s(20),
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'rgba(10, 16, 26, 0.72)',
+                backgroundColor: glass.surfaceRaised,
                 borderWidth: 1,
-                borderColor: 'rgba(255, 255, 255, 0.18)',
+                borderColor: glass.borderSpecular,
               }}
             >
               <ChevronRight size={s(20)} color="#fff" />
@@ -569,9 +578,9 @@ function ScreenshotModal({
               paddingHorizontal: s(12),
               paddingVertical: s(6),
               borderRadius: s(16),
-              backgroundColor: 'rgba(10, 16, 26, 0.72)',
+              backgroundColor: glass.surfaceRaised,
               borderWidth: 1,
-              borderColor: 'rgba(255, 255, 255, 0.18)',
+              borderColor: glass.borderSpecular,
             }}
           >
             <Press
@@ -778,10 +787,31 @@ function BuyButton({ action, compact }: { action: StoreBuyAction; compact?: bool
       sound="confirm"
       accessibilityLabel={action.label}
       style={{
-        height: s(36), paddingHorizontal: s(compact ? 14 : 18), borderRadius: s(18), flexDirection: 'row', alignItems: 'center', gap: s(7),
-        backgroundColor: colors.white, opacity: action.disabled ? 0.55 : 1,
+        height: s(36),
+        paddingHorizontal: s(compact ? 14 : 18),
+        borderRadius: s(18),
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: s(7),
+        backgroundColor: colors.white,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.9)',
+        shadowColor: '#ffffff',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.16,
+        shadowRadius: 8,
+        elevation: 4,
+        overflow: 'hidden',
+        opacity: action.disabled ? 0.55 : 1,
       }}
     >
+      <LinearGradient
+        colors={['rgba(255,255,255,0.45)', 'rgba(255,255,255,0.05)', 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={[StyleSheet.absoluteFill, { height: '55%' }]}
+        pointerEvents="none"
+      />
       <Icon size={s(compact ? 14 : 15)} color="#08111d" strokeWidth={2.3} fill={filled ? '#08111d' : 'none'} />
       <T size={compact ? 10.2 : 11.2} weight="bold" color="#08111d" numberOfLines={1}>{compact && action.price ? `${action.label} · ${action.price}` : action.label}</T>
     </Press>
@@ -893,7 +923,7 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyA
                   <BuyButton action={effectiveBuyAction} />
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8) }}>
                     {item.discounted ? (
-                      <View style={{ backgroundColor: colors.accent, borderRadius: s(6), paddingHorizontal: s(6), paddingVertical: s(2) }}>
+                      <View style={{ backgroundColor: colors.accent, borderRadius: s(8), paddingHorizontal: s(7), paddingVertical: s(3), borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', shadowColor: colors.accent, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 6, elevation: 2 }}>
                         <T size={9.6} weight="bold" color={colors.onAccent} tabular>-{item.discountPercent}%</T>
                       </View>
                     ) : null}
@@ -938,15 +968,21 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyA
           position: 'absolute', left: 0, right: 0, top: 0, height: s(56) + insets.top, paddingTop: insets.top,
           paddingLeft: s(12) + insets.left, paddingRight: s(12) + insets.right,
           flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-          backgroundColor: compact ? 'rgba(11,18,27,0.9)' : 'transparent',
-          borderBottomWidth: compact ? StyleSheet.hairlineWidth : 0, borderBottomColor: 'rgba(255,255,255,0.08)',
+          overflow: 'hidden',
         }}
       >
+        {compact ? (
+          <>
+            <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: glass.surfaceRaised }]} />
+            <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: StyleSheet.hairlineWidth, backgroundColor: glass.borderSpecular }} />
+          </>
+        ) : null}
         <Press onPress={onClose} sound="back" accessibilityLabel="Quay lại cửa hàng" style={[styles.navButton, { width: s(36), height: s(36), borderRadius: s(18) }]}>
           <ChevronLeft size={s(18)} color="rgba(255,255,255,0.86)" strokeWidth={2.2} />
         </Press>
         {compact ? (
-          <View style={{ width: s(27), height: s(40), borderRadius: s(6), overflow: 'hidden', borderWidth: 1, borderColor: colors.line }}>
+          <View style={{ width: s(27), height: s(40), borderRadius: s(8), overflow: 'hidden', borderWidth: 1, borderColor: glass.borderSpecular }}>
             <Img source={{ uri: coverSource }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
           </View>
         ) : <View />}
@@ -972,7 +1008,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: 'rgba(10,17,28,0.62)',
+    borderColor: glass.borderSpecular,
+    backgroundColor: glass.surfaceRaised,
+    ...glassShadowSubtle,
   },
 });

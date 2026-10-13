@@ -37,6 +37,7 @@ export const PC_ROUTES = {
   gameLaunch: '/games/launch',
   gameInstall: '/games/install',
   gameUninstall: '/games/uninstall',
+  gameDownloads: '/games/downloads',
   gameSession: '/games/session',
   gameRuntime: '/games/runtime',
   store: '/store',

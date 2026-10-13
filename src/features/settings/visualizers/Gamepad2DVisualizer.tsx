@@ -17,7 +17,6 @@ import Svg, {
 import type { NativeGamepadState } from 'jetsona-input';
 
 import { appleColors } from '@/features/settings/controls';
-import { T } from '@/ui/Text';
 
 export type ControllerLayoutKind = 'auto' | 'xbox' | 'playstation' | 'nintendo';
 
@@ -71,8 +70,8 @@ export function Gamepad2DVisualizer({
   const isY = (buttons & MASK_Y) !== 0;
   const isLB = (buttons & MASK_LB) !== 0;
   const isRB = (buttons & MASK_RB) !== 0;
-  const isLT = lt > triggerDeadzone;
-  const isRT = rt > triggerDeadzone;
+  const isLT = lt >= 0.5;
+  const isRT = rt >= 0.5;
   const isBack = (buttons & MASK_BACK) !== 0;
   const isStart = (buttons & MASK_START) !== 0;
   const isL3 = (buttons & MASK_L3) !== 0;
@@ -145,45 +144,27 @@ export function Gamepad2DVisualizer({
               <Stop offset="0%" stopColor="#1E2736" />
               <Stop offset="100%" stopColor="#11161F" />
             </LinearGradient>
-            {/* Gradient cho cò LT */}
-            <LinearGradient id="ltGrad" x1="0" y1="1" x2="0" y2="0">
-              <Stop offset="0%" stopColor={colorActive} stopOpacity={0.85} />
-              <Stop offset="100%" stopColor="#5AC8FA" stopOpacity={0.95} />
-            </LinearGradient>
-            {/* Gradient cho cò RT */}
-            <LinearGradient id="rtGrad" x1="0" y1="1" x2="0" y2="0">
-              <Stop offset="0%" stopColor={colorActive} stopOpacity={0.85} />
-              <Stop offset="100%" stopColor="#5AC8FA" stopOpacity={0.95} />
-            </LinearGradient>
           </Defs>
 
-          {/* 1. CÒ TRÁI LT & CÒ PHẢI RT (Triggers) */}
+          {/* 1. CÒ TRÁI LT & CÒ PHẢI RT (Triggers dạng nút click On/Off) */}
           {/* LT trigger */}
           <G onPress={() => onButtonPress?.('LT')}>
             {/* Nền cò LT */}
             <Path
               d="M 115 58 C 115 32, 130 18, 175 18 C 185 18, 190 28, 190 58 Z"
-              fill="#0F141C"
-              stroke={isLT ? colorActive : colorBorder}
+              fill={isLT ? colorActive : '#0F141C'}
+              stroke={isLT ? '#FFFFFF' : colorBorder}
               strokeWidth={isLT ? 2.5 : 1.5}
             />
-            {/* Tiến trình bóp cò LT (0% đến 100%) */}
-            {lt > 0.02 && (
-              <Path
-                d={`M 116 ${58 - lt * 38} C 116 32, 130 18, 175 18 C 185 18, 189 28, 189 ${58 - lt * 38} Z`}
-                fill="url(#ltGrad)"
-                opacity={0.85}
-              />
-            )}
             <SvgText
               x="152"
               y="44"
               fill={isLT ? '#FFFFFF' : colorMuted}
-              fontSize="10"
+              fontSize="11"
               fontWeight="bold"
               textAnchor="middle"
             >
-              {`LT ${Math.round(lt * 100)}%`}
+              LT
             </SvgText>
           </G>
 
@@ -192,27 +173,19 @@ export function Gamepad2DVisualizer({
             {/* Nền cò RT */}
             <Path
               d="M 350 58 C 350 28, 355 18, 365 18 C 410 18, 425 32, 425 58 Z"
-              fill="#0F141C"
-              stroke={isRT ? colorActive : colorBorder}
+              fill={isRT ? colorActive : '#0F141C'}
+              stroke={isRT ? '#FFFFFF' : colorBorder}
               strokeWidth={isRT ? 2.5 : 1.5}
             />
-            {/* Tiến trình bóp cò RT */}
-            {rt > 0.02 && (
-              <Path
-                d={`M 351 ${58 - rt * 38} C 351 28, 355 18, 365 18 C 410 18, 424 32, 424 ${58 - rt * 38} Z`}
-                fill="url(#rtGrad)"
-                opacity={0.85}
-              />
-            )}
             <SvgText
               x="388"
               y="44"
               fill={isRT ? '#FFFFFF' : colorMuted}
-              fontSize="10"
+              fontSize="11"
               fontWeight="bold"
               textAnchor="middle"
             >
-              {`RT ${Math.round(rt * 100)}%`}
+              RT
             </SvgText>
           </G>
 
@@ -735,36 +708,6 @@ export function Gamepad2DVisualizer({
         </Svg>
       </View>
 
-      {/* THANH THỐNG SỐ TỨC THỜI DƯỚI TAY CẦM */}
-      <View style={styles.metricsRow}>
-        <View style={styles.metricItem}>
-          <T size={9.5} color="#8E9EB5">CẦN TRÁI</T>
-          <T size={11} weight="semibold" color="#FFFFFF" tabular>
-            {`X: ${lx.toFixed(2)}  Y: ${ly.toFixed(2)}`}
-          </T>
-        </View>
-
-        <View style={styles.metricItem}>
-          <T size={9.5} color="#8E9EB5">CÒ TRÁI (LT)</T>
-          <T size={11} weight="semibold" color={isLT ? colorActive : '#FFFFFF'} tabular>
-            {`${Math.round(lt * 100)}%`}
-          </T>
-        </View>
-
-        <View style={styles.metricItem}>
-          <T size={9.5} color="#8E9EB5">CÒ PHẢI (RT)</T>
-          <T size={11} weight="semibold" color={isRT ? colorActive : '#FFFFFF'} tabular>
-            {`${Math.round(rt * 100)}%`}
-          </T>
-        </View>
-
-        <View style={styles.metricItem}>
-          <T size={9.5} color="#8E9EB5">CẦN PHẢI</T>
-          <T size={11} weight="semibold" color="#FFFFFF" tabular>
-            {`X: ${rx.toFixed(2)}  Y: ${ry.toFixed(2)}`}
-          </T>
-        </View>
-      </View>
     </View>
   );
 }
@@ -790,18 +733,5 @@ const styles = StyleSheet.create({
   svg: {
     width: '100%',
     height: '100%',
-  },
-  metricsRow: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 12,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#1A2433',
-  },
-  metricItem: {
-    alignItems: 'center',
-    gap: 2,
   },
 });

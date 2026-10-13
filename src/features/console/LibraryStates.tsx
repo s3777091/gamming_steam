@@ -1,39 +1,88 @@
 import { useEffect, useState } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Gamepad2, Monitor, RefreshCw, WifiOff } from 'lucide-react-native';
 
 import { colors } from '@/theme';
 import { Img } from '@/ui/Img';
+import { LiquidAmbientAurora } from '@/ui/LiquidGlass';
 import { Press } from '@/ui/Press';
 import { Skeleton } from '@/ui/Skeleton';
 import { useUi } from '@/ui/scale';
+import { TAB_MOTION_EASING, TAB_MOTION_MS } from './tabMotion';
 import { T } from '@/ui/Text';
 
-/** Ảnh nền toàn màn hình theo tab đang mở, kèm lớp tối để chữ đọc được. */
+type BackdropLayer = { key: number; url: string; opacity: number; fade: Animated.Value };
+
+/**
+ * Ảnh nền đổi giữa game ↔ store ↔ game khác: ảnh cũ giữ nguyên cho tới khi ảnh mới đã vẽ xong rồi
+ * mới crossfade lên trên. Trước đây dùng `key={url}` nên ảnh cũ biến mất ngay, ảnh mới hiện từ
+ * trong suốt → thấy nền Aurora chớp giữa hai ảnh.
+ */
+function BackdropImage({ url, store }: { url: string | null | undefined; store: boolean }) {
+  const [layers, setLayers] = useState<BackdropLayer[]>([]);
+
+  // Đổi url: thêm lớp mới (độ mờ 0) lên trên cùng; url rỗng thì giữ nguyên ảnh đang có.
+  const top = layers[layers.length - 1];
+  if (url && top?.url !== url) {
+    const layer: BackdropLayer = { key: (top?.key ?? 0) + 1, url, opacity: store ? 0.95 : 0.88, fade: new Animated.Value(layers.length ? 0 : 1) };
+    setLayers([...layers, layer]);
+  }
+
+  const reveal = (layer: BackdropLayer) => {
+    Animated.timing(layer.fade, {
+      toValue: 1,
+      duration: TAB_MOTION_MS * 2,
+      easing: TAB_MOTION_EASING,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      // Ảnh mới đã phủ kín: bỏ mọi lớp bên dưới nó.
+      if (finished) setLayers((current) => current.slice(current.findIndex((entry) => entry.key === layer.key)));
+    });
+  };
+
+  return (
+    <>
+      {layers.map((layer) => (
+        <Animated.View
+          key={layer.key}
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { opacity: Animated.multiply(layer.fade, layer.opacity) }]}
+        >
+          <Img
+            source={{ uri: layer.url }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={0}
+            onDisplay={() => reveal(layer)}
+          />
+        </Animated.View>
+      ))}
+    </>
+  );
+}
+
+/** Ảnh nền toàn màn hình theo tab đang mở, kết hợp Aurora chất lỏng phát quang và lớp làm tối dịu mắt. */
 export function LibraryBackdrop({ url, store }: { url: string | null | undefined; store: boolean }) {
   const [storeAnim] = useState(() => new Animated.Value(store ? 1 : 0));
 
   useEffect(() => {
     Animated.timing(storeAnim, {
       toValue: store ? 1 : 0,
-      duration: 320,
-      easing: Easing.out(Easing.cubic),
+      duration: TAB_MOTION_MS,
+      easing: TAB_MOTION_EASING,
       useNativeDriver: true,
     }).start();
   }, [store, storeAnim]);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {url ? (
-        <Img
-          key={url}
-          source={{ uri: url }}
-          style={[StyleSheet.absoluteFill, { opacity: store ? 1 : 0.8 }]}
-          contentFit="cover"
-          transition={560}
-        />
-      ) : null}
+      {/* 1. Lớp Aurora chất lỏng phát quang xuyên thấu qua các bề mặt kính */}
+      <LiquidAmbientAurora active opacity={0.85} />
+
+      {/* 2. Ảnh nền game / store nếu có */}
+      <BackdropImage url={url} store={store} />
+
       <Animated.View
         pointerEvents="none"
         style={[
@@ -44,13 +93,13 @@ export function LibraryBackdrop({ url, store }: { url: string | null | undefined
         ]}
       >
         <LinearGradient
-          colors={['rgba(5,10,17,0.82)', 'rgba(5,10,17,0.42)', 'rgba(5,10,17,0.06)', 'rgba(5,10,17,0.24)']}
+          colors={['rgba(5,10,17,0.60)', 'rgba(5,10,17,0.25)', 'transparent', 'rgba(5,10,17,0.18)']}
           locations={[0, 0.38, 0.73, 1]}
           start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
           style={StyleSheet.absoluteFill}
         />
         <LinearGradient
-          colors={['rgba(5,10,17,0.42)', 'rgba(5,10,17,0)', 'rgba(5,10,17,0.16)', 'rgba(5,10,17,0.96)']}
+          colors={['rgba(5,10,17,0.25)', 'transparent', 'rgba(5,10,17,0.08)', 'rgba(5,10,17,0.70)']}
           locations={[0, 0.28, 0.48, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -68,13 +117,13 @@ export function LibraryBackdrop({ url, store }: { url: string | null | undefined
         ]}
       >
         <LinearGradient
-          colors={['rgba(8,12,18,0.92)', 'rgba(8,12,18,0.58)', 'rgba(8,12,18,0.18)', 'rgba(8,12,18,0.44)']}
+          colors={['rgba(8,12,18,0.62)', 'rgba(8,12,18,0.28)', 'rgba(8,12,18,0.04)', 'rgba(8,12,18,0.22)']}
           locations={[0, 0.47, 0.76, 1]}
           start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
           style={StyleSheet.absoluteFill}
         />
         <LinearGradient
-          colors={['rgba(8,12,18,0.58)', 'rgba(8,12,18,0.08)', 'rgba(8,12,18,0.80)']}
+          colors={['rgba(8,12,18,0.32)', 'rgba(8,12,18,0.02)', 'rgba(8,12,18,0.60)']}
           locations={[0, 0.33, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -94,8 +143,8 @@ export function PcWallpaper({ visible }: { visible: boolean }) {
   useEffect(() => {
     Animated.timing(anim, {
       toValue: visible ? 1 : 0,
-      duration: 320,
-      easing: Easing.out(Easing.cubic),
+      duration: TAB_MOTION_MS,
+      easing: TAB_MOTION_EASING,
       useNativeDriver: true,
     }).start();
   }, [visible, anim]);
@@ -189,8 +238,9 @@ function RoundIcon({ children }: { children: React.ReactNode }) {
   const { s } = useUi();
   return (
     <View style={{
-      width: s(48), height: s(48), borderRadius: s(12), alignItems: 'center', justifyContent: 'center',
-      borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line, backgroundColor: 'rgba(255,255,255,0.07)',
+      width: s(54), height: s(54), borderRadius: s(16), alignItems: 'center', justifyContent: 'center',
+      borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)', backgroundColor: 'rgba(255,255,255,0.08)',
+      shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 10, elevation: 6,
     }}
     >
       {children}
@@ -203,12 +253,12 @@ export function StoreError({ message, onRetry }: { message: string; onRetry: () 
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
       <View style={{ maxWidth: s(380), alignItems: 'center' }}>
-        <RoundIcon><WifiOff size={s(20)} color="rgba(255,255,255,0.58)" /></RoundIcon>
-        <T size={18} weight="semibold" tracking={-0.02} style={{ marginTop: s(12) }}>Không tải được Steam Store</T>
+        <RoundIcon><WifiOff size={s(22)} color="rgba(255,255,255,0.7)" /></RoundIcon>
+        <T size={18} weight="semibold" tracking={-0.02} style={{ marginTop: s(14) }}>Không tải được Steam Store</T>
         <T size={12} color={colors.text3} leading={1.6} style={{ marginTop: s(6), textAlign: 'center' }}>{message}</T>
-        <Press onPress={onRetry} style={[styles.whiteButton, { marginTop: s(12), height: s(40), paddingHorizontal: s(16), borderRadius: s(20), gap: s(8) }]}>
-          <RefreshCw size={s(14)} color="#0a111c" />
-          <T size={12} weight="semibold" color="#0a111c">Thử lại</T>
+        <Press onPress={onRetry} style={[styles.whiteButton, { marginTop: s(14), height: s(40), paddingHorizontal: s(18), borderRadius: s(20), gap: s(8) }]}>
+          <RefreshCw size={s(14)} color="#0a111c" strokeWidth={2.2} />
+          <T size={12} weight="bold" color="#0a111c">Thử lại</T>
         </Press>
       </View>
     </View>
@@ -227,18 +277,18 @@ export function LibraryEmpty({ error, warning, refreshing, onOpenPc, onRetry }: 
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
       <View style={{ maxWidth: s(380), alignItems: 'center' }}>
         <RoundIcon>
-          {error ? <WifiOff size={s(20)} color="rgba(255,255,255,0.58)" /> : <Gamepad2 size={s(20)} color="rgba(255,255,255,0.58)" />}
+          {error ? <WifiOff size={s(22)} color="rgba(255,255,255,0.7)" /> : <Gamepad2 size={s(22)} color="rgba(255,255,255,0.7)" />}
         </RoundIcon>
-        <T size={18} weight="semibold" tracking={-0.02} style={{ marginTop: s(12) }}>
+        <T size={18} weight="semibold" tracking={-0.02} style={{ marginTop: s(14) }}>
           {error ? 'Chưa kết nối được máy tính' : warning ? 'Chưa đọc được thư viện Steam' : 'Chưa tìm thấy trò chơi có thể cài'}
         </T>
         <T size={12} color={colors.text3} leading={1.6} style={{ marginTop: s(6), textAlign: 'center' }}>
           {error || warning || 'Mở Steam trên máy tính để đồng bộ thư viện rồi thử lại.'}
         </T>
-        <View style={{ flexDirection: 'row', gap: s(10), marginTop: s(12) }}>
-          <Press onPress={onOpenPc} style={[styles.whiteButton, { height: s(40), paddingHorizontal: s(16), borderRadius: s(20), gap: s(8) }]}>
-            <Monitor size={s(14)} color="#0a111c" />
-            <T size={12} weight="semibold" color="#0a111c">Mở máy tính</T>
+        <View style={{ flexDirection: 'row', gap: s(12), marginTop: s(16) }}>
+          <Press onPress={onOpenPc} style={[styles.whiteButton, { height: s(40), paddingHorizontal: s(18), borderRadius: s(20), gap: s(8) }]}>
+            <Monitor size={s(14)} color="#0a111c" strokeWidth={2.2} />
+            <T size={12} weight="bold" color="#0a111c">Mở máy tính</T>
           </Press>
           <Press
             onPress={onRetry}
@@ -246,11 +296,11 @@ export function LibraryEmpty({ error, warning, refreshing, onOpenPc, onRetry }: 
             accessibilityLabel="Thử lại"
             style={{
               width: s(40), height: s(40), borderRadius: s(20), alignItems: 'center', justifyContent: 'center',
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.07)',
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.09)',
               opacity: refreshing ? 0.55 : 1,
             }}
           >
-            <RefreshCw size={s(14)} color="rgba(255,255,255,0.75)" />
+            <RefreshCw size={s(14)} color="rgba(255,255,255,0.85)" strokeWidth={2} />
           </Press>
         </View>
       </View>
@@ -259,5 +309,16 @@ export function LibraryEmpty({ error, warning, refreshing, onOpenPc, onRetry }: 
 }
 
 const styles = StyleSheet.create({
-  whiteButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
+  whiteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    shadowColor: '#ffffff',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
+  },
 });
+

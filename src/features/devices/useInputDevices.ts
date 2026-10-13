@@ -67,7 +67,13 @@ export function useInputDevices() {
     setBluetooth(getBluetooth());
   }, []);
 
-  return { devices, bluetooth, refresh };
+  /** Đọc lại ngay (không xin quyền). Native chỉ báo khi cắm/rút, không báo khi pin tụt,
+   *  nên gọi lúc người dùng mở menu thiết bị để % pin là số mới nhất. */
+  const resync = useCallback(() => {
+    setDevices(getDevices().map(toLocal));
+  }, []);
+
+  return { devices, bluetooth, refresh, resync };
 }
 
 export const KIND_LABEL: Record<DeviceKind, string> = {

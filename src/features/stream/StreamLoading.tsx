@@ -16,7 +16,7 @@ import { Monitor, RefreshCw, X } from 'lucide-react-native';
 
 import type { PendingGameLaunch } from '@/lib/game-launch';
 import type { LoadingThemeId } from '@/lib/loading-themes';
-import { colors } from '@/theme';
+import { colors, glass, glassShadowSubtle } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -398,66 +398,93 @@ export function StreamLoading({
         </Press>
       </View>
 
-      {/* 4. CHỮ TRẠNG THÁI KẾT NỐI Ở CHÍNH GIỮA (CHỖ KHOANH VÀNG ẢNH 2) */}
-      {/* Không có Description dài dòng, chữ lớn phong cách THE CITY OPENS */}
+      {/* 4. CHỮ TRẠNG THÁI KẾT NỐI Ở CHÍNH GIỮA */}
       <View style={styles.centerContainer} pointerEvents="none">
-        {/* Tiêu đề phụ: Tên Game hoặc PC */}
         {launch ? (
-          <View style={{ alignItems: 'center', marginBottom: s(10) }}>
+          <View style={{ alignItems: 'center' }}>
             {launch.logoUrl ? (
               <Img
                 source={{ uri: launch.logoUrl }}
-                style={{ width: Math.min(s(220), width * 0.45), height: s(46) }}
+                style={{ width: Math.min(s(280), width * 0.55), height: s(64) }}
                 contentFit="contain"
                 transition={0}
               />
             ) : (
               <T
-                size={11.5}
+                size={Platform.OS === 'web' ? 36 : s(26)}
                 weight="bold"
-                color="rgba(242,244,248,0.75)"
-                tracking={0.2}
-                numberOfLines={1}
+                color={COL_TEXT}
+                tracking={0.05}
+                numberOfLines={2}
+                style={styles.centerTitle}
               >
                 {launch.title.toUpperCase()}
               </T>
             )}
+
+            {/* Chỉ hiện trạng thái khi bị lỗi kết nối để người dùng biết */}
+            {failure ? (
+              <Animated.View style={{ transform: [{ scale: textScale }], marginTop: s(12) }}>
+                <T
+                  size={Platform.OS === 'web' ? 24 : s(18)}
+                  weight="bold"
+                  color="#F87171"
+                  tracking={-0.015}
+                  style={styles.centerTitle}
+                >
+                  {displayStatus}
+                </T>
+              </Animated.View>
+            ) : null}
+
+            {/* Chi tiết lỗi khi thất bại */}
+            {failure && detail ? (
+              <T
+                size={11.5}
+                color="rgba(254,202,202,0.8)"
+                style={{ marginTop: s(8), textAlign: 'center', maxWidth: width * 0.6 }}
+              >
+                {detail}
+              </T>
+            ) : null}
           </View>
         ) : (
-          <T
-            size={11}
-            weight="bold"
-            color="rgba(242,244,248,0.65)"
-            tracking={0.25}
-            style={{ marginBottom: s(8) }}
-          >
-            PC STREAMING
-          </T>
+          <>
+            <T
+              size={11}
+              weight="bold"
+              color="rgba(242,244,248,0.65)"
+              tracking={0.25}
+              style={{ marginBottom: s(8) }}
+            >
+              PC STREAMING
+            </T>
+
+            {/* Trạng thái kết nối nổi bật khi không có game launch */}
+            <Animated.View style={{ transform: [{ scale: textScale }] }}>
+              <T
+                size={Platform.OS === 'web' ? 46 : s(32)}
+                weight="bold"
+                color={failure ? '#F87171' : COL_TEXT}
+                tracking={-0.015}
+                style={styles.centerTitle}
+              >
+                {displayStatus}
+              </T>
+            </Animated.View>
+
+            {/* Chỉ hiện chi tiết khi bị lỗi kết nối để người dùng biết khắc phục */}
+            {failure && detail ? (
+              <T
+                size={11.5}
+                color="rgba(254,202,202,0.8)"
+                style={{ marginTop: s(8), textAlign: 'center', maxWidth: width * 0.6 }}
+              >
+                {detail}
+              </T>
+            ) : null}
+          </>
         )}
-
-        {/* Trạng thái kết nối nổi bật */}
-        <Animated.View style={{ transform: [{ scale: textScale }] }}>
-          <T
-            size={Platform.OS === 'web' ? 46 : s(32)}
-            weight="bold"
-            color={failure ? '#F87171' : COL_TEXT}
-            tracking={-0.015}
-            style={styles.centerTitle}
-          >
-            {displayStatus}
-          </T>
-        </Animated.View>
-
-        {/* Chỉ hiện chi tiết khi bị lỗi kết nối để người dùng biết khắc phục */}
-        {failure && detail ? (
-          <T
-            size={11.5}
-            color="rgba(254,202,202,0.8)"
-            style={{ marginTop: s(8), textAlign: 'center', maxWidth: width * 0.6 }}
-          >
-            {detail}
-          </T>
-        ) : null}
       </View>
 
       {/* NÚT THAO TÁC KHI CÓ LỖI HOẶC CẦN MỞ DESKTOP */}
@@ -540,12 +567,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: glass.surfaceRaised,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: glass.borderSpecular,
+    ...glassShadowSubtle,
   },
   centerContainer: {
     position: 'absolute',
@@ -572,11 +600,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 38,
-    paddingHorizontal: 16,
+    height: 40,
+    paddingHorizontal: 18,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.9)',
+    overflow: 'hidden',
     gap: 8,
+    ...glassShadowSubtle,
   },
   progressTrack: {
     position: 'absolute',

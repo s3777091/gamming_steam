@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowLeft,
   ChevronRight,
@@ -102,16 +103,24 @@ function DiscountNotificationCard({
   const finalPriceFormatted = formatStorePrice({ finalPrice: item.finalPrice, currency: item.currency });
 
   return (
-    <View style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(14), gap: s(8) }]}>
+    <View style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(16), gap: s(8) }]}>
+      {/* Specular top rim */}
+      <LinearGradient
+        colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.02)', 'transparent']}
+        locations={[0, 0.4, 1]}
+        style={[StyleSheet.absoluteFill, { height: '35%' }]}
+        pointerEvents="none"
+      />
+
       <Press
         onPress={onPress}
         pressScale={0.98}
         accessibilityLabel={`Xem game giảm giá ${item.gameTitle}`}
         style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(12) }}
       >
-        <View style={[styles.imageBox, { width: s(96), height: s(54), borderRadius: s(8) }]}>
+        <View style={[styles.imageBox, { width: s(96), height: s(54), borderRadius: s(9) }]}>
           <Img source={{ uri: item.imageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-          <View style={[styles.discountTag, { top: s(4), left: s(4), borderRadius: s(4), paddingHorizontal: s(4), paddingVertical: s(1.5) }]}>
+          <View style={[styles.discountTag, { top: s(4), left: s(4), borderRadius: s(5), paddingHorizontal: s(5), paddingVertical: s(1.5) }]}>
             <T size={8.5} weight="bold" color="#fff" tabular>
               -{item.discountPercent}%
             </T>
@@ -120,7 +129,7 @@ function DiscountNotificationCard({
 
         <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
-            <View style={[styles.pillBadge, { borderRadius: s(4), paddingHorizontal: s(5), paddingVertical: s(1.5) }]}>
+            <View style={[styles.pillBadge, { borderRadius: s(5), paddingHorizontal: s(6), paddingVertical: s(1.5) }]}>
               <Tag size={s(9)} color={colors.accent} strokeWidth={2} />
               <T size={8.5} weight="semibold" color={colors.accent}>
                 GIẢM GIÁ STEAM
@@ -175,21 +184,29 @@ function UpdateNotificationCard({
   const timeAgo = formatRelative(item.publishedAt);
 
   return (
-    <View style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(14), gap: s(8) }]}>
+    <View style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(16), gap: s(8) }]}>
+      {/* Specular top rim */}
+      <LinearGradient
+        colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.02)', 'transparent']}
+        locations={[0, 0.4, 1]}
+        style={[StyleSheet.absoluteFill, { height: '35%' }]}
+        pointerEvents="none"
+      />
+
       <Press
         onPress={onPress}
         pressScale={0.98}
         accessibilityLabel={`Xem cập nhật ${item.gameTitle}: ${item.title}`}
         style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(12) }}
       >
-        <View style={[styles.imageBox, { width: s(96), height: s(54), borderRadius: s(8) }]}>
+        <View style={[styles.imageBox, { width: s(96), height: s(54), borderRadius: s(9) }]}>
           <Img source={{ uri: item.gameImageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
         </View>
 
         <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(6) }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6), flex: 1, minWidth: 0 }}>
-              <View style={[styles.pillBadgeNews, { borderRadius: s(4), paddingHorizontal: s(5), paddingVertical: s(1.5) }]}>
+              <View style={[styles.pillBadgeNews, { borderRadius: s(5), paddingHorizontal: s(6), paddingVertical: s(1.5) }]}>
                 <Newspaper size={s(9)} color="#8dc0ff" strokeWidth={2} />
                 <T size={8.5} weight="semibold" color="#8dc0ff" numberOfLines={1}>
                   {item.feedLabel || 'BẢN CẬP NHẬT'}
@@ -437,9 +454,15 @@ export function NotificationsPanel({
 
 const styles = StyleSheet.create({
   card: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.line,
-    backgroundColor: 'rgba(255,255,255,0.035)',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.045)',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
   },
   notifCard: {
     flexDirection: 'row',
@@ -447,19 +470,27 @@ const styles = StyleSheet.create({
   },
   imageBox: {
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.14)',
   },
   discountTag: {
     position: 'absolute',
-    backgroundColor: colors.primary,
+    backgroundColor: colors.accent,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.4)',
+    shadowColor: '#66a8ff',
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 3,
   },
   pillBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(102,168,255,0.12)',
+    backgroundColor: 'rgba(102,168,255,0.14)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(102,168,255,0.25)',
+    borderColor: 'rgba(102,168,255,0.3)',
   },
   pillBadgeNews: {
     flexDirection: 'row',
@@ -467,7 +498,7 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   tabPill: {
     alignItems: 'center',
@@ -478,15 +509,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
   },
   dismissBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
 });

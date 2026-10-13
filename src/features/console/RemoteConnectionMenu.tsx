@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { Moon, Play, Power, RotateCw, X } from 'lucide-react-native';
 
 import { FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
-import { colors } from '@/theme';
+import { colors, glass } from '@/theme';
+import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -45,6 +46,7 @@ export function RemoteConnectionMenu({
 }: RemoteConnectionMenuProps) {
   const { s, width: screenWidth, insets } = useUi();
   const [anim] = useState(() => new Animated.Value(0));
+  const closingRef = useRef(false);
   const [spinAnim] = useState(() => new Animated.Value(0));
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isSleeping, setIsSleeping] = useState(false);
@@ -64,26 +66,37 @@ export function RemoteConnectionMenu({
   // Hiệu ứng slide out trượt mượt mà từ trên xuống
   useEffect(() => {
     if (open) {
+      closingRef.current = false;
       anim.setValue(0);
-      Animated.timing(anim, {
+      const animation = Animated.timing(anim, {
         toValue: 1,
-        duration: 240,
+        duration: 220,
         easing: Easing.bezier(0.16, 1, 0.3, 1),
         useNativeDriver: true,
-      }).start();
+      });
+      animation.start();
+      return () => animation.stop();
     }
   }, [anim, open]);
 
-  const closeWithAnimation = useCallback(() => {
+  const closeWithAnimation = useCallback((after?: () => void) => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    anim.stopAnimation();
     Animated.timing(anim, {
       toValue: 0,
-      duration: 160,
+      duration: 150,
       easing: Easing.bezier(0.4, 0, 1, 1),
       useNativeDriver: true,
-    }).start(() => {
+    }).start(({ finished }) => {
+      if (!finished) {
+        closingRef.current = false;
+        return;
+      }
       setIsSleeping(false);
       setFeedback(null);
       onClose();
+      after?.();
     });
   }, [anim, onClose]);
 
@@ -96,8 +109,7 @@ export function RemoteConnectionMenu({
 
   const handleStream = () => {
     playUiSound('confirm');
-    closeWithAnimation();
-    onStream();
+    closeWithAnimation(onStream);
   };
 
   const handleReload = () => {
@@ -166,7 +178,7 @@ export function RemoteConnectionMenu({
         <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0, 0, 0, 0.32)', opacity: anim }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
-            onPress={closeWithAnimation}
+            onPress={() => closeWithAnimation()}
             accessibilityLabel="Đóng menu kết nối"
           />
         </Animated.View>
@@ -180,7 +192,7 @@ export function RemoteConnectionMenu({
               top: topPos,
               left: leftPos,
               right: leftPos !== undefined ? undefined : fallbackRight,
-              borderRadius: s(16),
+              borderRadius: s(18),
               paddingHorizontal: s(10),
               paddingTop: s(9),
               paddingBottom: s(10),
@@ -189,19 +201,21 @@ export function RemoteConnectionMenu({
                 {
                   translateY: anim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [-18, 0],
+                    outputRange: [-8, 0],
                   }),
                 },
                 {
                   scale: anim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0.93, 1],
+                    outputRange: [0.975, 1],
                   }),
                 },
               ],
             },
           ]}
         >
+          <GlassBackdrop material="panel" intensity={34} radius={s(20)} />
+
           {/* Thanh trạng thái nhỏ gọn phía trên */}
           <View style={styles.topBar}>
             {feedback ? (
@@ -228,7 +242,7 @@ export function RemoteConnectionMenu({
             )}
 
             <Press
-              onPress={closeWithAnimation}
+              onPress={() => closeWithAnimation()}
               sound="back"
               focusable={false}
               accessibilityLabel="Đóng menu"
@@ -251,8 +265,8 @@ export function RemoteConnectionMenu({
                 {
                   height: s(36),
                   borderRadius: s(11),
-                  backgroundColor: 'rgba(102, 168, 255, 0.12)',
-                  borderColor: 'rgba(102, 168, 255, 0.24)',
+                  backgroundColor: 'rgba(102, 168, 255, 0.16)',
+                  borderColor: 'rgba(102, 168, 255, 0.35)',
                 },
               ]}
               accessibilityLabel="Stream phát PC"
@@ -270,8 +284,8 @@ export function RemoteConnectionMenu({
                 {
                   height: s(36),
                   borderRadius: s(11),
-                  backgroundColor: 'rgba(255, 255, 255, 0.07)',
-                  borderColor: 'rgba(255, 255, 255, 0.13)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  borderColor: 'rgba(255, 255, 255, 0.16)',
                 },
               ]}
               accessibilityLabel="Làm mới kết nối remote"
@@ -296,8 +310,8 @@ export function RemoteConnectionMenu({
                   {
                     height: s(36),
                     borderRadius: s(11),
-                    backgroundColor: 'rgba(192, 132, 252, 0.12)',
-                    borderColor: 'rgba(192, 132, 252, 0.24)',
+                    backgroundColor: 'rgba(192, 132, 252, 0.15)',
+                    borderColor: 'rgba(192, 132, 252, 0.32)',
                   },
                 ]}
                 accessibilityLabel="Ru PC ngủ & thoát"
@@ -318,8 +332,8 @@ export function RemoteConnectionMenu({
                   {
                     height: s(36),
                     borderRadius: s(11),
-                    backgroundColor: 'rgba(74, 222, 128, 0.12)',
-                    borderColor: 'rgba(74, 222, 128, 0.24)',
+                    backgroundColor: 'rgba(74, 222, 128, 0.15)',
+                    borderColor: 'rgba(74, 222, 128, 0.32)',
                   },
                 ]}
                 accessibilityLabel="Đánh thức PC"
@@ -337,13 +351,14 @@ export function RemoteConnectionMenu({
 const styles = StyleSheet.create({
   glassCard: {
     position: 'absolute',
+    overflow: 'hidden',
     borderWidth: 1.2,
-    borderColor: 'rgba(255, 255, 255, 0.16)',
-    backgroundColor: 'rgba(10, 17, 28, 0.94)',
+    borderColor: glass.panelBorder,
+    backgroundColor: glass.modal,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.45,
+    shadowRadius: 24,
     elevation: 24,
   },
   topBar: {
@@ -363,7 +378,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
   },
   actionRow: {
     flexDirection: 'row',

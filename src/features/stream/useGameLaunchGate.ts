@@ -35,10 +35,8 @@ import { PC_ROUTES, pcFetch, pcPostJson } from '@/lib/pc-api';
 import { realtimeChannelInstance } from '@/lib/realtime-channels';
 import { createClient } from '@/lib/supabase';
 
-/** Không có sự kiện nào trong chừng này thì đọc một lần REST (agent PC chưa đẩy sự kiện). */
-const FIRST_EVENT_GRACE_MS = 12_000;
 /** Ở chế độ dự phòng không có sự kiện `running`, nên chỉ còn cách tin khoảng chờ này sau khi đã báo start. */
-const FALLBACK_REVEAL_AFTER_START_MS = 40_000;
+const FALLBACK_REVEAL_AFTER_START_MS = 30_000;
 const START_RETRY_DELAYS_MS = [1_500, 3_000, 6_000];
 
 type Row = {
@@ -118,77 +116,82 @@ export function useGameLaunchGate(launch: PendingGameLaunch | null, streamLive: 
     };
   }, [sessionId]);
 
-  // Nghe sự kiện pha của phiên chơi.
+  // Nghe sự kiện pha của phiên chơi và đồng bộ trực tiếp với PC.
   useEffect(() => {
     if (!sessionId || done) return;
-    const supabase = createClient();
-    if (!supabase) return;
     let disposed = false;
-    let channel: RealtimeChannel | null = null;
-    let graceTimer: ReturnType<typeof setTimeout> | undefined;
-    let sawEvent = false;
 
-    const handleRow = (row: Row | null | undefined) => {
-      if (disposed || !row || row.id !== sessionId) return;
-      sawEvent = true;
-      clearTimeout(graceTimer);
-      apply(rowToStatus(row));
-    };
-
-    const readSnapshot = async () => {
-      const { data } = await supabase
-        .from('pc_game_sessions')
-        .select('id,game_id,title,phase,timed_out,error,boost')
-        .eq('id', sessionId)
-        .maybeSingle();
-      handleRow(data as Row | null);
-    };
-
-    // Dây an toàn: PC chưa đẩy sự kiện nào -> hỏi agent đúng một lần.
-    const fallbackOnce = async () => {
-      if (disposed || sawEvent) return;
-      setDegraded(true);
+    // 1. Đồng bộ trực tiếp với PC agent qua REST (nhanh và tin cậy nhất trong mạng LAN/Tailscale)
+    const syncFromPc = async () => {
       try {
         const response = await pcFetch(PC_ROUTES.gameSession, { cache: 'no-store' });
-        const body = await response.json().catch(() => null) as
+        const body = (await response.json().catch(() => null)) as
           | { ok?: boolean; session?: GameSessionStatus | null }
           | null;
-        if (disposed || sawEvent) return;
-        const session = body?.ok ? body.session : null;
-        if (!session || session.id !== sessionId) {
-          setNotice('Chưa theo dõi được trò chơi trên máy tính.');
-          setRevealed(true);
-          return;
-        }
-        apply(session);
-      } catch {
         if (disposed) return;
-        setNotice('Chưa theo dõi được trò chơi trên máy tính.');
-        setRevealed(true);
+        const session = body?.ok ? body.session : null;
+        if (session && session.id === sessionId) {
+          apply(session);
+          if (session.phase === 'running' || isTerminalGamePhase(session.phase) || session.timedOut) {
+            setRevealed(true);
+          }
+        }
+      } catch {
+        // Bỏ qua lỗi mạng tạm thời
       }
     };
 
-    channel = supabase
-      .channel(realtimeChannelInstance(`jetsona:game-session:${sessionId}`))
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'pc_game_sessions', filter: `id=eq.${sessionId}` },
-        (payload) => handleRow(payload.new as Row),
-      )
-      .subscribe((state) => {
-        if (disposed) return;
-        if (state === 'SUBSCRIBED') {
-          void readSnapshot().catch(() => {});
-          graceTimer = setTimeout(() => void fallbackOnce(), FIRST_EVENT_GRACE_MS);
-        } else if (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT') {
-          void fallbackOnce();
+    // Kiểm tra ngay khi khởi tạo để bắt kịp trạng thái nếu PC đã sẵn sàng
+    void syncFromPc();
+
+    // Chu kỳ thăm dò nhanh mỗi 1 giây trong suốt thời gian màn loading che
+    const pollInterval = setInterval(() => {
+      void syncFromPc();
+    }, 1_000);
+
+    // 2. Lắng nghe Realtime từ Supabase (nếu có cấu hình)
+    const supabase = createClient();
+    let channel: RealtimeChannel | null = null;
+
+    if (!supabase) {
+      setDegraded(true);
+    } else {
+      const handleRow = (row: Row | null | undefined) => {
+        if (disposed || !row || row.id !== sessionId) return;
+        apply(rowToStatus(row));
+        if (row.phase === 'running' || isTerminalGamePhase(row.phase) || row.timed_out) {
+          setRevealed(true);
         }
-      });
+      };
+
+      const readSnapshot = async () => {
+        const { data } = await supabase
+          .from('pc_game_sessions')
+          .select('id,game_id,title,phase,timed_out,error,boost')
+          .eq('id', sessionId)
+          .maybeSingle();
+        handleRow(data as Row | null);
+      };
+
+      channel = supabase
+        .channel(realtimeChannelInstance(`jetsona:game-session:${sessionId}`))
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'pc_game_sessions', filter: `id=eq.${sessionId}` },
+          (payload) => handleRow(payload.new as Row),
+        )
+        .subscribe((state) => {
+          if (disposed) return;
+          if (state === 'SUBSCRIBED') {
+            void readSnapshot().catch(() => {});
+          }
+        });
+    }
 
     return () => {
       disposed = true;
-      clearTimeout(graceTimer);
-      if (channel) void supabase.removeChannel(channel);
+      clearInterval(pollInterval);
+      if (channel && supabase) void supabase.removeChannel(channel);
     };
   }, [apply, done, sessionId]);
 

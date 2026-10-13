@@ -10,7 +10,8 @@ import { FocusLayer, FocusScroll } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { type GameDownload, type InstallFolder, formatBytes } from '@/lib/steam-downloads';
-import { colors } from '@/theme';
+import { colors, glass } from '@/theme';
+import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -104,15 +105,20 @@ export function InstallConfigSheet({ download, imageUrl, notice, onAnswer, onClo
   return (
     <FocusLayer>
       <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', zIndex: 70, elevation: 70 }]}>
-        <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.74)' }]} onPress={() => { playUiSound('back'); onClose(); }} />
-        <View style={[styles.card, { width: Math.min(s(480), width - s(48)), maxHeight: height - s(24), borderRadius: s(22), padding: s(20) }]}>
-          <Press onPress={onClose} sound="back" accessibilityLabel="Đóng" style={[styles.close, { top: s(10), right: s(10), width: s(30), height: s(30), borderRadius: s(15) }]}>
-            <X size={s(14)} color={colors.text3} />
+        <View style={StyleSheet.absoluteFill}>
+          <GlassBackdrop material="scrim" />
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => { playUiSound('back'); onClose(); }} />
+        </View>
+        <View style={[styles.card, { width: Math.min(s(480), width - s(48)), maxHeight: height - s(24), borderRadius: s(24), padding: s(20) }]}>
+          <GlassBackdrop material="panel" intensity={36} radius={s(24)} />
+
+          <Press onPress={onClose} sound="back" accessibilityLabel="Đóng" style={[styles.close, { top: s(12), right: s(12), width: s(30), height: s(30), borderRadius: s(15) }]}>
+            <X size={s(14)} color="rgba(255,255,255,0.75)" />
           </Press>
 
           <T size={16} weight="semibold" tracking={-0.02}>Cài đặt</T>
           <View style={[styles.game, { marginTop: s(12), gap: s(12), paddingVertical: s(10), borderRadius: s(12) }]}>
-            <View style={{ width: s(86), height: s(40), borderRadius: s(6), overflow: 'hidden', backgroundColor: colors.fill }}>
+            <View style={{ width: s(86), height: s(40), borderRadius: s(8), overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.14)' }}>
               {imageUrl ? <Img source={{ uri: imageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : null}
             </View>
             <T size={11.8} color={colors.text2} numberOfLines={1} style={{ flex: 1 }}>{download.name ?? 'Trò chơi Steam'}</T>
@@ -160,19 +166,74 @@ export function InstallConfigSheet({ download, imageUrl, notice, onAnswer, onClo
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', backgroundColor: '#0d1520' },
-  close: { position: 'absolute', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.07)' },
+  card: {
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: glass.panelBorder,
+    backgroundColor: glass.modal,
+    shadowColor: '#000',
+    shadowOpacity: 0.45,
+    shadowRadius: 32,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 20,
+  },
+  close: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: glass.control,
+    borderWidth: 1,
+    borderColor: glass.controlBorder,
+  },
   game: {
     flexDirection: 'row',
     alignItems: 'center',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.line,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
   },
-  box: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: colors.lineStrong },
-  boxOn: { borderColor: colors.accent, backgroundColor: colors.accent },
-  folder: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.line, backgroundColor: colors.fillSoft },
-  folderOn: { borderColor: colors.accent, backgroundColor: colors.accent },
-  secondary: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong },
-  primary: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
+  box: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.30)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  boxOn: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
+  },
+  folder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.20)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  folderOn: {
+    borderColor: 'rgba(255, 255, 255, 0.45)',
+    backgroundColor: colors.accent,
+    shadowColor: '#66a8ff',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  secondary: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+  },
+  primary: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+    shadowColor: '#fff',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+  },
 });

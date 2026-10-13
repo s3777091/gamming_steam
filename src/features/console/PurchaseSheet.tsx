@@ -2,7 +2,7 @@
 // trên PC (giao diện chính chủ, xem qua stream). App chỉ theo dõi tới khi game vào
 // thư viện rồi mời Tải về — không bao giờ thấy thông tin thẻ hay bấm mua thay.
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,7 +19,8 @@ import { openExternal } from '@/lib/open-external';
 import {
   type PurchaseOffer, type PurchasePhase, type PurchaseState, type PurchaseTarget, purchaseKind, purchaseSavings, steamWebUrl,
 } from '@/lib/steam-purchase';
-import { colors } from '@/theme';
+import { colors, glass } from '@/theme';
+import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -117,7 +118,21 @@ function PriceBlock({ offer }: { offer: PurchaseOffer }) {
     <View>
       {saved !== null ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8), marginBottom: s(2) }}>
-          <View style={{ backgroundColor: colors.accent, borderRadius: s(6), paddingHorizontal: s(6), paddingVertical: s(2) }}>
+          <View
+            style={{
+              backgroundColor: colors.accent,
+              borderRadius: s(7),
+              paddingHorizontal: s(6),
+              paddingVertical: s(2),
+              borderWidth: StyleSheet.hairlineWidth,
+              borderColor: 'rgba(255,255,255,0.4)',
+              shadowColor: '#66a8ff',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.5,
+              shadowRadius: 6,
+              elevation: 4,
+            }}
+          >
             <T size={10} weight="bold" color={colors.onAccent} tabular>-{offer.discountPercent}%</T>
           </View>
           <T size={11.4} color={colors.text4} tabular style={{ textDecorationLine: 'line-through' }}>{money(offer, offer.original)}</T>
@@ -175,14 +190,26 @@ function Button({
         isSuccess ? styles.success : isPrimary ? styles.primary : styles.secondary,
         {
           height: s(42),
+          width: '100%',
           paddingHorizontal: s(isPrimary || isSuccess ? 18 : 16),
           borderRadius: s(21),
           gap: s(7),
         },
-        flex !== undefined && { flex: 1, alignSelf: 'stretch' },
         disabled && { opacity: 0.45 },
       ]}
     >
+      {/* Specular top rim sheen */}
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: StyleSheet.hairlineWidth,
+          backgroundColor: isPrimary ? 'rgba(255,255,255,0.6)' : isSuccess ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.18)',
+        }}
+        pointerEvents="none"
+      />
       {errorGlowAnim ? (
         <Animated.View
           pointerEvents="none"
@@ -222,7 +249,8 @@ function Button({
   return (
     <Animated.View
       style={[
-        flex !== undefined && { flex },
+        { height: s(42) },
+        flex !== undefined ? { flex } : { alignSelf: 'flex-start' },
         transform.length > 0 && { transform },
       ]}
     >
@@ -299,6 +327,26 @@ export function PurchaseSheet({
   const prevPhaseRef = useRef<PurchasePhase>(phase);
   const [justSucceeded, setJustSucceeded] = useState(false);
   const [retrying, setRetrying] = useState(false);
+
+  const imageCandidates = useMemo(() => {
+    const list = [
+      offer.imageUrl,
+      offer.fallbackImageUrl,
+      `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${offer.appId}/header.jpg`,
+      `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${offer.appId}/header.jpg`,
+      `https://cdn.cloudflare.steamstatic.com/steam/apps/${offer.appId}/header.jpg`,
+    ].filter((u): u is string => Boolean(u && typeof u === 'string'));
+    return Array.from(new Set(list));
+  }, [offer.appId, offer.fallbackImageUrl, offer.imageUrl]);
+
+  const [imageIndex, setImageIndex] = useState(0);
+  const [prevImageKey, setPrevImageKey] = useState(offer.imageUrl);
+  if (prevImageKey !== offer.imageUrl) {
+    setPrevImageKey(offer.imageUrl);
+    setImageIndex(0);
+  }
+
+  const activeImageUri = imageCandidates[imageIndex] ?? null;
 
   useBack(() => { onClose(); });
 
@@ -536,7 +584,10 @@ export function PurchaseSheet({
   return (
     <FocusLayer>
       <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', zIndex: 70, elevation: 70 }]}>
-        <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.76)' }]} onPress={() => { playUiSound('back'); onClose(); }} />
+        <View style={StyleSheet.absoluteFill}>
+          <GlassBackdrop material="scrim" />
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => { playUiSound('back'); onClose(); }} />
+        </View>
         <Animated.View
           style={[
             styles.card,
@@ -547,9 +598,23 @@ export function PurchaseSheet({
             },
           ]}
         >
+          <GlassBackdrop material="panel" intensity={36} radius={s(24)} />
+
           {artWidth ? (
-            <View style={{ width: artWidth, alignSelf: 'stretch', backgroundColor: '#152130' }}>
-              {offer.imageUrl ? <Img source={{ uri: offer.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
+            <View style={{ width: artWidth, alignSelf: 'stretch', backgroundColor: '#152130', overflow: 'hidden' }}>
+              {activeImageUri ? (
+                <Img
+                  key={activeImageUri}
+                  source={{ uri: activeImageUri }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  onError={() => {
+                    if (imageIndex + 1 < imageCandidates.length) {
+                      setImageIndex((prev) => prev + 1);
+                    }
+                  }}
+                />
+              ) : null}
               <LinearGradient colors={['rgba(13,21,32,0)', 'rgba(13,21,32,0.15)', CARD_BG]} locations={[0, 0.6, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
               <LinearGradient colors={['rgba(13,21,32,0)', 'rgba(13,21,32,0.85)']} locations={[0.55, 1]} style={StyleSheet.absoluteFill} />
               <View style={[styles.steamTag, { left: s(12), bottom: s(12), paddingHorizontal: s(8), paddingVertical: s(4), borderRadius: s(8), gap: s(5) }]}>
@@ -566,7 +631,7 @@ export function PurchaseSheet({
                 <T size={17} weight="bold" tracking={-0.02} numberOfLines={2} style={{ marginTop: s(3) }}>{offer.name}</T>
               </View>
               <Press onPress={onClose} sound="back" accessibilityLabel="Đóng" style={[styles.close, { width: s(30), height: s(30), borderRadius: s(15) }]}>
-                <X size={s(14)} color={colors.text3} />
+                <X size={s(14)} color="rgba(255,255,255,0.75)" />
               </Press>
             </View>
 
@@ -574,7 +639,7 @@ export function PurchaseSheet({
             <Stepper state={state} />
             {status}
             {notice && phase === 'owned' ? <T size={10} color="#fecaca" leading={1.4}>{notice}</T> : null}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10) }}>{actions}</View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10), minHeight: s(42) }}>{actions}</View>
           </View>
         </Animated.View>
       </View>
@@ -587,10 +652,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: CARD_BG,
+    borderColor: glass.panelBorder,
+    backgroundColor: glass.modal,
+    shadowColor: '#000',
+    shadowOpacity: 0.45,
+    shadowRadius: 32,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 20,
   },
-  close: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.07)' },
+  close: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: glass.control,
+    borderWidth: 1,
+    borderColor: glass.controlBorder,
+  },
   dot: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, backgroundColor: CARD_BG },
   steamTag: { position: 'absolute', flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(5,8,13,0.62)', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
   buttonBase: {
@@ -601,20 +677,26 @@ const styles = StyleSheet.create({
   },
   primary: {
     backgroundColor: colors.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.4)',
+    shadowColor: '#fff',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
   },
   secondary: {
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: 'rgba(255,255,255,0.16)',
   },
   success: {
     backgroundColor: '#16a34a',
     borderWidth: 1,
-    borderColor: 'rgba(74,222,128,0.45)',
+    borderColor: 'rgba(74,222,128,0.5)',
     shadowColor: '#22c55e',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.35,
-    shadowRadius: 6,
+    shadowRadius: 8,
     elevation: 4,
   },
 });

@@ -7,7 +7,8 @@ import { useBack } from '@/features/gamepad/hooks';
 import type { PcGame } from '@/features/library/types';
 import type { UninstallResult } from '@/features/library/usePcLibrary';
 import type { GameUninstall } from '@/lib/steam-downloads';
-import { colors } from '@/theme';
+import { colors, glass } from '@/theme';
+import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -42,20 +43,22 @@ export function UninstallSheet({ game, operation, requesting, notice, onConfirm,
   return (
     <FocusLayer>
       <View style={[StyleSheet.absoluteFill, styles.layer]}>
+        <GlassBackdrop material="scrim" />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <View style={[styles.card, { width: Math.min(s(430), width - s(48)), borderRadius: s(22), padding: s(22) }]}>
+        <View style={[styles.card, { width: Math.min(s(430), width - s(48)), borderRadius: s(24), padding: s(22) }]}>
+          <GlassBackdrop material="panel" intensity={36} radius={s(24)} />
+
           <Press
             onPress={onClose}
             sound="back"
             accessibilityLabel="Đóng"
-            style={[styles.close, { top: s(10), right: s(10), width: s(30), height: s(30), borderRadius: s(15) }]}
-          >
-            <X size={s(14)} color={colors.text3} />
+            style={[styles.close, { top: s(12), right: s(12), width: s(30), height: s(30), borderRadius: s(15) }]}>
+            <X size={s(14)} color="rgba(255,255,255,0.75)" />
           </Press>
 
-          <View style={[styles.icon, { width: s(42), height: s(42), borderRadius: s(21) }]}>
+          <View style={[styles.icon, { width: s(44), height: s(44), borderRadius: s(14) }]}>
             {done
-              ? <CircleCheck size={s(21)} color={colors.success} />
+              ? <CircleCheck size={s(22)} color={colors.success} />
               : <Trash2 size={s(20)} color={failed || requestError ? '#fecaca' : '#fca5a5'} />}
           </View>
 
@@ -119,13 +122,68 @@ const styles = StyleSheet.create({
     elevation: 72,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(4,8,14,0.74)',
+    backgroundColor: 'transparent',
   },
-  card: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', backgroundColor: '#0d1520' },
-  close: { position: 'absolute', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.07)' },
-  icon: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239,68,68,0.12)' },
-  track: { width: '100%', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.14)' },
-  secondary: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong },
-  primary: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
-  danger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, backgroundColor: '#b91c1c' },
+  card: {
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: glass.panelBorder,
+    backgroundColor: glass.modal,
+    shadowColor: '#000',
+    shadowOpacity: 0.45,
+    shadowRadius: 32,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 20,
+  },
+  close: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: glass.control,
+    borderWidth: 1,
+    borderColor: glass.controlBorder,
+  },
+  icon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(239,68,68,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.25)',
+  },
+  track: {
+    width: '100%',
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  secondary: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+  },
+  primary: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.4)',
+    shadowColor: '#fff',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  danger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    backgroundColor: '#dc2626',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.3)',
+    shadowColor: '#ef4444',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
 });

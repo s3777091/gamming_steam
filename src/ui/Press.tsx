@@ -19,10 +19,14 @@ type Props = Omit<PressableProps, 'style' | 'children'> & {
   autoFocus?: boolean;
   /** Bo góc của viền tiêu điểm khi bo góc nằm ở phần tử con chứ không ở `style`. */
   focusRadius?: number;
+  /** Dùng mép kính mảnh cho thẻ ảnh thay vì vòng focus trắng đục mặc định. */
+  focusVariant?: 'auto' | 'card' | 'glassCard' | 'row';
   /** Gọi khi tay cầm chuyển tiêu điểm vào ô này (xem trước game, chọn tab...). */
   onFocused?: () => void;
   /** Slider: nhận D-pad trái/phải khi đang được chọn; trả true nếu đã xử lý. */
   onAdjust?: (step: -1 | 1) => boolean;
+  /** Màu quầng sáng của viền tiêu điểm khi tay cầm chọn ('accent' hoặc 'danger'). */
+  focusTint?: 'accent' | 'danger';
   /** Semantic cue for activation. `false` keeps intentionally silent hit targets silent. */
   sound?: UiSound | false;
   children?: ReactNode;
@@ -41,7 +45,7 @@ const PRESS_FLASH_MS = 110;
  * viền trắng + phóng nhẹ cho biết ô đang chọn, A kích hoạt `onPress`.
  */
 export function Press({
-  style, pressScale = 0.96, onPressIn, onPressOut, onPress, onLayout, focusable = true, autoFocus = false, focusRadius, onAdjust, onFocused, sound = 'select', children, ...rest
+  style, pressScale = 0.96, onPressIn, onPressOut, onPress, onLayout, focusable = true, autoFocus = false, focusRadius, focusVariant = 'auto', focusTint = 'accent', onAdjust, onFocused, sound = 'select', children, ...rest
 }: Props) {
   const hostRef = useRef<View>(null);
   const [box, setBox] = useState({ w: 120, h: 60 });
@@ -95,6 +99,7 @@ export function Press({
   useEffect(() => () => clearTimeout(flashTimer.current), []);
 
   const radius = focusRadius ?? Number(StyleSheet.flatten(style)?.borderRadius ?? 12);
+  const ringVariant = focusVariant === 'auto' ? (row ? 'row' : 'card') : focusVariant;
   return (
     <AnimatedPressable
       {...rest}
@@ -110,7 +115,7 @@ export function Press({
       onPressOut={(event) => { if (pressScale !== 1) animate(1); onPressOut?.(event); }}
     >
       {children}
-      {focused || ringShown ? <FocusRing radius={radius} variant={row ? 'row' : 'card'} visible={focused} onHidden={hideRing} /> : null}
+      {focused || ringShown ? <FocusRing radius={radius} variant={ringVariant} tint={focusTint} visible={focused} onHidden={hideRing} /> : null}
     </AnimatedPressable>
   );
 }

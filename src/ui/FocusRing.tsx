@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Animated, Easing, View } from 'react-native';
 
 const RING = 2;
@@ -15,14 +15,15 @@ const GAP = 3;
  * Đặt làm con CUỐI của phần tử được chọn; nó tràn ra ngoài nên không đổi bố cục.
  * `visible` về false thì mờ đi rồi gọi `onHidden` để cha gỡ nó khỏi cây.
  */
-export function FocusRing({ radius, variant = 'card', visible = true, onHidden }: {
+export function FocusRing({ radius, variant = 'card', tint = 'accent', visible = true, onHidden }: {
   radius: number;
-  variant?: 'card' | 'row';
+  variant?: 'card' | 'glassCard' | 'row';
+  tint?: 'accent' | 'danger';
   visible?: boolean;
   onHidden?: () => void;
 }) {
-  const appear = useRef(new Animated.Value(0)).current;
-  const breathe = useRef(new Animated.Value(0)).current;
+  const appear = useMemo(() => new Animated.Value(0), []);
+  const breathe = useMemo(() => new Animated.Value(0), []);
 
   useEffect(() => {
     const animation = Animated.timing(appear, {
@@ -45,13 +46,14 @@ export function FocusRing({ radius, variant = 'card', visible = true, onHidden }
     return () => loop.stop();
   }, [breathe, visible]);
 
-  const band = (inset: number, width: number, alpha: number, extra: number) => ({
+  const isDanger = tint === 'danger';
+  const band = (inset: number, width: number, color: string, alpha: number, extra: number) => ({
     position: 'absolute' as const,
     top: -inset, left: -inset, right: -inset, bottom: -inset,
     borderRadius: radius + inset,
     borderWidth: width,
-    borderColor: `rgba(255,255,255,${alpha})`,
-    opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 1 - extra] }),
+    borderColor: color,
+    opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [alpha, alpha * (1 - extra)] }),
   });
 
   if (variant === 'row') {
@@ -63,24 +65,28 @@ export function FocusRing({ radius, variant = 'card', visible = true, onHidden }
           opacity: appear,
         }}
       >
-        {/* Lớp phủ sáng nhẹ cho cả hàng đang chọn */}
+        {/* Lớp phủ sáng Liquid Glass mờ cho cả hàng đang chọn */}
         <View
           pointerEvents="none"
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius, backgroundColor: 'rgba(255,255,255,0.08)' }}
+          style={{
+            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+            borderRadius: radius,
+            backgroundColor: isDanger ? 'rgba(239, 68, 68, 0.14)' : 'rgba(102, 168, 255, 0.12)',
+          }}
         />
-        {/* Viền quầng sáng thở nhẹ ngay sát viền hàng */}
+        {/* Viền quầng sáng thở nhẹ */}
         <Animated.View
           pointerEvents="none"
           style={{
             position: 'absolute',
             top: -1, left: -1, right: -1, bottom: -1,
             borderRadius: radius + 1,
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.3)',
-            opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [0.8, 0.4] }),
+            borderWidth: 1.5,
+            borderColor: isDanger ? 'rgba(248, 113, 113, 0.55)' : 'rgba(102, 168, 255, 0.45)',
+            opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [0.85, 0.4] }),
           }}
         />
-        {/* Viền tiêu điểm trắng sắc nét bao trọn hàng */}
+        {/* Viền tiêu điểm trắng specular sắc nét */}
         <View
           pointerEvents="none"
           style={{
@@ -88,7 +94,40 @@ export function FocusRing({ radius, variant = 'card', visible = true, onHidden }
             top: 0, left: 0, right: 0, bottom: 0,
             borderRadius: radius,
             borderWidth: RING,
-            borderColor: 'rgba(255,255,255,0.96)',
+            borderColor: 'rgba(255,255,255,0.95)',
+          }}
+        />
+      </Animated.View>
+    );
+  }
+
+  if (variant === 'glassCard') {
+    return (
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+          opacity: appear,
+        }}
+      >
+        <Animated.View
+          pointerEvents="none"
+          style={band(
+            GAP + 4,
+            2,
+            isDanger ? 'rgba(248, 113, 113, 0.28)' : 'rgba(138, 192, 255, 0.28)',
+            0.8,
+            0.45,
+          )}
+        />
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: -1, left: -1, right: -1, bottom: -1,
+            borderRadius: radius + 1,
+            borderWidth: 1.25,
+            borderColor: 'rgba(255, 255, 255, 0.54)',
           }}
         />
       </Animated.View>
@@ -103,9 +142,27 @@ export function FocusRing({ radius, variant = 'card', visible = true, onHidden }
         opacity: appear,
       }}
     >
-      {/* Quầng sáng: hai dải mờ dần ra ngoài cho thẻ (card). */}
-      <Animated.View pointerEvents="none" style={band(GAP + RING + 7, 4, 0.05, 0.5)} />
-      <Animated.View pointerEvents="none" style={band(GAP + RING + 3, 4, 0.12, 0.35)} />
+      {/* Quầng sáng quang học Liquid Glass */}
+      <Animated.View
+        pointerEvents="none"
+        style={band(
+          GAP + RING + 8,
+          4,
+          isDanger ? 'rgba(239, 68, 68, 0.22)' : 'rgba(102, 168, 255, 0.22)',
+          1,
+          0.5,
+        )}
+      />
+      <Animated.View
+        pointerEvents="none"
+        style={band(
+          GAP + RING + 3,
+          3,
+          isDanger ? 'rgba(248, 113, 113, 0.45)' : 'rgba(138, 192, 255, 0.42)',
+          1,
+          0.3,
+        )}
+      />
       <View
         pointerEvents="none"
         style={{
@@ -113,7 +170,7 @@ export function FocusRing({ radius, variant = 'card', visible = true, onHidden }
           top: -GAP - RING, left: -GAP - RING, right: -GAP - RING, bottom: -GAP - RING,
           borderRadius: radius + GAP + RING,
           borderWidth: RING,
-          borderColor: 'rgba(255,255,255,0.96)',
+          borderColor: 'rgba(255, 255, 255, 0.98)',
         }}
       />
     </Animated.View>

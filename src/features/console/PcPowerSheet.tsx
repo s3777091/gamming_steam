@@ -12,7 +12,8 @@ import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { useDeviceStatus } from '@/features/devices/useDeviceStatus';
 import { apiFetch } from '@/lib/api';
 import { friendlyMessage } from '@/lib/friendly';
-import { colors } from '@/theme';
+import { colors, glass } from '@/theme';
+import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -83,13 +84,18 @@ export function PcPowerSheet({ onClose, onReady }: { onClose: () => void; onRead
   return (
     <FocusLayer>
     <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', zIndex: 70, elevation: 70 }]}>
-      <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.74)' }]} onPress={() => { playUiSound('back'); onClose(); }} />
-      <View style={[styles.card, { width: Math.min(s(400), width - s(48)), borderRadius: s(22), padding: s(22) }]}>
-        <Press onPress={onClose} sound="back" accessibilityLabel="Đóng" style={[styles.close, { top: s(10), right: s(10), width: s(30), height: s(30), borderRadius: s(15) }]}>
-          <X size={s(14)} color={colors.text3} />
+      <View style={StyleSheet.absoluteFill}>
+        <GlassBackdrop material="scrim" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => { playUiSound('back'); onClose(); }} />
+      </View>
+      <View style={[styles.card, { width: Math.min(s(400), width - s(48)), borderRadius: s(24), padding: s(22) }]}>
+        <GlassBackdrop material="panel" intensity={36} radius={s(24)} />
+
+        <Press onPress={onClose} sound="back" accessibilityLabel="Đóng" style={[styles.close, { top: s(12), right: s(12), width: s(30), height: s(30), borderRadius: s(15) }]}>
+          <X size={s(14)} color="rgba(255,255,255,0.75)" />
         </Press>
         <View style={{ alignItems: 'center' }}>
-          <View style={[styles.badge, { width: s(56), height: s(56), borderRadius: s(18), borderColor: phase === 'ready' ? 'rgba(74,222,128,0.4)' : colors.line }]}>
+          <View style={[styles.badge, { width: s(58), height: s(58), borderRadius: s(19), borderColor: phase === 'ready' ? 'rgba(74,222,128,0.5)' : 'rgba(255,255,255,0.28)' }]}>
             {phase === 'ready' ? <Check size={s(26)} color={colors.success} strokeWidth={2.4} /> : phase === 'sending' || phase === 'waiting'
               ? <ActivityIndicator color={colors.text2} /> : <Monitor size={s(24)} color={colors.text2} />}
           </View>
@@ -109,8 +115,45 @@ export function PcPowerSheet({ onClose, onReady }: { onClose: () => void; onRead
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', backgroundColor: '#0d1520' },
-  close: { position: 'absolute', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.07)' },
-  badge: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, backgroundColor: 'rgba(255,255,255,0.06)' },
-  button: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
+  card: {
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: glass.panelBorder,
+    backgroundColor: glass.modal,
+    shadowColor: '#000',
+    shadowOpacity: 0.45,
+    shadowRadius: 32,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 20,
+  },
+  close: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: glass.control,
+    borderWidth: 1,
+    borderColor: glass.controlBorder,
+  },
+  badge: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.4)',
+    shadowColor: '#fff',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 2 },
+  },
 });

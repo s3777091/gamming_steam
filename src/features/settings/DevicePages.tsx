@@ -119,7 +119,7 @@ function DeviceRow({ device }: { device: LocalDevice }) {
             right: -s(1),
             bottom: -s(1),
             borderWidth: 1.5,
-            borderColor: '#FFFFFF',
+            borderColor: '#111821',
             backgroundColor: appleColors.green,
           }}
         />
@@ -203,16 +203,6 @@ export function DevicesPage({ notify }: { notify: Notify }) {
             }}
           />
         ) : null}
-        {bluetooth.bonded.length ? (
-          <View style={{ paddingHorizontal: s(16), paddingVertical: s(10) }}>
-            <T size={9.6} weight="semibold" color={appleColors.textSecondary} tracking={0.08}>
-              ĐÃ GHÉP ĐÔI
-            </T>
-            <T size={10.8} color={appleColors.textTertiary} leading={1.5} style={{ marginTop: s(4) }}>
-              {bluetooth.bonded.map((item) => item.name).join(' · ')}
-            </T>
-          </View>
-        ) : null}
       </SettingsGroup>
     </>
   );
@@ -254,7 +244,7 @@ function Bar({ label, value, signed }: { label: string; value: number; signed?: 
         style={{
           height: s(5),
           borderRadius: s(2.5),
-          backgroundColor: '#E5E5EA',
+          backgroundColor: 'rgba(255, 255, 255, 0.10)',
           overflow: 'hidden',
         }}
       >
@@ -351,25 +341,42 @@ function ControllerInspector({
                     borderRadius: s(5),
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: on ? appleColors.blue : '#E5E5EA',
+                    backgroundColor: on ? appleColors.blue : 'rgba(255, 255, 255, 0.08)',
                   }}
                 >
-                  <T size={10} weight="semibold" color={on ? '#FFFFFF' : appleColors.text}>
+                  <T size={10} weight="semibold" color={on ? '#FFFFFF' : 'rgba(255, 255, 255, 0.75)'}>
                     {label}
                   </T>
                 </View>
               );
             })}
+            {[
+              { label: 'LT', on: (state?.lt ?? 0) >= 0.5 },
+              { label: 'RT', on: (state?.rt ?? 0) >= 0.5 },
+            ].map(({ label, on }) => (
+              <View
+                key={label}
+                style={{
+                  minWidth: s(34),
+                  height: s(24),
+                  paddingHorizontal: s(6),
+                  borderRadius: s(5),
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: on ? appleColors.blue : 'rgba(255, 255, 255, 0.08)',
+                }}
+              >
+                <T size={10} weight="semibold" color={on ? '#FFFFFF' : 'rgba(255, 255, 255, 0.75)'}>
+                  {label}
+                </T>
+              </View>
+            ))}
           </View>
           <View style={{ flexDirection: 'row', gap: s(10) }}>
             <Bar label="Cần trái X" value={state?.lx ?? 0} signed />
             <Bar label="Cần trái Y" value={state?.ly ?? 0} signed />
             <Bar label="Cần phải X" value={state?.rx ?? 0} signed />
             <Bar label="Cần phải Y" value={state?.ry ?? 0} signed />
-          </View>
-          <View style={{ flexDirection: 'row', gap: s(10) }}>
-            <Bar label="Cò trái (LT)" value={state?.lt ?? 0} />
-            <Bar label="Cò phải (RT)" value={state?.rt ?? 0} />
           </View>
         </View>
       )}
@@ -538,10 +545,7 @@ export function MousePage({ input }: { input: InputSettingsState }) {
         )}
       </SettingsGroup>
 
-      <SettingsGroup
-        title="Kiểm tra tín hiệu & con trỏ"
-        footer="Mô hình 2D phản hồi nút bấm trái/phải/giữa, nút phụ hông, con lăn cuộn và chuyển động con trỏ theo thời gian thực."
-      >
+      <SettingsGroup title="Kiểm tra tín hiệu & con trỏ">
         <View style={{ padding: s(12) }}>
           <Mouse2DVisualizer sensitivity={settings.mouseSensitivity} />
         </View>
@@ -633,8 +637,8 @@ function KeyCapture({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: listening ? appleColors.blue : '#D1D1D6',
-        backgroundColor: listening ? 'rgba(0,122,255,0.1)' : '#FFFFFF',
+        borderColor: listening ? appleColors.blue : 'rgba(255, 255, 255, 0.18)',
+        backgroundColor: listening ? 'rgba(31, 111, 235, 0.2)' : 'rgba(255, 255, 255, 0.08)',
       }}
     >
       <T
@@ -676,13 +680,13 @@ function ActionPicker({
               paddingHorizontal: s(10),
               paddingVertical: s(6),
               borderRadius: s(6),
-              backgroundColor: active ? appleColors.blue : '#E5E5EA',
+              backgroundColor: active ? appleColors.blue : 'rgba(255, 255, 255, 0.08)',
             }}
           >
             <T
               size={10.6}
               weight={active ? 'semibold' : 'regular'}
-              color={active ? '#FFFFFF' : appleColors.text}
+              color={active ? '#FFFFFF' : 'rgba(255, 255, 255, 0.75)'}
             >
               {option.label}
             </T>
@@ -736,10 +740,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
 
   return (
     <>
-      <SettingsGroup
-        title="Kiểm tra tín hiệu bàn phím"
-        footer="Mô hình 2D phản hồi chính xác từng phím được gõ ngoài đời thực. Hiển thị mã phím, phím bổ trợ (Shift/Ctrl/Alt/Win) và N-Key Rollover."
-      >
+      <SettingsGroup title="Kiểm tra tín hiệu bàn phím">
         <View style={{ padding: s(12) }}>
           <Keyboard2DVisualizer />
         </View>
@@ -752,7 +753,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
             marginBottom: s(8),
             padding: s(12),
             borderRadius: s(10),
-            backgroundColor: '#F9F9FB',
+            backgroundColor: '#0c121a',
             borderWidth: StyleSheet.hairlineWidth,
             borderColor: appleColors.cardBorder,
           }}
@@ -773,13 +774,13 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
                 pressScale={0.995}
                 style={rowStyle(s, {
                   minHeight: s(48),
-                  backgroundColor: open ? '#F9F9FB' : appleColors.card,
+                  backgroundColor: open ? '#0c121a' : appleColors.card,
                 })}
               >
                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(5) }}>
                   <Keycap>{hostLabel}</Keycap>
                   <T size={10} color={appleColors.textTertiary}>
-                    +
+                     +
                   </T>
                   <Keycap accent>{keyCodeLabel(code)}</Keycap>
                 </View>
@@ -794,7 +795,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
                     paddingBottom: s(12),
                     paddingTop: s(4),
                     gap: s(8),
-                    backgroundColor: '#F9F9FB',
+                    backgroundColor: '#0c121a',
                   }}
                 >
                   <ActionPicker
@@ -837,7 +838,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
               paddingHorizontal: s(14),
               paddingVertical: s(12),
               gap: s(8),
-              backgroundColor: '#F9F9FB',
+              backgroundColor: '#0c121a',
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(5) }}>

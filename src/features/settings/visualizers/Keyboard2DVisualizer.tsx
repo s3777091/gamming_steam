@@ -2,12 +2,11 @@
 // Bắt sự kiện phím vật lý từ cổng Android native và làm sáng các phím tương ứng trên mô hình 2D.
 // Hiển thị mã phím, mã web, Virtual Key (VK), phím bổ trợ (Shift/Ctrl/Alt/Meta) và N-Key Rollover.
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import {
   addListener,
   setCaptureMode,
-  type NativeKeyEvent,
 } from 'jetsona-input';
 
 import { appleColors } from '@/features/settings/controls';
@@ -124,19 +123,14 @@ const KEYBOARD_ROWS: KeyItem[][] = [
 
 export function Keyboard2DVisualizer() {
   const [activeCodes, setActiveCodes] = useState<Set<string>>(new Set());
-  const [lastEvent, setLastEvent] = useState<NativeKeyEvent | null>(null);
-  const [testActive, setTestActive] = useState(true);
   const timerMap = useRef<Map<string, any>>(new Map());
 
   // Bật chế độ thu thập tín hiệu phím khi mở trang
   useEffect(() => {
-    if (!testActive) return;
     setCaptureMode('stream');
 
     const offKey = addListener('onKey', (event) => {
       const code = webCodeForKeyCode(event.keyCode);
-      setLastEvent(event);
-
       if (!code) return;
 
       setActiveCodes((prev) => {
@@ -154,7 +148,7 @@ export function Keyboard2DVisualizer() {
       offKey();
       setCaptureMode('ui');
     };
-  }, [testActive]);
+  }, []);
 
   // Mô phỏng bấm phím khi chạm vào màn hình (touch fallback)
   const handleTouchKey = (code: string) => {
@@ -170,83 +164,8 @@ export function Keyboard2DVisualizer() {
     timerMap.current.set(code, timer);
   };
 
-  const modifiers = lastEvent?.modifiers ?? 0;
-  const isShift = (modifiers & 1) !== 0;
-  const isCtrl = (modifiers & 2) !== 0;
-  const isAlt = (modifiers & 4) !== 0;
-  const isMeta = (modifiers & 8) !== 0;
-
-  const lastKeyLabel = useMemo(() => {
-    if (!lastEvent) return 'Chờ tín hiệu…';
-    const code = webCodeForKeyCode(lastEvent.keyCode);
-    if (!code) return `Mã: ${lastEvent.keyCode}`;
-    return code.replace(/^Key/, '').replace(/^Digit/, '');
-  }, [lastEvent]);
-
   return (
     <View style={styles.container}>
-      {/* 1. HUD THỐNG KÊ TÍN HIỆU PHÍM */}
-      <View style={styles.hudBar}>
-        <View style={styles.hudMain}>
-          <T size={10} color="#8E9EB5">PHÍM VỪA BẤM</T>
-          <View style={styles.hudKeyBadge}>
-            <T size={13} weight="bold" color={appleColors.blue}>
-              {lastKeyLabel}
-            </T>
-          </View>
-        </View>
-
-        <View style={styles.hudDetails}>
-          <View style={styles.hudRow}>
-            <T size={9.5} color="#8E9EB5">Mã Web: </T>
-            <T size={9.5} weight="semibold" color="#FFFFFF">
-              {lastEvent ? webCodeForKeyCode(lastEvent.keyCode) ?? 'N/A' : '—'}
-            </T>
-            <T size={9.5} color="#8E9EB5" style={{ marginLeft: 6 }}>VK: </T>
-            <T size={9.5} weight="semibold" color="#FFFFFF">
-              {lastEvent ? `0x${lastEvent.vk.toString(16).toUpperCase()}` : '—'}
-            </T>
-          </View>
-
-          {/* Cụm đèn Modifiers */}
-          <View style={styles.modifierRow}>
-            <View style={[styles.modBadge, isShift && styles.modActive]}>
-              <T size={8.5} weight="bold" color={isShift ? '#FFFFFF' : '#6A7D94'}>SHIFT</T>
-            </View>
-            <View style={[styles.modBadge, isCtrl && styles.modActive]}>
-              <T size={8.5} weight="bold" color={isCtrl ? '#FFFFFF' : '#6A7D94'}>CTRL</T>
-            </View>
-            <View style={[styles.modBadge, isAlt && styles.modActive]}>
-              <T size={8.5} weight="bold" color={isAlt ? '#FFFFFF' : '#6A7D94'}>ALT</T>
-            </View>
-            <View style={[styles.modBadge, isMeta && styles.modActive]}>
-              <T size={8.5} weight="bold" color={isMeta ? '#FFFFFF' : '#6A7D94'}>WIN</T>
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.hudCount}>
-          <Press
-            onPress={() => setTestActive((v) => !v)}
-            style={{
-              paddingHorizontal: 8,
-              paddingVertical: 2,
-              borderRadius: 4,
-              borderWidth: 1,
-              borderColor: testActive ? appleColors.green : appleColors.blue,
-              backgroundColor: testActive ? 'rgba(52,199,89,0.15)' : 'transparent',
-            }}
-          >
-            <T size={8.5} weight="bold" color={testActive ? appleColors.green : appleColors.blue}>
-              {testActive ? '● Đang bắt phím' : 'Tạm dừng'}
-            </T>
-          </Press>
-          <T size={11} weight="bold" color="#FFFFFF" tabular>
-            {activeCodes.size} phím giữ
-          </T>
-        </View>
-      </View>
-
       {/* 2. MA TRẬN 2D BÀN PHÍM */}
       <View style={styles.keyboardFrame}>
         {KEYBOARD_ROWS.map((row, rowIndex) => (
@@ -299,58 +218,6 @@ const styles = StyleSheet.create({
     borderColor: '#1D2736',
     overflow: 'hidden',
     padding: 10,
-    gap: 8,
-  },
-  hudBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#111722',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#202C3E',
-  },
-  hudMain: {
-    alignItems: 'flex-start',
-    gap: 2,
-  },
-  hudKeyBadge: {
-    backgroundColor: 'rgba(0,122,255,0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: appleColors.blue,
-  },
-  hudDetails: {
-    gap: 4,
-    alignItems: 'center',
-  },
-  hudRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  modifierRow: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  modBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 4,
-    backgroundColor: '#192333',
-    borderWidth: 1,
-    borderColor: '#26374E',
-  },
-  modActive: {
-    backgroundColor: '#30D158',
-    borderColor: '#FFFFFF',
-  },
-  hudCount: {
-    alignItems: 'flex-end',
-    gap: 2,
   },
   keyboardFrame: {
     backgroundColor: '#131A26',

@@ -2,10 +2,12 @@
 // jitter, mất gói, đường ICE, bitrate, khung rớt, fps). Chỉ chạy khi HUD bật.
 
 import { useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import type { NativeMoonlightClient } from '@/lib/moonlight-native';
-import { colors } from '@/theme';
+import { colors, glass, glassShadowSubtle } from '@/theme';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
@@ -99,10 +101,17 @@ export function StreamHud({ client, enabled, top, left }: { client: NativeMoonli
     <View
       pointerEvents="none"
       style={{
-        position: 'absolute', top, left, flexDirection: 'row', alignItems: 'center', gap: s(10), paddingHorizontal: s(12), paddingVertical: s(6),
-        borderRadius: s(12), borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(7,10,16,0.62)',
+        position: 'absolute', top, left, flexDirection: 'row', alignItems: 'center', gap: s(10), paddingHorizontal: s(14), paddingVertical: s(7),
+        borderRadius: s(14), borderWidth: 1, borderColor: glass.borderSpecular, backgroundColor: glass.surfaceRaised, overflow: 'hidden', ...glassShadowSubtle,
       }}
     >
+      <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
+      <LinearGradient
+        colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.06)', 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, zIndex: 2 }}
+      />
       <Cell label="RTT" value={fmt(stats.rttMs, 0, ' ms')} warn={(stats.rttMs ?? 0) > 80} />
       <Cell label="JITTER" value={fmt(stats.jitterMs, 1, ' ms')} warn={(stats.jitterMs ?? 0) > 20} />
       <Cell label="MẤT GÓI" value={fmt(stats.lossPercent, 1, '%')} warn={(stats.lossPercent ?? 0) > 1} />

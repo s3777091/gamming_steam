@@ -3,6 +3,7 @@
 // ngang, cùng thao tác, cùng dữ liệu.
 
 import { useRouter } from 'expo-router';
+import { BlurTargetView } from 'expo-blur';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
@@ -22,12 +23,15 @@ import { useSteamPurchase, useStoreOwnership } from '@/features/library/useSteam
 import { useSteamProfile } from '@/features/library/useSteamProfile';
 import { useSteamStore, useStoreGameDetail, useStoreSearch } from '@/features/library/useSteamStore';
 import { useDeviceStatus } from '@/features/devices/useDeviceStatus';
+import { useInputDevices } from '@/features/devices/useInputDevices';
 import ConsoleSettings, { type SettingsCategory } from '@/features/settings/ConsoleSettings';
 import { clearPendingGameLaunch, savePendingGameLaunch } from '@/lib/game-launch';
 import { type GameDownload, allDownloads, downloadForApp, isDownloadActive, uninstallForApp } from '@/lib/steam-downloads';
 import { type PurchaseOffer, type PurchaseTarget, purchaseKind } from '@/lib/steam-purchase';
 import { useUi } from '@/ui/scale';
+import { GlassBlurProvider } from '@/ui/GlassMaterial';
 
+import { DeviceConnectionMenu } from './DeviceConnectionMenu';
 import { type Flight, type FlightRect, DownloadFlight } from './DownloadFlight';
 import { EulaSheet } from './DownloadViews';
 import { GamesView } from './GamesView';
@@ -61,11 +65,14 @@ export default function ConsoleScreen() {
   const [settingsCategory, setSettingsCategory] = useState<SettingsCategory | null>(null);
   const [powerOpen, setPowerOpen] = useState(false);
   const [remoteMenuOpen, setRemoteMenuOpen] = useState(false);
+  const [deviceMenuOpen, setDeviceMenuOpen] = useState(false);
   const [uninstallTarget, setUninstallTarget] = useState<PcGame | null>(null);
   const searchInputRef = useRef<TextInput>(null);
   const rootRef = useRef<View>(null);
+  const blurTargetRef = useRef<View>(null);
   const bellRef = useRef<View>(null);
   const remoteAnchorRef = useRef<View>(null);
+  const deviceAnchorRef = useRef<View>(null);
   const [flight, setFlight] = useState<Flight | null>(null);
   const flightBusy = useRef(false);
   const flightResult = useRef<'ok' | 'fail' | null>(null);
@@ -78,6 +85,7 @@ export default function ConsoleScreen() {
   const library = usePcLibrary();
   const { selected } = library;
   const deviceStatus = useDeviceStatus();
+  const inputDevices = useInputDevices();
   const { sleepPcAndExit, wakePc } = usePcSleepWake(useCallback(() => {
     void library.reload(true);
   }, [library]));
@@ -172,18 +180,20 @@ export default function ConsoleScreen() {
     setSelectedStoreItem(null);
     setSelectedPromotion(null);
     setRemoteMenuOpen(false);
+    setDeviceMenuOpen(false);
   }, []);
 
-  const anyOverlay = Boolean(settingsCategory || selectedStoreItem || selectedPromotion || panel || menuOpen || storeSearchOpen || powerOpen || remoteMenuOpen || uninstallTarget || purchase.visible);
+  const anyOverlay = Boolean(settingsCategory || selectedStoreItem || selectedPromotion || panel || menuOpen || storeSearchOpen || powerOpen || remoteMenuOpen || deviceMenuOpen || uninstallTarget || purchase.visible);
 
   // Nút B / Back: đóng lớp trên cùng trước. Các panel tự đăng ký Back riêng; ở đây
   // chỉ cần xử lý những lớp do màn này sở hữu (menu, ô tìm kiếm).
   useBack(() => {
+    if (deviceMenuOpen) { setDeviceMenuOpen(false); return; }
     if (remoteMenuOpen) { setRemoteMenuOpen(false); return; }
     if (menuOpen) { setMenuOpen(false); return; }
     if (storeSearchOpen) { setStoreSearchOpen(false); searchInputRef.current?.blur(); return; }
     return true;
-  }, remoteMenuOpen || menuOpen || storeSearchOpen);
+  }, deviceMenuOpen || remoteMenuOpen || menuOpen || storeSearchOpen);
 
   // LB/RB đổi giữa Games, Store và PC khi không có lớp nào đang mở.
   useGamepadTabs((direction) => {
@@ -192,11 +202,11 @@ export default function ConsoleScreen() {
     if (next) switchTab(next);
   });
 
-  const selectGame = (id: string) => {
+  const selectGame = useCallback((id: string) => {
     library.selectGame(id);
     setMenuOpen(false);
     setPanel(null);
-  };
+  }, [library]);
 
   const openProfile = () => {
     setMenuOpen(false);
@@ -252,7 +262,7 @@ export default function ConsoleScreen() {
   };
 
   // Bấm Play: PC bắt đầu bật booster NGAY, rồi vào màn stream (loading -> game).
-  const play = async () => {
+  const play = useCallback(async () => {
     if (!library.reachable) { setPowerOpen(true); return; }
     const result = await library.launchSelected();
     if (!result || !selected) return;
@@ -267,21 +277,33 @@ export default function ConsoleScreen() {
       });
     }
     router.push('/stream');
-  };
+  }, [library, router, selected]);
 
   // Tab PC: stream thẳng desktop, cùng cấu hình stream và đường WebRTC như khi chơi game.
-  const connectPc = () => {
+  const connectPc = useCallback(() => {
     if (!library.reachable) { setPowerOpen(true); return; }
     clearPendingGameLaunch();
     router.push('/stream');
-  };
+  }, [library.reachable, router]);
 
   const toggleRemoteMenu = useCallback(() => {
     setRemoteMenuOpen((prev) => !prev);
+    setDeviceMenuOpen(false);
     setMenuOpen(false);
     setPanel(null);
     setStoreSearchOpen(false);
   }, []);
+
+  const { resync: resyncDevices } = inputDevices;
+  const toggleDeviceMenu = useCallback(() => {
+    // Native không báo khi pin tụt, nên đọc lại để % pin trong menu là số mới nhất.
+    resyncDevices();
+    setDeviceMenuOpen((prev) => !prev);
+    setRemoteMenuOpen(false);
+    setMenuOpen(false);
+    setPanel(null);
+    setStoreSearchOpen(false);
+  }, [resyncDevices]);
 
   const handleRemoteStream = useCallback(() => {
     setRemoteMenuOpen(false);
@@ -294,7 +316,7 @@ export default function ConsoleScreen() {
     } else {
       router.push('/stream');
     }
-  }, [library.reachable, router, selected]);
+  }, [library.reachable, play, router, selected]);
 
   const handleRemoteReload = useCallback(() => {
     void library.reload(true);
@@ -310,10 +332,13 @@ export default function ConsoleScreen() {
 
   const storeOffer = (item: SteamStoreItem): PurchaseOffer => {
     const detail = storeDetail.data?.appId === item.appId ? storeDetail.data : null;
+    const portrait = detail?.portraitImage || item.portraitImage || null;
+    const header = detail?.headerImage || item.headerImage || item.largeImage || null;
     return {
       appId: item.appId,
       name: detail?.name || item.name,
-      imageUrl: detail?.portraitImage || item.portraitImage || detail?.headerImage || item.headerImage || null,
+      imageUrl: portrait || header,
+      fallbackImageUrl: header,
       free: detail?.isFree ?? item.finalPrice === 0,
       comingSoon: detail?.comingSoon ?? false,
       currency: detail?.price.currency ?? item.currency,
@@ -381,81 +406,107 @@ export default function ConsoleScreen() {
     setStoreQuery((current) => `${current}${key.toLocaleLowerCase('vi')}`.slice(0, 80));
   };
   const eraseStoreKey = () => setStoreQuery((current) => Array.from(current).slice(0, -1).join(''));
-  const submitStoreSearch = () => { if (storeSearch.results[0]) openStoreGame(storeSearch.results[0]); };
+  const submitStoreSearch = useCallback(() => { if (storeSearch.results[0]) openStoreGame(storeSearch.results[0]); }, [storeSearch.results]);
 
-  const storeContent = storeSearchOpen ? (
-    <StoreSearchPanel query={storeQuery} search={storeSearch} onOpenGame={openStoreGame} onKey={pressStoreKey} onErase={eraseStoreKey} onSubmit={submitStoreSearch} />
-  ) : store.loading && !store.data ? (
-    <StoreLoading />
-  ) : store.error && !store.data ? (
-    <StoreError message={store.error} onRetry={() => void store.reload()} />
-  ) : store.data && storeFeatured && storePreview ? (
-    <StoreHome
-      data={store.data}
-      featured={storeFeatured}
-      preview={storePreview}
-      onPreview={setStorePreviewItem}
-      onOpenGame={openStoreGame}
-      onOpenPromotion={(promotion) => { setSelectedStoreItem(null); setSelectedPromotion(promotion); }}
-    />
-  ) : (
-    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-      <T size={12} color="rgba(255,255,255,0.48)">Steam Store chưa có nội dung để hiển thị.</T>
-    </View>
-  );
+  const storeContent = useMemo(() => (
+    storeSearchOpen ? (
+      <StoreSearchPanel query={storeQuery} search={storeSearch} onOpenGame={openStoreGame} onKey={pressStoreKey} onErase={eraseStoreKey} onSubmit={submitStoreSearch} />
+    ) : store.loading && !store.data ? (
+      <StoreLoading />
+    ) : store.error && !store.data ? (
+      <StoreError message={store.error} onRetry={() => void store.reload()} />
+    ) : store.data && storeFeatured && storePreview ? (
+      <StoreHome
+        data={store.data}
+        featured={storeFeatured}
+        preview={storePreview}
+        onPreview={setStorePreviewItem}
+        onOpenGame={openStoreGame}
+        onOpenPromotion={(promotion) => { setSelectedStoreItem(null); setSelectedPromotion(promotion); }}
+      />
+    ) : (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <T size={12} color="rgba(255,255,255,0.48)">Steam Store chưa có nội dung để hiển thị.</T>
+      </View>
+    )
+  ), [storeSearchOpen, storeQuery, storeSearch, store, storeFeatured, storePreview, submitStoreSearch]);
 
-  const gamesContent = library.loading && !library.games.length ? (
-    <LibrarySkeleton />
-  ) : library.games.length ? (
-    <GamesView
-      library={library}
-      downloads={downloads}
-      reachable={library.reachable}
-      menuOpen={menuOpen}
-      onMenuOpenChange={setMenuOpen}
-      onSelectGame={selectGame}
-      onOpenPanel={setPanel}
-      onPlay={() => void play()}
-      onUninstall={setUninstallTarget}
-      onOpenPrompt={openPrompt}
-      onInstallStart={startFlight}
-      onInstallResult={resolveFlight}
-    />
-  ) : (
-    <LibraryEmpty
-      error={library.error}
-      warning={library.libraryWarning}
-      refreshing={library.refreshing}
-      onOpenPc={() => setPowerOpen(true)}
-      onRetry={() => void library.reload(true)}
-    />
-  );
+  const gamesContent = useMemo(() => (
+    library.loading && !library.games.length ? (
+      <LibrarySkeleton />
+    ) : library.games.length ? (
+      <GamesView
+        library={library}
+        downloads={downloads}
+        reachable={library.reachable}
+        menuOpen={menuOpen}
+        onMenuOpenChange={setMenuOpen}
+        onSelectGame={selectGame}
+        onOpenPanel={setPanel}
+        onPlay={() => void play()}
+        onUninstall={setUninstallTarget}
+        onOpenPrompt={openPrompt}
+        onInstallStart={startFlight}
+        onInstallResult={resolveFlight}
+      />
+    ) : (
+      <LibraryEmpty
+        error={library.error}
+        warning={library.libraryWarning}
+        refreshing={library.refreshing}
+        onOpenPc={() => setPowerOpen(true)}
+        onRetry={() => void library.reload(true)}
+      />
+    )
+  ), [library, downloads, menuOpen, openPrompt, play, selectGame, startFlight, resolveFlight]);
 
-  const pcContent = (
+  const pcContent = useMemo(() => (
     <PcView
       reachable={library.reachable}
       refreshing={library.refreshing || library.loading}
       error={library.error}
       onConnect={connectPc}
     />
-  );
+  ), [library.reachable, library.refreshing, library.loading, library.error, connectPc]);
+
+  const renderTab = useCallback((tab: StoreTab) => {
+    switch (tab) {
+      case 'store': return storeContent;
+      case 'pc': return pcContent;
+      case 'games': default: return gamesContent;
+    }
+  }, [storeContent, pcContent, gamesContent]);
 
   return (
-    <View ref={rootRef} collapsable={false} style={styles.root}>
-      <LibraryBackdrop url={backdropUrl} store={activeTab === 'store'} />
-      <PcWallpaper visible={activeTab === 'pc'} />
+    <GlassBlurProvider targetRef={blurTargetRef}>
+      <View ref={rootRef} collapsable={false} style={styles.root}>
+        <BlurTargetView ref={blurTargetRef} style={StyleSheet.absoluteFill}>
+          <LibraryBackdrop url={backdropUrl} store={activeTab === 'store'} />
+          <PcWallpaper visible={activeTab === 'pc'} />
+          <View style={[styles.contentFrame, {
+            paddingLeft: s(22) + insets.left,
+            paddingRight: s(22) + insets.right,
+            paddingTop: s(10) + insets.top,
+            paddingBottom: s(12) + insets.bottom,
+          }]}
+          >
+            <View style={{ height: s(48) }} />
+            <ConsoleTabTransition
+              activeTab={activeTab}
+              renderTab={renderTab}
+            />
+          </View>
+        </BlurTargetView>
 
-      <View
-        style={{
-          flex: 1,
-          zIndex: 1,
-          paddingLeft: s(22) + insets.left,
-          paddingRight: s(22) + insets.right,
-          paddingTop: s(10) + insets.top,
-          paddingBottom: s(12) + insets.bottom,
-        }}
-      >
-        <LibraryHeader
+        <View
+          pointerEvents="box-none"
+          style={[styles.headerFrame, {
+            left: s(22) + insets.left,
+            right: s(22) + insets.right,
+            top: s(10) + insets.top,
+          }]}
+        >
+          <LibraryHeader
           activeTab={activeTab}
           onTabChange={switchTab}
           steamProfile={library.steamProfile}
@@ -473,6 +524,10 @@ export default function ConsoleScreen() {
           remoteOnline={deviceStatus.online}
           remoteStage={deviceStatus.stage}
           remoteReachable={library.reachable}
+          devices={inputDevices.devices}
+          deviceAnchorRef={deviceAnchorRef}
+          deviceMenuOpen={deviceMenuOpen}
+          onToggleDeviceMenu={toggleDeviceMenu}
           search={(
             <StoreSearchField
               open={storeSearchOpen}
@@ -484,12 +539,8 @@ export default function ConsoleScreen() {
               onClose={() => setStoreSearchOpen(false)}
             />
           )}
-        />
-        <ConsoleTabTransition
-          activeTab={activeTab}
-          renderTab={(tab) => (tab === 'store' ? storeContent : tab === 'pc' ? pcContent : gamesContent)}
-        />
-      </View>
+          />
+        </View>
 
       {selectedStoreItem ? (() => {
         const priceLabel = formatStorePrice({ finalPrice: selectedStoreItem.finalPrice, currency: selectedStoreItem.currency });
@@ -643,10 +694,21 @@ export default function ConsoleScreen() {
         onSleep={handleRemoteSleep}
         onWake={handleRemoteWake}
       />
-    </View>
+
+        <DeviceConnectionMenu
+          open={deviceMenuOpen}
+          anchorRef={deviceAnchorRef}
+          devices={inputDevices.devices}
+          onClose={() => setDeviceMenuOpen(false)}
+          onOpenSettings={() => openSettings('devices')}
+        />
+      </View>
+    </GlassBlurProvider>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, overflow: 'hidden', backgroundColor: '#080c12' },
+  contentFrame: { flex: 1 },
+  headerFrame: { position: 'absolute', zIndex: 30, elevation: 30 },
 });

@@ -103,8 +103,8 @@ class PadState(val deviceId: Int) {
   // cần phải, kiểu PlayStation dùng RX/RY. Chọn sai là cần phải chết cứng.
   private var rightAxisX = MotionEvent.AXIS_Z
   private var rightAxisY = MotionEvent.AXIS_RZ
-  private var leftTriggerAxis = MotionEvent.AXIS_LTRIGGER
-  private var rightTriggerAxis = MotionEvent.AXIS_RTRIGGER
+  private var leftTriggerAxis = -1
+  private var rightTriggerAxis = -1
 
   val buttons: Int get() = keyButtons or hatButtons
 
@@ -124,16 +124,15 @@ class PadState(val deviceId: Int) {
       rightAxisX = MotionEvent.AXIS_Z
       rightAxisY = MotionEvent.AXIS_RZ
     }
-    if (!has(MotionEvent.AXIS_LTRIGGER) && has(MotionEvent.AXIS_BRAKE)) leftTriggerAxis = MotionEvent.AXIS_BRAKE
-    if (!has(MotionEvent.AXIS_RTRIGGER) && has(MotionEvent.AXIS_GAS)) rightTriggerAxis = MotionEvent.AXIS_GAS
-    // PlayStation: cò nằm ở Z/RZ khi cần phải dùng RX/RY.
-    if (hasRxRy && has(MotionEvent.AXIS_Z) && hasRz &&
-      !has(MotionEvent.AXIS_LTRIGGER) && !has(MotionEvent.AXIS_BRAKE)
-    ) {
-      leftTriggerAxis = MotionEvent.AXIS_Z
-      rightTriggerAxis = MotionEvent.AXIS_RZ
-      rightAxisX = MotionEvent.AXIS_RX
-      rightAxisY = MotionEvent.AXIS_RY
+    leftTriggerAxis = when {
+      has(MotionEvent.AXIS_LTRIGGER) -> MotionEvent.AXIS_LTRIGGER
+      has(MotionEvent.AXIS_BRAKE) -> MotionEvent.AXIS_BRAKE
+      else -> -1
+    }
+    rightTriggerAxis = when {
+      has(MotionEvent.AXIS_RTRIGGER) -> MotionEvent.AXIS_RTRIGGER
+      has(MotionEvent.AXIS_GAS) -> MotionEvent.AXIS_GAS
+      else -> -1
     }
   }
 
@@ -166,8 +165,8 @@ class PadState(val deviceId: Int) {
     ly = axis(event, device, MotionEvent.AXIS_Y)
     rx = axis(event, device, rightAxisX)
     ry = axis(event, device, rightAxisY)
-    axisLt = trigger(event, device, leftTriggerAxis)
-    axisRt = trigger(event, device, rightTriggerAxis)
+    axisLt = if (leftTriggerAxis >= 0) trigger(event, device, leftTriggerAxis) else 0f
+    axisRt = if (rightTriggerAxis >= 0) trigger(event, device, rightTriggerAxis) else 0f
 
     val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
     val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
@@ -188,11 +187,16 @@ class PadState(val deviceId: Int) {
   }
 
   private fun trigger(event: MotionEvent, device: InputDevice?, axis: Int): Float {
-    val range = device?.getMotionRange(axis, event.source)
+    if (axis < 0) return 0f
+    val range = device?.getMotionRange(axis, event.source) ?: device?.getMotionRange(axis)
+    if (range == null) return 0f
     val value = event.getAxisValue(axis)
-    if (range == null) return value.coerceIn(0f, 1f)
     // Cò có thể báo -1..1 (trạng thái nghỉ là -1) hoặc 0..1.
-    val normalized = if (range.min < 0f) (value - range.min) / (range.max - range.min) else value / range.max
+    val normalized = if (range.min < 0f && range.max > range.min) {
+      (value - range.min) / (range.max - range.min)
+    } else if (range.max > 0f) {
+      value / range.max
+    } else 0f
     return normalized.coerceIn(0f, 1f)
   }
 

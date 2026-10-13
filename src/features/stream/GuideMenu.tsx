@@ -18,7 +18,9 @@ import { KIND_LABEL, useInputDevices } from '@/features/devices/useInputDevices'
 import { KIND_ICONS } from '@/features/devices/kindIcons';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { PC_ROUTES, pcFetch, pcPostJson } from '@/lib/pc-api';
-import { colors } from '@/theme';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, glass, glassShadow, glassShadowSubtle } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -233,6 +235,7 @@ export function GuideMenu({
   const connected = devices;
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.root, { opacity: fade }]} accessibilityViewIsModal>
+      <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
       <Press
         onPress={onClose}
         sound="back"
@@ -255,7 +258,7 @@ export function GuideMenu({
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: s(12), paddingBottom: s(8) }}>
                 {loadingGames && !games.length ? (
-                  <View style={[styles.empty, { height: s(128), minWidth: width - s(64), borderRadius: s(16) }]}>
+                  <View style={[styles.empty, { height: s(128), minWidth: width - s(64), borderRadius: s(18) }]}>
                     <ActivityIndicator size="small" color="rgba(255,255,255,0.45)" />
                     <T size={11.4} color="rgba(255,255,255,0.45)" style={{ marginTop: s(8) }}>Đang đọc phiên game</T>
                   </View>
@@ -269,8 +272,9 @@ export function GuideMenu({
                       onPress={() => switchGame(game)}
                       pressScale={0.98}
                       style={{
-                        width: s(256), height: s(136), borderRadius: s(16), overflow: 'hidden', borderWidth: focused || game.active ? 2 : 1,
-                        borderColor: focused ? colors.white : game.active ? 'rgba(159,138,255,0.8)' : 'rgba(255,255,255,0.12)', backgroundColor: '#171a23',
+                        width: s(256), height: s(136), borderRadius: s(18), overflow: 'hidden', borderWidth: focused || game.active ? 2 : 1,
+                        borderColor: focused ? colors.white : game.active ? 'rgba(159,138,255,0.85)' : glass.borderSpecular, backgroundColor: '#171a23',
+                        ...glassShadowSubtle,
                       }}
                     >
                       {art ? <Img source={{ uri: art }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
@@ -285,7 +289,7 @@ export function GuideMenu({
                     </Press>
                   );
                 }) : (
-                  <View style={[styles.empty, { height: s(128), minWidth: width - s(64), borderRadius: s(16) }]}>
+                  <View style={[styles.empty, { height: s(128), minWidth: width - s(64), borderRadius: s(18) }]}>
                     <Layers3 size={s(24)} color="rgba(255,255,255,0.32)" />
                     <T size={13} weight="medium" color="rgba(255,255,255,0.7)" style={{ marginTop: s(8) }}>Chưa tìm thấy game đang chạy</T>
                     <T size={10.4} color="rgba(255,255,255,0.38)" style={{ marginTop: s(4) }}>Game mở từ thư viện sẽ xuất hiện tại đây.</T>
@@ -294,8 +298,8 @@ export function GuideMenu({
               </ScrollView>
             </View>
           ) : section === 'streaming' ? (
-            <View style={[styles.deviceRow, { alignSelf: 'center', maxWidth: s(520), width: '100%', borderRadius: s(16), padding: s(20), flexDirection: 'column', alignItems: 'center' }]}>
-              <View style={{ width: s(52), height: s(52), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: watchParty.live ? 'rgba(74,222,128,0.12)' : 'rgba(255,255,255,0.08)' }}>
+            <View style={[styles.deviceRow, { alignSelf: 'center', maxWidth: s(520), width: '100%', borderRadius: s(20), padding: s(20), flexDirection: 'column', alignItems: 'center', ...glassShadowSubtle }]}>
+              <View style={{ width: s(52), height: s(52), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: watchParty.live ? 'rgba(74,222,128,0.14)' : glass.surfaceUltraThin, borderWidth: 1, borderColor: glass.borderSpecular }}>
                 <Radio size={s(23)} color={watchParty.live ? colors.success : colors.text3} />
               </View>
               <T size={18} weight="semibold" style={{ marginTop: s(12) }}>Streaming cho người xem</T>
@@ -331,8 +335,8 @@ export function GuideMenu({
                 {connected.length ? connected.map((device) => {
                   const Icon = device.bluetooth && device.kind !== 'headset' ? Bluetooth : device.kind === 'headset' ? Headphones : KIND_ICONS[device.kind];
                   return (
-                    <View key={device.id} style={[styles.deviceRow, { width: '49%', minHeight: s(56), borderRadius: s(16), paddingHorizontal: s(14), gap: s(12) }]}>
-                      <View style={{ width: s(36), height: s(36), borderRadius: s(12), alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.07)' }}>
+                    <View key={device.id} style={[styles.deviceRow, { width: '49%', minHeight: s(56), borderRadius: s(18), paddingHorizontal: s(14), gap: s(12) }]}>
+                      <View style={{ width: s(36), height: s(36), borderRadius: s(12), alignItems: 'center', justifyContent: 'center', backgroundColor: glass.surfaceUltraThin, borderWidth: 1, borderColor: glass.borderSpecular }}>
                         <Icon size={s(16)} color="#b9adff" />
                       </View>
                       <View style={{ flex: 1, minWidth: 0 }}>
@@ -343,15 +347,15 @@ export function GuideMenu({
                     </View>
                   );
                 }) : (
-                  <View style={[styles.empty, { width: '100%', minHeight: s(110), borderRadius: s(16) }]}>
+                  <View style={[styles.empty, { width: '100%', minHeight: s(110), borderRadius: s(18) }]}>
                     <T size={12} color="rgba(255,255,255,0.45)">Chưa có thiết bị ngoài nào được Android nhận diện.</T>
                   </View>
                 )}
               </View>
             </View>
           ) : (
-            <View style={[styles.deviceRow, { alignSelf: 'center', maxWidth: s(448), width: '100%', borderRadius: s(16), padding: s(20), flexDirection: 'column', alignItems: 'center' }]}>
-              <View style={{ width: s(64), height: s(64), borderRadius: s(32), overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' }}>
+            <View style={[styles.deviceRow, { alignSelf: 'center', maxWidth: s(448), width: '100%', borderRadius: s(20), padding: s(20), flexDirection: 'column', alignItems: 'center', ...glassShadowSubtle }]}>
+              <View style={{ width: s(64), height: s(64), borderRadius: s(32), overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: glass.surfaceUltraThin, borderWidth: 1, borderColor: glass.borderSpecular }}>
                 {profile?.avatarUrl ? <Img source={{ uri: profile.avatarUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : <UserRound size={s(28)} color="rgba(255,255,255,0.55)" />}
               </View>
               <T size={18} weight="semibold" style={{ marginTop: s(12) }}>{profile?.name || 'Người điều khiển'}</T>
@@ -367,7 +371,14 @@ export function GuideMenu({
         ) : null}
       </View>
 
-      <View style={[styles.nav, { bottom: s(10) + insets.bottom, borderRadius: s(16), padding: s(6), gap: s(2), maxWidth: width - s(16) }]}>
+      <View style={[styles.nav, { bottom: s(10) + insets.bottom, borderRadius: s(22), padding: s(6), gap: s(2), maxWidth: width - s(16) }]}>
+        <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill} />
+        <LinearGradient
+          colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.06)', 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, zIndex: 2 }}
+        />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: s(2) }}>
           {actions.map((action, index) => {
             const Icon = action.icon;
@@ -382,8 +393,8 @@ export function GuideMenu({
                 pressScale={0.96}
                 accessibilityLabel={action.label}
                 style={{
-                  minWidth: s(64), alignItems: 'center', justifyContent: 'center', gap: s(4), paddingHorizontal: s(8), paddingVertical: s(6), borderRadius: s(12),
-                  backgroundColor: selected ? 'rgba(255,255,255,0.12)' : 'transparent', borderWidth: focused ? 2 : 0, borderColor: colors.white,
+                  minWidth: s(64), alignItems: 'center', justifyContent: 'center', gap: s(4), paddingHorizontal: s(8), paddingVertical: s(6), borderRadius: s(14),
+                  backgroundColor: selected ? 'rgba(255,255,255,0.14)' : 'transparent', borderWidth: focused ? 2 : 0, borderColor: colors.white,
                 }}
               >
                 {busy === action.id ? <ActivityIndicator size="small" color={colors.text2} /> : (
@@ -398,16 +409,23 @@ export function GuideMenu({
 
       {shot ? (
         <View style={[StyleSheet.absoluteFill, styles.modal, { padding: s(16) }]}>
-          <View style={{ width: '100%', maxWidth: s(640), overflow: 'hidden', borderRadius: s(16), backgroundColor: '#11151d', borderWidth: 1, borderColor: colors.line }}>
+          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={{ width: '100%', maxWidth: s(640), overflow: 'hidden', borderRadius: s(24), backgroundColor: glass.modal, borderWidth: 1, borderColor: glass.borderSpecular, ...glassShadow }}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.06)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, zIndex: 2 }}
+            />
             <Img source={{ uri: `data:image/png;base64,${shot}` }} style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: 'rgba(0,0,0,0.4)' }} contentFit="contain" transition={0} />
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(12), padding: s(12) }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(12), padding: s(14) }}>
               <T size={11} color="rgba(255,255,255,0.55)" style={{ flex: 1 }}>Ảnh được giữ cho tới khi đóng menu.</T>
-              <Press onPress={() => setShot(null)} sound="back" style={{ height: s(36), paddingHorizontal: s(12), justifyContent: 'center', borderRadius: s(12) }}>
+              <Press onPress={() => setShot(null)} sound="back" style={{ height: s(36), paddingHorizontal: s(14), justifyContent: 'center', borderRadius: s(12), backgroundColor: glass.surfaceUltraThin, borderWidth: 1, borderColor: glass.borderSpecular }}>
                 <T size={11} color="rgba(255,255,255,0.6)">Đóng</T>
               </Press>
               <Press
                 onPress={() => void run('copy', async () => { await Clipboard.setImageAsync(shot); }, 'Đã sao chép ảnh.')}
-                style={{ height: s(36), paddingHorizontal: s(12), flexDirection: 'row', alignItems: 'center', gap: s(8), borderRadius: s(12), backgroundColor: '#8f74ff' }}
+                style={{ height: s(36), paddingHorizontal: s(14), flexDirection: 'row', alignItems: 'center', gap: s(8), borderRadius: s(12), backgroundColor: '#8f74ff', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
               >
                 <Copy size={s(14)} color={colors.white} />
                 <T size={11} weight="semibold">Sao chép</T>
@@ -419,19 +437,26 @@ export function GuideMenu({
 
       {confirmExit ? (
         <View style={[StyleSheet.absoluteFill, styles.modal, { padding: s(16) }]}>
-          <View style={{ width: '100%', maxWidth: s(384), alignItems: 'center', borderRadius: s(16), padding: s(20), backgroundColor: '#14171f', borderWidth: 1, borderColor: colors.line }}>
-            <View style={{ width: s(44), height: s(44), borderRadius: s(14), alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(248,113,113,0.1)' }}>
+          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={{ width: '100%', maxWidth: s(384), alignItems: 'center', borderRadius: s(24), padding: s(22), backgroundColor: glass.modal, borderWidth: 1, borderColor: glass.borderSpecular, ...glassShadow }}>
+            <LinearGradient
+              colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.06)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, zIndex: 2 }}
+            />
+            <View style={{ width: s(48), height: s(48), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(248,113,113,0.12)', borderWidth: 1, borderColor: 'rgba(248,113,113,0.25)' }}>
               <LogOut size={s(20)} color="#fca5a5" />
             </View>
             <T size={15} weight="semibold" style={{ marginTop: s(12) }}>Thoát game và dừng stream?</T>
             <T size={11.4} color="rgba(255,255,255,0.48)" leading={1.55} style={{ marginTop: s(6), textAlign: 'center' }}>
               Game đang hiển thị sẽ đóng. Các game khác trong Tab game vẫn được giữ.
             </T>
-            <View style={{ flexDirection: 'row', gap: s(8), marginTop: s(16) }}>
-              <Press onPress={() => setConfirmExit(false)} style={{ height: s(40), paddingHorizontal: s(16), justifyContent: 'center', borderRadius: s(12) }}>
+            <View style={{ flexDirection: 'row', gap: s(8), marginTop: s(18) }}>
+              <Press onPress={() => setConfirmExit(false)} style={{ height: s(40), paddingHorizontal: s(16), justifyContent: 'center', borderRadius: s(12), backgroundColor: glass.surfaceUltraThin, borderWidth: 1, borderColor: glass.borderSpecular }}>
                 <T size={11.4} weight="semibold" color="rgba(255,255,255,0.6)">Hủy</T>
               </Press>
-              <Press onPress={exitGame} style={{ height: s(40), paddingHorizontal: s(16), flexDirection: 'row', alignItems: 'center', gap: s(8), borderRadius: s(12), backgroundColor: 'rgba(239,68,68,0.85)' }}>
+              <Press onPress={exitGame} style={{ height: s(40), paddingHorizontal: s(16), flexDirection: 'row', alignItems: 'center', gap: s(8), borderRadius: s(12), backgroundColor: 'rgba(239,68,68,0.85)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}>
                 {busy === 'exit' ? <ActivityIndicator size="small" color={colors.white} /> : <LogOut size={s(14)} color={colors.white} />}
                 <T size={11.4} weight="semibold">Thoát game</T>
               </Press>
@@ -444,37 +469,46 @@ export function GuideMenu({
 }
 
 const styles = StyleSheet.create({
-  root: { backgroundColor: 'rgba(7,10,16,0.82)', zIndex: 160, elevation: 160 },
+  root: { backgroundColor: 'rgba(7,10,16,0.76)', zIndex: 160, elevation: 160 },
   close: {
     position: 'absolute',
     zIndex: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: glass.borderSpecular,
+    backgroundColor: glass.surfaceRaised,
+    ...glassShadowSubtle,
   },
   empty: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.035)',
+    borderColor: glass.borderSpecular,
+    backgroundColor: glass.surfaceUltraThin,
   },
   deviceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    borderColor: glass.borderSpecular,
+    backgroundColor: glass.surfaceRaised,
+    overflow: 'hidden',
   },
-  toast: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(0,0,0,0.36)' },
+  toast: {
+    borderWidth: 1,
+    borderColor: glass.borderSpecular,
+    backgroundColor: glass.surfaceRaised,
+    ...glassShadowSubtle,
+  },
   nav: {
     position: 'absolute',
     alignSelf: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(16,19,26,0.94)',
+    borderColor: glass.borderSpecular,
+    backgroundColor: glass.floatingBar,
+    overflow: 'hidden',
+    ...glassShadow,
   },
-  modal: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(7,10,16,0.88)', zIndex: 20 },
+  modal: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(7,10,16,0.72)', zIndex: 20 },
 });

@@ -17,31 +17,32 @@ import { T } from '@/ui/Text';
 
 export const appleColors = {
   // Nền & khung
-  bg: '#F2F2F7',             // Nền chính Apple Grouped Background
-  sidebarBg: '#F2F2F7',      // Nền sidebar iPadOS
-  card: '#FFFFFF',           // Nền card trắng Inset Grouped
-  cardBorder: '#E5E5EA',     // Viền card mỏng
-  separator: '#E5E5EA',      // Đường kẻ thụt lề giữa các hàng
-  pressedBg: '#E5E5EA',      // Màu phản hồi khi chạm hàng
+  bg: '#080c12',             // Nền chính Console (#080c12 đồng bộ với toàn app)
+  sidebarBg: 'rgba(10, 16, 26, 0.75)',      // Nền sidebar Console glass
+  card: 'rgba(255, 255, 255, 0.045)',       // Nền card liquid glass
+  cardBorder: 'rgba(255, 255, 255, 0.12)',     // Viền card tinh gọn
+  separator: 'rgba(255, 255, 255, 0.07)',      // Đường kẻ phân cách giữa các hàng
+  pressedBg: 'rgba(255, 255, 255, 0.08)',      // Màu phản hồi khi chạm hàng
+  cardRaised: 'rgba(24, 32, 44, 0.7)',     // Nền nhóm phụ hoặc dropdown inline
 
   // Văn bản
-  text: '#000000',           // Nhãn chính
-  textSecondary: '#6D6D72',  // Tiêu đề nhóm, chú thích dưới card
-  textTertiary: '#8E8E93',   // Giá trị bên phải, phụ đề mờ
-  chevron: '#C7C7CC',        // Mũi tên điều hướng phụ
+  text: 'rgba(255, 255, 255, 0.95)',          // Nhãn chính màu trắng sáng
+  textSecondary: 'rgba(255, 255, 255, 0.65)', // Tiêu đề nhóm, chú thích dưới card
+  textTertiary: 'rgba(255, 255, 255, 0.45)',  // Giá trị bên phải, phụ đề mờ
+  chevron: 'rgba(255, 255, 255, 0.35)',       // Mũi tên điều hướng phụ
 
-  // Màu hệ thống Apple
-  blue: '#007AFF',           // Nút, hàng chọn, dấu tích
-  green: '#34C759',          // Công tắc bật (UISwitch), chấm online
-  red: '#FF3B30',            // Hành động xóa, cảnh báo lỗi
-  orange: '#FF9500',         // Cảnh báo, pin yếu, icon khôi phục
-  yellow: '#FFCC00',
-  purple: '#AF52DE',
-  indigo: '#5856D6',
-  teal: '#30B0C7',
-  pink: '#FF2D55',
-  gray: '#8E8E93',
-  switchOff: '#E9E9EB',      // Nền công tắc khi tắt
+  // Màu hệ thống
+  blue: '#1f6feb',           // Nút, hàng chọn, dấu tích
+  green: '#34c759',          // Công tắc bật (UISwitch), chấm online
+  red: '#ff453a',            // Hành động xóa, cảnh báo lỗi
+  orange: '#ff9f0a',         // Cảnh báo, pin yếu, icon khôi phục
+  yellow: '#ffd60a',
+  purple: '#bf5af2',
+  indigo: '#5e5ce6',
+  teal: '#40c8e0',
+  pink: '#ff375f',
+  gray: '#8e8e93',
+  switchOff: 'rgba(255, 255, 255, 0.16)',     // Nền công tắc khi tắt
 } as const;
 
 export function SettingsGroup({
@@ -75,12 +76,30 @@ export function SettingsGroup({
       <View
         style={{
           backgroundColor: appleColors.card,
-          borderRadius: s(10),
-          borderWidth: StyleSheet.hairlineWidth,
+          borderRadius: s(16),
+          borderWidth: 1,
           borderColor: appleColors.cardBorder,
           overflow: 'hidden',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.2,
+          shadowRadius: 10,
+          elevation: 2,
         }}
       >
+        {/* Specular top rim highlight */}
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: StyleSheet.hairlineWidth,
+            backgroundColor: 'rgba(255, 255, 255, 0.18)',
+          }}
+          pointerEvents="none"
+        />
+
         {items.map((child, index) => (
           <View key={index}>
             {index > 0 ? (
@@ -152,7 +171,7 @@ export function rowStyle(s: (n: number) => number, extra?: object) {
     gap: s(12),
     paddingHorizontal: s(16),
     paddingVertical: s(8),
-    backgroundColor: appleColors.card,
+    backgroundColor: 'transparent',
     ...extra,
   };
 }
@@ -160,7 +179,8 @@ export function rowStyle(s: (n: number) => number, extra?: object) {
 /**
  * Công tắc UISwitch chuẩn Apple (như được khoanh đỏ trong ảnh mẫu):
  * - Rộng 46dp, cao 26dp, bo tròn dạng viên thuốc.
- * - Bật: xanh lá Apple #34C759. Tắt: xám nhạt Apple #E9E9EB.
+ * - Bật: xanh lá Apple #34C759 với viền sáng và đổ bóng dịu.
+ * - Tắt: xám mờ Apple.
  * - Nút tròn trắng tinh, đổ bóng chuẩn iOS.
  */
 export function Switch({ checked }: { checked: boolean }) {
@@ -194,6 +214,11 @@ export function Switch({ checked }: { checked: boolean }) {
         }),
         justifyContent: 'center',
         paddingHorizontal: thumbPadding,
+        shadowColor: '#34c759',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: checked ? 0.4 : 0,
+        shadowRadius: 6,
+        elevation: checked ? 3 : 0,
       }}
     >
       <Animated.View
@@ -212,8 +237,8 @@ export function Switch({ checked }: { checked: boolean }) {
           ],
           shadowColor: '#000000',
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.2,
-          shadowRadius: 2.5,
+          shadowOpacity: 0.25,
+          shadowRadius: 3,
           elevation: 2,
         }}
       />
@@ -290,7 +315,7 @@ export function ChoiceRow<V extends string>({
         </View>
       </Press>
       {open ? (
-        <View style={{ backgroundColor: '#F9F9FB', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: appleColors.separator }}>
+        <View style={{ backgroundColor: '#0c121a', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: appleColors.separator }}>
           {options.map((option, idx) => {
             const active = option.value === value;
             return (
@@ -616,8 +641,8 @@ export function Keycap({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: accent ? appleColors.blue : '#D1D1D6',
-        backgroundColor: accent ? 'rgba(0,122,255,0.1)' : '#FFFFFF',
+        borderColor: accent ? appleColors.blue : 'rgba(255, 255, 255, 0.15)',
+        backgroundColor: accent ? 'rgba(31, 111, 235, 0.2)' : 'rgba(255, 255, 255, 0.08)',
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.08,
@@ -652,16 +677,16 @@ export function PillButton({
   const { s } = useUi();
   const bg =
     tone === 'danger'
-      ? 'rgba(255,59,48,0.1)'
+      ? 'rgba(255, 69, 58, 0.15)'
       : tone === 'accent'
         ? appleColors.blue
-        : '#E5E5EA';
+        : 'rgba(255, 255, 255, 0.08)';
   const fg =
     tone === 'danger'
       ? appleColors.red
       : tone === 'accent'
         ? '#FFFFFF'
-        : appleColors.text;
+        : 'rgba(255, 255, 255, 0.85)';
 
   return (
     <Press

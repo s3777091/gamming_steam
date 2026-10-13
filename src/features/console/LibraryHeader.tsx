@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
-import { Animated, Easing, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { Bell, Gamepad2, Monitor, MonitorSmartphone, Settings } from 'lucide-react-native';
 
-import { DEVICE_KIND_ORDER, useInputDevices, type DeviceKind } from '@/features/devices/useInputDevices';
+import { batteryColor, lowestControllerBattery } from '@/features/devices/battery';
+import { DEVICE_KIND_ORDER, type LocalDevice } from '@/features/devices/useInputDevices';
 import { KIND_ICONS } from '@/features/devices/kindIcons';
 import { formatClock } from '@/features/library/format';
 import type { SteamProfile, StoreTab } from '@/features/library/types';
-import { colors } from '@/theme';
+import { colors, glass } from '@/theme';
 import { Img } from '@/ui/Img';
+import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -20,48 +22,188 @@ const TABS: { id: StoreTab; label: string }[] = [
   { id: 'pc', label: 'PC' },
 ];
 
-// Ước lượng vị trí/độ rộng vạch chỉ tab trước khi đo layout (cùng đơn vị s()).
-const TAB_ESTIMATE: Record<StoreTab, { x: number; w: number }> = {
-  games: { x: 14, w: 44 },
-  store: { x: 94, w: 38 },
-  pc: { x: 168, w: 20 },
-};
+// Kích thước chuẩn cho mỗi tab để indicator trượt bằng GPU (useNativeDriver: true), không phụ thuộc đo layout.
+const TAB_ITEM_WIDTH = 66;
 
-/** Cụm icon thiết bị đang nối (tay cầm, tai nghe, bàn phím, chuột); chạm để mở Cài đặt > Thiết bị. */
-function DeviceStatusButton({ onPress }: { onPress: () => void }) {
+/** Cụm icon thiết bị đang nối:
+ *  - Bình thường (đóng): các icon đè lên nhau tạo thành stack gọn gàng.
+ *  - Khi chạm mở: các icon tách ra bình thường với hiệu ứng ease-out, nút nở rộng mượt mà.
+ *  - Canh chỉnh linh hoạt theo số lượng icon và thiết bị thực tế bên trong.
+ */
+function DeviceStatusButton({ devices, open, onPress }: { devices: LocalDevice[]; open: boolean; onPress: () => void }) {
   const { s } = useUi();
-  const { devices } = useInputDevices();
-  const groups = useMemo(() => {
-    const byKind = new Map<DeviceKind, number>();
-    for (const device of devices) byKind.set(device.kind, (byKind.get(device.kind) ?? 0) + 1);
-    return DEVICE_KIND_ORDER.filter((kind) => byKind.has(kind)).map((kind) => ({ kind, count: byKind.get(kind)! }));
+  const [anim] = useState(() => new Animated.Value(open ? 1 : 0));
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: open ? 1 : 0,
+      duration: 260,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
+      useNativeDriver: false,
+    }).start();
+  }, [anim, open]);
+
+  const sortedDevices = useMemo(() => {
+    return [...devices].sort((a, b) => DEVICE_KIND_ORDER.indexOf(a.kind) - DEVICE_KIND_ORDER.indexOf(b.kind));
   }, [devices]);
 
+  const controllerBattery = useMemo(() => lowestControllerBattery(devices), [devices]);
+  const displayDevices = useMemo(() => sortedDevices.slice(0, 4), [sortedDevices]);
+  const overflowCount = sortedDevices.length > 4 ? sortedDevices.length - 4 : 0;
+  const N = displayDevices.length;
+  const hasBattery = controllerBattery !== null;
+
+  const ICON_WRAP = s(22);
+  const ICON_SIZE = s(14.5);
+  const SEPARATED_GAP = s(6);
+  const OVERLAP_OFFSET = s(13); // Khoảng cách giữa các icon khi đè lên nhau (overlap 9dp)
+  const SHIFT_DELTA = (ICON_WRAP + SEPARATED_GAP) - OVERLAP_OFFSET; // 15dp
+  const PADDING_H = s(9);
+  const batteryWidth = hasBattery ? s(28) : 0;
+  const overflowWidth = overflowCount > 0 ? s(16) : 0;
+
+  // Tính độ rộng theo số lượng icon và thiết bị
+  let collapsedContentWidth = ICON_WRAP;
+  let separatedContentWidth = ICON_WRAP;
+
+  if (N >= 2) {
+    collapsedContentWidth = ICON_WRAP + (N - 1) * OVERLAP_OFFSET + batteryWidth + overflowWidth;
+    separatedContentWidth = ICON_WRAP + (N - 1) * (ICON_WRAP + SEPARATED_GAP) + batteryWidth + overflowWidth;
+  } else if (N === 1) {
+    collapsedContentWidth = ICON_WRAP + batteryWidth;
+    separatedContentWidth = ICON_WRAP + batteryWidth;
+  }
+
+  const collapsedTotalWidth = collapsedContentWidth + PADDING_H * 2;
+  const separatedTotalWidth = separatedContentWidth + PADDING_H * 2;
+
+  const animatedWidth = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [collapsedTotalWidth, separatedTotalWidth],
+  });
+
+  const pillBg = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(255, 255, 255, 0.08)', 'rgba(102, 168, 255, 0.22)'],
+  });
+
+  const pillBorder = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(255, 255, 255, 0.16)', colors.accent],
+  });
+
+  const accessibilityLabel = controllerBattery !== null
+    ? `Thiết bị đang kết nối, pin tay cầm ${controllerBattery}%`
+    : (N > 0 ? `Thiết bị đang kết nối: ${N} thiết bị` : 'Thiết bị đang kết nối');
+
   return (
-    <Press
-      onPress={onPress}
-      accessibilityLabel="Thiết bị đang kết nối"
-      style={[styles.devices, { height: s(32), borderRadius: s(16), paddingHorizontal: s(10), gap: s(4) }]}
+    <Animated.View
+      style={[
+        styles.devices,
+        {
+          width: animatedWidth,
+          height: s(32),
+          borderRadius: s(16),
+          paddingHorizontal: PADDING_H,
+          backgroundColor: pillBg,
+          borderColor: pillBorder,
+          overflow: 'hidden',
+        },
+      ]}
     >
-      {groups.length ? groups.slice(0, 4).map(({ kind, count }) => {
-        const Icon = KIND_ICONS[kind];
-        return (
-          <View key={kind} style={{ width: s(24), height: s(24), alignItems: 'center', justifyContent: 'center' }}>
-            <Icon size={s(15)} color={colors.text2} strokeWidth={1.8} />
-            {count > 1 ? (
-              <View style={[styles.count, { minWidth: s(14), height: s(14), borderRadius: s(7), top: -s(1), right: -s(2) }]}>
-                <T size={8} weight="semibold" tabular>{count}</T>
-              </View>
+      <GlassBackdrop material="control" intensity={40} radius={s(16)} />
+      <Press
+        onPress={onPress}
+        sound="confirm"
+        accessibilityLabel={accessibilityLabel}
+        style={{
+          flex: 1,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: N > 0 ? 'flex-start' : 'center',
+        }}
+      >
+        {N > 0 ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {displayDevices.map((device, i) => {
+              const Icon = KIND_ICONS[device.kind];
+              const translateX = anim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-i * SHIFT_DELTA, 0],
+              });
+
+              return (
+                <Animated.View
+                  key={device.id}
+                  style={[
+                    styles.deviceIconWrapper,
+                    {
+                      width: ICON_WRAP,
+                      height: ICON_WRAP,
+                      borderRadius: ICON_WRAP / 2,
+                      marginLeft: i > 0 ? SEPARATED_GAP : 0,
+                      zIndex: i + 1,
+                      transform: [{ translateX }],
+                      backgroundColor: i === 0 ? 'transparent' : anim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['rgba(18, 22, 30, 0.95)', 'rgba(0, 0, 0, 0)'],
+                      }),
+                      borderWidth: i === 0 ? 0 : 1.5,
+                      borderColor: i === 0 ? 'transparent' : anim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['rgba(28, 34, 46, 0.9)', 'rgba(0, 0, 0, 0)'],
+                      }),
+                    },
+                  ]}
+                >
+                  <Icon size={ICON_SIZE} color={open ? colors.accent : colors.text} strokeWidth={1.8} />
+                </Animated.View>
+              );
+            })}
+
+            {hasBattery ? (
+              <Animated.View
+                style={{
+                  marginLeft: s(4),
+                  transform: [{
+                    translateX: anim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-(N - 1) * SHIFT_DELTA, 0],
+                    }),
+                  }],
+                }}
+              >
+                <T size={10.5} weight="bold" color={batteryColor(controllerBattery)} tabular>
+                  {controllerBattery}%
+                </T>
+              </Animated.View>
+            ) : null}
+
+            {overflowCount > 0 ? (
+              <Animated.View
+                style={{
+                  marginLeft: s(4),
+                  transform: [{
+                    translateX: anim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-(N - 1) * SHIFT_DELTA, 0],
+                    }),
+                  }],
+                }}
+              >
+                <T size={9.6} weight="bold" color={colors.accentSoft} tabular>
+                  +{overflowCount}
+                </T>
+              </Animated.View>
             ) : null}
           </View>
-        );
-      }) : (
-        <View style={{ width: s(24), height: s(24), alignItems: 'center', justifyContent: 'center' }}>
-          <MonitorSmartphone size={s(15)} color={colors.text4} strokeWidth={1.8} />
-        </View>
-      )}
-      {groups.length > 4 ? <T size={9.6} weight="semibold" color={colors.text3} tabular>+{groups.length - 4}</T> : null}
-    </Press>
+        ) : (
+          <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}>
+            <MonitorSmartphone size={ICON_SIZE} color={colors.text3} strokeWidth={1.8} />
+          </View>
+        )}
+      </Press>
+    </Animated.View>
   );
 }
 
@@ -95,14 +237,15 @@ function RemoteStatusButton({
           width: s(32),
           height: s(32),
           borderRadius: s(16),
-          backgroundColor: open ? 'rgba(102,168,255,0.22)' : 'rgba(255,255,255,0.07)',
-          borderColor: open ? colors.accent : 'rgba(255,255,255,0.14)',
+          backgroundColor: open ? 'rgba(102,168,255,0.24)' : 'rgba(255,255,255,0.08)',
+          borderColor: open ? colors.accent : 'rgba(255,255,255,0.18)',
         },
       ]}
     >
+      <GlassBackdrop material="control" intensity={40} radius={s(16)} />
       <Monitor
         size={s(15)}
-        color={open ? colors.accent : isOnline ? colors.white : 'rgba(255,255,255,0.66)'}
+        color={open ? colors.accent : isOnline ? colors.white : 'rgba(255,255,255,0.72)'}
         strokeWidth={1.8}
       />
       <View
@@ -134,7 +277,7 @@ function SteamAccountButton({ profile, onPress }: { profile: SteamProfile | null
         {profile?.avatarUrl ? (
           <Img source={{ uri: profile.avatarUrl }} style={{ width: '100%', height: '100%', borderRadius: s(16) }} contentFit="cover" />
         ) : (
-          <Gamepad2 size={s(16)} color="rgba(255,255,255,0.62)" strokeWidth={1.7} />
+          <Gamepad2 size={s(16)} color="rgba(255,255,255,0.7)" strokeWidth={1.7} />
         )}
         {profile ? (
           <View
@@ -153,7 +296,6 @@ function HeaderClock() {
   const { s } = useUi();
   const [clock, setClock] = useState(() => formatClock(new Date()));
   useEffect(() => {
-    // Một timeout bắn đúng đầu phút kế tiếp, không phải đồng hồ chạy 30 giây một lần.
     let timer: ReturnType<typeof setTimeout>;
     const schedule = () => {
       const now = new Date();
@@ -164,8 +306,9 @@ function HeaderClock() {
     return () => clearTimeout(timer);
   }, []);
   return (
-    <View style={{ height: s(32), justifyContent: 'center' }}>
-      <T size={13.2} weight="semibold" color="rgba(255,255,255,0.92)" tabular>{clock}</T>
+    <View style={[styles.clockBadge, { height: s(32), paddingHorizontal: s(10), borderRadius: s(16) }]}>
+      <GlassBackdrop material="control" intensity={40} radius={s(16)} />
+      <T size={13} weight="semibold" color="rgba(255,255,255,0.95)" tabular>{clock}</T>
     </View>
   );
 }
@@ -174,21 +317,22 @@ function ConsoleTabItem({
   tab,
   active,
   onPress,
-  onLayout,
+  tabWidth,
 }: {
   tab: { id: StoreTab; label: string };
   active: boolean;
   onPress: () => void;
-  onLayout: (e: LayoutChangeEvent) => void;
+  tabWidth: number;
 }) {
   const { s } = useUi();
   const [anim] = useState(() => new Animated.Value(active ? 1 : 0));
 
   useEffect(() => {
-    Animated.timing(anim, {
+    Animated.spring(anim, {
       toValue: active ? 1 : 0,
-      duration: 220,
-      easing: Easing.out(Easing.cubic),
+      stiffness: 300,
+      damping: 24,
+      mass: 0.8,
       useNativeDriver: true,
     }).start();
   }, [active, anim]);
@@ -196,18 +340,23 @@ function ConsoleTabItem({
   return (
     <Press
       sound="navigate"
-      pressScale={0.97}
+      pressScale={0.96}
       onPress={onPress}
-      onLayout={onLayout}
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
-      style={{ height: s(34), paddingHorizontal: s(14), borderRadius: s(17), alignSelf: 'center', justifyContent: 'center' }}
+      style={{
+        width: tabWidth,
+        height: s(30),
+        borderRadius: s(15),
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
     >
       <Animated.View
         style={{
           opacity: anim.interpolate({
             inputRange: [0, 1],
-            outputRange: [0.48, 1],
+            outputRange: [0.6, 1],
           }),
           transform: [
             {
@@ -219,7 +368,7 @@ function ConsoleTabItem({
           ],
         }}
       >
-        <T size={12.2} weight="semibold" color={colors.white}>{tab.label}</T>
+        <T size={12} weight="bold" color={colors.white}>{tab.label}</T>
       </Animated.View>
     </Press>
   );
@@ -233,80 +382,81 @@ function ConsoleTabs({
   onTabChange: (tab: StoreTab) => void;
 }) {
   const { s } = useUi();
-  const [tabLayouts, setTabLayouts] = useState<Record<string, { x: number; width: number }>>({});
-  const initialEstimate = TAB_ESTIMATE[activeTab];
+  const tabWidth = s(TAB_ITEM_WIDTH);
 
-  const [indicatorX] = useState(() => new Animated.Value(s(initialEstimate.x)));
-  const [indicatorW] = useState(() => new Animated.Value(s(initialEstimate.w)));
+  const tabIndex = useMemo(() => {
+    const idx = TABS.findIndex((t) => t.id === activeTab);
+    return idx >= 0 ? idx : 0;
+  }, [activeTab]);
+
+  const targetX = tabIndex * tabWidth;
+  const [indicatorX] = useState(() => new Animated.Value(targetX));
   const hasMounted = useRef(false);
+  const prevTabIndex = useRef(tabIndex);
 
   useEffect(() => {
-    const layout = tabLayouts[activeTab];
-    const estimate = TAB_ESTIMATE[activeTab];
-    const targetX = layout ? layout.x + s(14) : s(estimate.x);
-    const targetW = layout ? Math.max(s(16), layout.width - s(28)) : s(estimate.w);
-
     if (!hasMounted.current) {
-      if (layout) hasMounted.current = true;
+      hasMounted.current = true;
       indicatorX.setValue(targetX);
-      indicatorW.setValue(targetW);
+      prevTabIndex.current = tabIndex;
       return;
     }
 
-    Animated.parallel([
+    if (prevTabIndex.current !== tabIndex) {
+      prevTabIndex.current = tabIndex;
       Animated.spring(indicatorX, {
         toValue: targetX,
-        damping: 24,
-        stiffness: 260,
-        mass: 0.8,
-        useNativeDriver: false,
-      }),
-      Animated.spring(indicatorW, {
-        toValue: targetW,
-        damping: 24,
-        stiffness: 260,
-        mass: 0.8,
-        useNativeDriver: false,
-      }),
-    ]).start();
-  }, [activeTab, tabLayouts, s, indicatorX, indicatorW]);
-
-  const handleLayout = (id: StoreTab, layout: { x: number; width: number }) => {
-    setTabLayouts((prev) => {
-      const existing = prev[id];
-      if (existing && Math.abs(existing.x - layout.x) < 1 && Math.abs(existing.width - layout.width) < 1) {
-        return prev;
-      }
-      return { ...prev, [id]: layout };
-    });
-  };
+        damping: 26,
+        stiffness: 300,
+        mass: 0.7,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      indicatorX.setValue(targetX);
+    }
+  }, [indicatorX, tabIndex, targetX]);
 
   return (
-    <View style={{ flexDirection: 'row', height: s(48), gap: s(8), alignItems: 'center', position: 'relative' }} accessibilityRole="tablist">
-      {TABS.map((tab) => (
-        <ConsoleTabItem
-          key={tab.id}
-          tab={tab}
-          active={activeTab === tab.id}
-          onPress={() => onTabChange(tab.id)}
-          onLayout={(e) => handleLayout(tab.id, e.nativeEvent.layout)}
-        />
-      ))}
+    <View
+      style={[
+        styles.tabBarCapsule,
+        {
+          flexDirection: 'row',
+          height: s(36),
+          borderRadius: s(18),
+          alignItems: 'center',
+          position: 'relative',
+          paddingHorizontal: s(3),
+          overflow: 'hidden',
+        },
+      ]}
+      accessibilityRole="tablist"
+    >
+      <GlassBackdrop material="control" intensity={46} radius={s(18)} />
       <Animated.View
         pointerEvents="none"
         style={[
           styles.tabIndicator,
           {
             position: 'absolute',
-            bottom: s(9),
-            left: 0,
-            height: s(2.5),
-            borderRadius: s(1.25),
-            width: indicatorW,
+            top: s(3),
+            bottom: s(3),
+            left: s(3),
+            borderRadius: s(15),
+            width: tabWidth,
             transform: [{ translateX: indicatorX }],
           },
         ]}
       />
+      {TABS.map((tab) => (
+        <ConsoleTabItem
+          key={tab.id}
+          tab={tab}
+          active={activeTab === tab.id}
+          onPress={() => onTabChange(tab.id)}
+          tabWidth={tabWidth}
+        />
+      ))}
     </View>
   );
 }
@@ -378,6 +528,10 @@ export function LibraryHeader({
   remoteOnline,
   remoteStage,
   remoteReachable,
+  devices = [],
+  deviceAnchorRef,
+  deviceMenuOpen,
+  onToggleDeviceMenu,
 }: {
   activeTab: StoreTab;
   onTabChange: (tab: StoreTab) => void;
@@ -403,6 +557,13 @@ export function LibraryHeader({
   remoteOnline?: boolean | null;
   remoteStage?: string;
   remoteReachable?: boolean;
+  /** Thiết bị đang nối (từ useInputDevices) — cụm icon + % pin tay cầm. */
+  devices?: LocalDevice[];
+  /** Điểm neo để menu thiết bị thả xuống ngay dưới cụm icon. */
+  deviceAnchorRef?: RefObject<View | null>;
+  deviceMenuOpen?: boolean;
+  /** Không truyền thì chạm cụm icon mở thẳng Cài đặt > Thiết bị. */
+  onToggleDeviceMenu?: () => void;
 }) {
   const { s } = useUi();
   const totalNotifications = notificationCount !== undefined
@@ -420,7 +581,13 @@ export function LibraryHeader({
         <HeaderSearchContainer visible={activeTab === 'store'}>
           {search}
         </HeaderSearchContainer>
-        <DeviceStatusButton onPress={() => onOpenSettings('devices')} />
+        <View ref={deviceAnchorRef} collapsable={false}>
+          <DeviceStatusButton
+            devices={devices}
+            open={Boolean(deviceMenuOpen)}
+            onPress={onToggleDeviceMenu ?? (() => onOpenSettings('devices'))}
+          />
+        </View>
         {onToggleRemoteMenu ? (
           <View ref={remoteAnchorRef} collapsable={false}>
             <RemoteStatusButton
@@ -437,13 +604,23 @@ export function LibraryHeader({
             onPress={onOpenNotifications}
             sound="navigate"
             accessibilityLabel={totalNotifications > 0 ? `Thông báo, ${totalNotifications} thông báo` : 'Thông báo'}
-            style={{ minWidth: s(32), height: s(32), paddingHorizontal: s(4), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' }}
+            style={[
+              styles.glassCircleButton,
+              {
+                width: s(32),
+                height: s(32),
+                borderRadius: s(16),
+                borderColor: totalNotifications > 0 ? 'rgba(102,168,255,0.4)' : 'rgba(255,255,255,0.16)',
+                backgroundColor: totalNotifications > 0 ? 'rgba(102,168,255,0.14)' : 'rgba(255,255,255,0.08)',
+              },
+            ]}
           >
+            <GlassBackdrop material="control" intensity={40} radius={s(16)} />
             {downloadPercent !== null ? <ProgressRing size={s(32)} percent={downloadPercent} color={colors.accent} /> : null}
             <View style={{ position: 'relative', width: s(18), height: s(18), alignItems: 'center', justifyContent: 'center' }}>
               <Bell
-                size={s(17)}
-                color={totalNotifications > 0 ? colors.white : 'rgba(255,255,255,0.66)'}
+                size={s(16)}
+                color={totalNotifications > 0 ? colors.white : 'rgba(255,255,255,0.72)'}
                 strokeWidth={1.8}
               />
               {totalNotifications > 0 ? (
@@ -459,9 +636,10 @@ export function LibraryHeader({
         <Press
           onPress={() => onOpenSettings('quality')}
           accessibilityLabel="Cài đặt"
-          style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center' }}
+          style={[styles.glassCircleButton, { width: s(32), height: s(32), borderRadius: s(16) }]}
         >
-          <Settings size={s(16)} color="rgba(255,255,255,0.66)" strokeWidth={1.8} />
+          <GlassBackdrop material="control" intensity={40} radius={s(16)} />
+          <Settings size={s(16)} color="rgba(255,255,255,0.72)" strokeWidth={1.8} />
         </Press>
         <View style={{ width: StyleSheet.hairlineWidth, height: s(20), backgroundColor: 'rgba(255,255,255,0.16)' }} />
         <SteamAccountButton profile={steamProfile} onPress={onOpenProfile} />
@@ -472,21 +650,53 @@ export function LibraryHeader({
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 30 },
-  tabIndicator: {
-    backgroundColor: colors.accent,
-    shadowColor: colors.accent,
-    shadowOpacity: 0.8,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 0 },
+  clockBadge: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+    backgroundColor: glass.control,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  tabBarCapsule: {
+    backgroundColor: glass.control,
+    borderWidth: 1,
+    borderColor: glass.controlBorder,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
     elevation: 3,
+  },
+  tabIndicator: {
+    backgroundColor: glass.controlActive,
+    borderWidth: 1,
+    borderColor: glass.controlBorderActive,
+    shadowColor: '#ffffff',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
   },
   devices: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  deviceIconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   count: {
     position: 'absolute',
@@ -505,19 +715,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'visible',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.45)',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    shadowColor: colors.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
   presence: { position: 'absolute', right: 0, bottom: 0, borderWidth: 1, borderColor: '#111821' },
   remoteButton: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   statusDot: {
     position: 'absolute',
     borderWidth: 1.2,
     borderColor: '#080c12',
+  },
+  glassCircleButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: glass.controlBorder,
+    backgroundColor: glass.control,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
   },
 });

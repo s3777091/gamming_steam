@@ -43,8 +43,22 @@ function NotchFillet({ bottom, right }: { bottom: number; right: number }) {
 function DiscountBadge({ percent, size = 9 }: { percent: number; size?: number }) {
   const { s } = useUi();
   return (
-    <View style={{ backgroundColor: colors.accent, borderRadius: s(6), paddingHorizontal: s(6), paddingVertical: s(2) }}>
-      <T size={size} weight="bold" color={colors.onAccent} tabular>-{percent}%</T>
+    <View
+      style={{
+        backgroundColor: 'rgba(38, 120, 255, 0.42)',
+        borderRadius: s(8),
+        paddingHorizontal: s(7),
+        paddingVertical: s(2.5),
+        borderWidth: 1,
+        borderColor: 'rgba(140, 195, 255, 0.7)',
+        shadowColor: colors.accent,
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.35,
+        shadowRadius: 4,
+        elevation: 2,
+      }}
+    >
+      <T size={size} weight="bold" color="#ffffff" tabular>-{percent}%</T>
     </View>
   );
 }
@@ -85,7 +99,7 @@ function StorePreview({ item }: { item: SteamStoreItem }) {
           {item.name}
         </T>
       )}
-      <T size={10.5} color="rgba(255,255,255,0.64)" leading={1.5} numberOfLines={2} style={{ marginTop: s(6), maxWidth: s(560) }}>
+      <T size={10.5} color="rgba(255,255,255,0.78)" leading={1.5} numberOfLines={2} style={{ marginTop: s(6), maxWidth: s(560) }}>
         {item.shortDescription
           || item.genres?.slice(0, 3).join(' / ')
           || 'Khám phá game nổi bật, ưu đãi mới và các trò chơi bán chạy trên Steam.'}
@@ -101,10 +115,18 @@ function ShelfCard({ item, previewing, onPreview, onOpen }: {
   onOpen: () => void;
 }) {
   const { s } = useUi();
-  const [grow] = useState(() => new Animated.Value(previewing ? 1 : 0));
+  const [selection] = useState(() => new Animated.Value(previewing ? 1 : 0));
   useEffect(() => {
-    Animated.timing(grow, { toValue: previewing ? 1 : 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-  }, [previewing, grow]);
+    const animation = Animated.spring(selection, {
+      toValue: previewing ? 1 : 0,
+      stiffness: 260,
+      damping: 26,
+      mass: 0.72,
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [previewing, selection]);
 
   return (
     <View>
@@ -113,12 +135,16 @@ function ShelfCard({ item, previewing, onPreview, onOpen }: {
           style={[
             styles.card,
             {
-              borderRadius: grow.interpolate({ inputRange: [0, 1], outputRange: [s(12), s(20)] }),
-              width: grow.interpolate({ inputRange: [0, 1], outputRange: [s(IDLE.w), s(PREVIEW.w)] }),
-              height: grow.interpolate({ inputRange: [0, 1], outputRange: [s(IDLE.h), s(PREVIEW.h)] }),
-              marginBottom: grow.interpolate({ inputRange: [0, 1], outputRange: [s(4), 0] }),
-              borderColor: grow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.14)', 'rgba(255,255,255,0)'] }),
-              opacity: grow.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }),
+              borderRadius: s(previewing ? 20 : 12),
+              width: s(previewing ? PREVIEW.w : IDLE.w),
+              height: s(previewing ? PREVIEW.h : IDLE.h),
+              marginBottom: previewing ? 0 : s(4),
+              borderColor: previewing ? 'rgba(255,255,255,0)' : 'rgba(255,255,255,0.14)',
+              opacity: selection.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }),
+              transform: [
+                { scale: selection.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1] }) },
+                { translateY: selection.interpolate({ inputRange: [0, 1], outputRange: [s(2), 0] }) },
+              ],
             },
           ]}
         >
@@ -129,11 +155,11 @@ function ShelfCard({ item, previewing, onPreview, onOpen }: {
               <View pointerEvents="none" style={[styles.badgeSlot, { top: s(10), left: s(10), gap: s(5) }]}>
                 {item.discounted ? (
                   <View style={[styles.saleBadge, { minHeight: s(24), paddingHorizontal: s(8), borderRadius: s(12) }]}>
-                    <T size={9} weight="bold" color={colors.onAccent} tabular>-{item.discountPercent}%</T>
+                    <T size={9.2} weight="bold" color="#ffffff" tabular>-{item.discountPercent}%</T>
                   </View>
                 ) : null}
                 <View style={[styles.badge, { minHeight: s(24), paddingHorizontal: s(9), borderRadius: s(12) }]}>
-                  <T size={9.2} weight="semibold" color="rgba(255,255,255,0.96)" tabular>
+                  <T size={9.2} weight="semibold" color="rgba(255,255,255,0.98)" tabular>
                     {formatStorePrice(item)}
                   </T>
                 </View>
@@ -187,8 +213,8 @@ function PromotionTile({ promotion, onOpen }: { promotion: SteamPromotion; onOpe
       <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, maxWidth: '72%', justifyContent: 'center', padding: s(10) }}>
         <T size={10.2} weight="semibold" leading={1.15} numberOfLines={2}>{promotion.name}</T>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(4), marginTop: s(4) }}>
-          <T size={8.6} weight="medium" color="rgba(255,255,255,0.58)">Xem khuyến mãi</T>
-          <ChevronRight size={s(10)} color="rgba(255,255,255,0.58)" strokeWidth={1.8} />
+          <T size={8.6} weight="medium" color="rgba(255,255,255,0.82)">Xem khuyến mãi</T>
+          <ChevronRight size={s(10)} color="rgba(255,255,255,0.82)" strokeWidth={1.8} />
         </View>
       </View>
     </Press>
@@ -209,7 +235,7 @@ function QuickDealTile({ item, previewing, onPreview }: { item: SteamStoreItem; 
       <LinearGradient colors={['rgba(6,16,29,0.84)', 'rgba(6,16,29,0.24)', 'rgba(6,16,29,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
       <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, maxWidth: '72%', justifyContent: 'center', padding: s(10) }}>
         <T size={9.3} weight="semibold" color="rgba(255,255,255,0.92)" numberOfLines={1}>{item.name}</T>
-        <T size={8.6} weight="medium" color="rgba(255,255,255,0.56)" style={{ marginTop: s(4) }}>
+        <T size={8.6} weight="semibold" color={item.discounted ? '#9ac5ff' : 'rgba(255,255,255,0.78)'} style={{ marginTop: s(4) }}>
           {item.discounted ? `Giảm ${item.discountPercent}%` : formatStorePrice(item)}
         </T>
       </View>
@@ -250,7 +276,7 @@ export function StoreHome({ data, featured, preview, onPreview, onOpenGame, onOp
   return (
     <View style={{ flex: 1, justifyContent: 'flex-end', overflow: 'hidden', paddingBottom: s(2), paddingTop: s(4) }}>
       <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: s(10) }}>
-        <StorePreview key={preview.appId} item={preview} />
+        <StorePreview item={preview} />
       </View>
 
       <FocusScroll
@@ -285,8 +311,27 @@ export function StoreHome({ data, featured, preview, onPreview, onOpenGame, onOp
 }
 
 const styles = StyleSheet.create({
-  card: { overflow: 'hidden', borderWidth: 1, backgroundColor: colors.card },
-  tile: { overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: colors.card },
+  card: {
+    overflow: 'hidden',
+    borderWidth: 1,
+    backgroundColor: 'rgba(17, 24, 33, 0.85)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.38,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  tile: {
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(17, 24, 33, 0.82)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+  },
   selectedWash: {
     position: 'absolute',
     top: 0,
@@ -303,14 +348,26 @@ const styles = StyleSheet.create({
   saleBadge: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.accent,
+    backgroundColor: 'rgba(38, 120, 255, 0.48)',
+    borderWidth: 1,
+    borderColor: 'rgba(140, 195, 255, 0.75)',
+    shadowColor: colors.accent,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.45,
+    shadowRadius: 6,
+    elevation: 3,
   },
   badge: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.32)',
-    backgroundColor: 'rgba(18,20,24,0.68)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.36)',
+    backgroundColor: 'rgba(16, 26, 42, 0.78)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.28,
+    shadowRadius: 6,
+    elevation: 3,
   },
   openButton: {
     position: 'absolute',
@@ -318,11 +375,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#202124',
+    backgroundColor: 'rgba(32, 33, 36, 0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     shadowColor: '#020812',
-    shadowOpacity: 0.36,
-    shadowRadius: 10,
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 7,
+    elevation: 8,
   },
 });

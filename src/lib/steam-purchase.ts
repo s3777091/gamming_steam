@@ -29,6 +29,7 @@ export type PurchaseOffer = {
   appId: number;
   name: string;
   imageUrl: string | null;
+  fallbackImageUrl?: string | null;
   free: boolean;
   comingSoon: boolean;
   currency: string | null;

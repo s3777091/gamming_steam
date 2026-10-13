@@ -21,7 +21,6 @@ import {
 } from 'jetsona-input';
 
 import { appleColors } from '@/features/settings/controls';
-import { Press } from '@/ui/Press';
 import { T } from '@/ui/Text';
 
 export type Mouse2DVisualizerProps = {
@@ -30,15 +29,11 @@ export type Mouse2DVisualizerProps = {
 
 export function Mouse2DVisualizer({ sensitivity = 1.0 }: Mouse2DVisualizerProps) {
   const [activeButtons, setActiveButtons] = useState<Set<number>>(new Set());
-  const [scrollDelta, setScrollDelta] = useState(0);
   const [scrollDirection, setScrollDirection] = useState<'up' | 'down' | null>(null);
-  const [pointerCaptureActive, setPointerCaptureActive] = useState(false);
 
   // Vị trí con trỏ trong sân khấu kiểm tra chuyển động (Radar Pad)
   const [pointerPos, setPointerPos] = useState({ x: 90, y: 70 });
-  const [velocity, setVelocity] = useState(0);
   const scrollTimer = useRef<any>(null);
-  const velTimer = useRef<any>(null);
   const buttonTimers = useRef<Map<number, any>>(new Map());
 
   // Thu thập sự kiện chuột trực tiếp
@@ -57,14 +52,10 @@ export function Mouse2DVisualizer({ sensitivity = 1.0 }: Mouse2DVisualizerProps)
           return next;
         });
       } else if (event.type === 'wheel') {
-        setScrollDelta((prev) => prev + event.dy);
         setScrollDirection(event.dy > 0 ? 'up' : 'down');
         if (scrollTimer.current) clearTimeout(scrollTimer.current);
         scrollTimer.current = setTimeout(() => setScrollDirection(null), 300);
       } else if (event.type === 'move') {
-        const speed = Math.sqrt(event.dx * event.dx + event.dy * event.dy);
-        setVelocity(Math.round(speed * 10));
-
         setPointerPos((prev) => {
           const radarW = 180;
           const radarH = 140;
@@ -79,9 +70,6 @@ export function Mouse2DVisualizer({ sensitivity = 1.0 }: Mouse2DVisualizerProps)
 
           return { x: newX, y: newY };
         });
-
-        if (velTimer.current) clearTimeout(velTimer.current);
-        velTimer.current = setTimeout(() => setVelocity(0), 150);
       }
     });
 
@@ -112,47 +100,8 @@ export function Mouse2DVisualizer({ sensitivity = 1.0 }: Mouse2DVisualizerProps)
   const isSideBack = activeButtons.has(4);
   const isSideFwd = activeButtons.has(5);
 
-  const togglePointerCapture = () => {
-    const next = !pointerCaptureActive;
-    setPointerCaptureActive(next);
-    setPointerCapture(next);
-  };
-
   return (
     <View style={styles.container}>
-      {/* 1. HUD TRẠNG THÁI CHUỘT */}
-      <View style={styles.hudBar}>
-        <View style={styles.hudItem}>
-          <T size={9.5} color="#8E9EB5">NÚT CHUỘT ĐANG NHẤN</T>
-          <View style={styles.buttonTags}>
-            {isLMB && <View style={styles.activeTag}><T size={9} weight="bold" color="#FFFFFF">LMB (Trái)</T></View>}
-            {isRMB && <View style={styles.activeTag}><T size={9} weight="bold" color="#FFFFFF">RMB (Phải)</T></View>}
-            {isMMB && <View style={styles.activeTag}><T size={9} weight="bold" color="#FFFFFF">MMB (Giữa)</T></View>}
-            {isSideBack && <View style={styles.activeTag}><T size={9} weight="bold" color="#FFFFFF">Nút phụ 1</T></View>}
-            {isSideFwd && <View style={styles.activeTag}><T size={9} weight="bold" color="#FFFFFF">Nút phụ 2</T></View>}
-            {!activeButtons.size && <T size={10} color="#5D7089">Chưa nhấn nút nào</T>}
-          </View>
-        </View>
-
-        <View style={styles.hudItem}>
-          <T size={9.5} color="#8E9EB5">TỐC ĐỘ DI CHUỘT</T>
-          <T size={12} weight="bold" color={velocity > 0 ? '#30D158' : '#FFFFFF'} tabular>
-            {velocity} px/s
-          </T>
-        </View>
-
-        <View style={styles.hudItem}>
-          <T size={9.5} color="#8E9EB5">CON LĂN (SCROLL)</T>
-          <T size={12} weight="bold" color={scrollDirection ? appleColors.blue : '#FFFFFF'} tabular>
-            {scrollDirection === 'up'
-              ? `▲ Cuộn lên (${scrollDelta.toFixed(0)})`
-              : scrollDirection === 'down'
-                ? `▼ Cuộn xuống (${scrollDelta.toFixed(0)})`
-                : `${scrollDelta.toFixed(0)} nấc`}
-          </T>
-        </View>
-      </View>
-
       {/* 2. KHU VỰC TRỰC QUAN HOÁ: MÔ HÌNH CHUỘT 2D & SÂN KHẤU RADAR CON TRỎ */}
       <View style={styles.mainStage}>
         {/* MÔ HÌNH CHUỘT 2D SVG */}
@@ -311,14 +260,6 @@ export function Mouse2DVisualizer({ sensitivity = 1.0 }: Mouse2DVisualizerProps)
         <View style={styles.radarBox}>
           <View style={styles.radarHeader}>
             <T size={10} weight="semibold" color="#8E9EB5">KHU VỰC THỬ CHUỘT (POINTER RADAR)</T>
-            <Press
-              onPress={togglePointerCapture}
-              style={[styles.captureButton, pointerCaptureActive && styles.captureButtonActive]}
-            >
-              <T size={9} weight="bold" color={pointerCaptureActive ? '#FFFFFF' : appleColors.blue}>
-                {pointerCaptureActive ? 'Đang khoá con trỏ' : 'Khoá con trỏ'}
-              </T>
-            </Press>
           </View>
 
           <View style={styles.radarArea}>
@@ -360,31 +301,6 @@ const styles = StyleSheet.create({
     padding: 10,
     gap: 8,
   },
-  hudBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#111722',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#202C3E',
-  },
-  hudItem: {
-    gap: 3,
-  },
-  buttonTags: {
-    flexDirection: 'row',
-    gap: 4,
-    alignItems: 'center',
-  },
-  activeTag: {
-    backgroundColor: appleColors.blue,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
   mainStage: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -414,18 +330,7 @@ const styles = StyleSheet.create({
   radarHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  captureButton: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: appleColors.blue,
-  },
-  captureButtonActive: {
-    backgroundColor: appleColors.blue,
-    borderColor: '#FFFFFF',
+    justifyContent: 'flex-start',
   },
   radarArea: {
     width: '100%',

@@ -76,6 +76,7 @@ export type QueueItem = {
   queueIndex: number;
   downloaded: number;
   total: number;
+  percent?: number | null;
   error: string | null;
   completedAt: number | null;
 };
@@ -257,7 +258,8 @@ export function downloadForApp(state: DownloadsState | null, appid: number | nul
   }
   if (item) {
     if (item.completed) return { ...base, status: 'installed', label: 'Đã cài xong', percent: 100 };
-    const progress = { percent: percentOf(item.downloaded, item.total), downloaded: item.downloaded, total: item.total };
+    const calculatedPercent = item.percent ?? percentOf(item.downloaded, item.total);
+    const progress = { percent: calculatedPercent, downloaded: item.downloaded, total: item.total };
     if (item.error) return { ...base, ...progress, status: 'failed', label: 'Steam báo lỗi', error: item.error };
     return item.paused
       ? { ...base, ...progress, status: 'paused', label: 'Đã tạm dừng' }

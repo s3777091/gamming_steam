@@ -61,9 +61,9 @@ export const LAUNCH_REVEAL_AFTER_MS = 60_000;
  * một game: đừng che nó quá lâu. Where Winds Meet được PC agent mở thẳng game,
  * không đi qua launcher "Enter Game".
  */
-export const STARTING_REVEAL_AFTER_MS = 25_000;
+export const STARTING_REVEAL_AFTER_MS = 15_000;
 /** Loading screen đã che chừng này mà chưa tan thì hiện nút "Xem màn hình máy tính". */
-export const COVER_SKIP_AFTER_MS = 7_000;
+export const COVER_SKIP_AFTER_MS = 4_000;
 
 const TERMINAL_PHASES: ReadonlySet<GameSessionPhase> = new Set(['ended', 'cancelled', 'failed']);
 

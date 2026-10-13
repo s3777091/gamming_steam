@@ -1,10 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Monitor, Play } from 'lucide-react-native';
 
 import { FocusScroll } from '@/features/gamepad/focus';
-import { colors } from '@/theme';
+import { colors, glass } from '@/theme';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -24,7 +24,7 @@ export function PcView({ reachable, refreshing, error, onConnect }: {
   onConnect: () => void;
 }) {
   const { s, width } = useUi();
-  const enter = useRef(new Animated.Value(0)).current;
+  const [enter] = useState(() => new Animated.Value(0));
   useEffect(() => {
     Animated.timing(enter, { toValue: 1, duration: 760, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [enter]);
@@ -78,19 +78,32 @@ export function PcView({ reachable, refreshing, error, onConnect }: {
         contentContainerStyle={{ alignItems: 'flex-end', paddingHorizontal: s(10), paddingTop: s(10), paddingBottom: s(12) }}
         accessibilityRole="list"
       >
-        <Press onPress={onConnect} focusRadius={s(16)} pressScale={0.98} accessibilityLabel="Jetson PC">
-          <View style={[styles.card, { width: s(CARD.w), height: s(CARD.h), borderRadius: s(16) }]}>
+        <Press onPress={onConnect} focusRadius={s(20)} focusVariant="glassCard" pressScale={0.98} accessibilityLabel="Jetson PC">
+          <View style={[styles.card, { width: s(CARD.w), height: s(CARD.h), borderRadius: s(20) }]}>
             <LinearGradient
               colors={['#0a4fb8', '#06265f', '#020b24']}
               start={{ x: 1, y: 0 }}
               end={{ x: 0, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
-            <LinearGradient colors={['rgba(255,255,255,0.08)', 'rgba(7,16,28,0)', 'rgba(7,16,28,0.5)']} style={StyleSheet.absoluteFill} />
-            <Monitor size={s(36)} color="rgba(255,255,255,0.86)" strokeWidth={1.4} style={styles.cardIcon} />
+            {/* Lớp phản quang khúc xạ ánh sáng đa góc Liquid Glass */}
+            <LinearGradient
+              colors={['rgba(255,255,255,0.22)', 'rgba(7,16,28,0)', 'rgba(7,16,28,0.6)']}
+              locations={[0, 0.35, 1]}
+              style={StyleSheet.absoluteFill}
+            />
+            <LinearGradient
+              colors={['rgba(255,255,255,0.4)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0.8, y: 0.8 }}
+              pointerEvents="none"
+              style={StyleSheet.absoluteFill}
+            />
+            <View pointerEvents="none" style={[styles.glassEdge, { borderRadius: s(19) }]} />
+            <Monitor size={s(36)} color="rgba(255,255,255,0.92)" strokeWidth={1.5} style={styles.cardIcon} />
             <View style={[styles.chip, { right: s(10), bottom: s(10), borderRadius: s(12), paddingHorizontal: s(10), paddingVertical: s(6), gap: s(8) }]}>
               <View style={{ width: s(7), height: s(7), borderRadius: s(3.5), backgroundColor: reachable ? colors.success : colors.text4 }} />
-              <T size={10.9} weight="semibold">{reachable ? 'Trực tuyến' : 'Ngoại tuyến'}</T>
+              <T size={10.9} weight="bold">{reachable ? 'Trực tuyến' : 'Ngoại tuyến'}</T>
             </View>
           </View>
         </Press>
@@ -103,18 +116,30 @@ const styles = StyleSheet.create({
   play: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.38,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 10,
+    backgroundColor: '#1a6ae8',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.48)',
+    shadowColor: '#2b7fff',
+    shadowOpacity: 0.55,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
   },
   card: {
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.8)',
-    backgroundColor: colors.card,
+    borderColor: glass.cardBorderActive,
+    backgroundColor: 'rgba(17, 24, 33, 0.85)',
+    shadowColor: '#0a4fb8',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  glassEdge: {
+    ...StyleSheet.absoluteFill,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: glass.cardInnerEdge,
   },
   cardIcon: { position: 'absolute', left: 16, top: 16 },
   chip: {
@@ -122,12 +147,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(10,17,28,0.58)',
+    borderColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(10,17,28,0.65)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
   },
   error: {
     borderWidth: 1,
-    borderColor: 'rgba(254,202,202,0.2)',
-    backgroundColor: 'rgba(69,10,10,0.54)',
+    borderColor: 'rgba(254,202,202,0.3)',
+    backgroundColor: 'rgba(80,12,12,0.65)',
+    shadowColor: '#f87171',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
 });

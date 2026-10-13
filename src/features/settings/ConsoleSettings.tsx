@@ -12,7 +12,6 @@ import {
   Gamepad2,
   Gauge,
   Keyboard,
-  Layers,
   Monitor,
   MonitorPlay,
   Mouse,
@@ -31,7 +30,7 @@ import { T } from '@/ui/Text';
 
 import { appleColors, PillButton } from './controls';
 import { AudioPage, ControllerPage, DevicesPage, KeyboardPage, MousePage } from './DevicePages';
-import { LatencyPage, NetworkPage, OverlayPage, QualityPage, VideoPage } from './StreamPages';
+import { LatencyPage, NetworkPage, QualityPage, VideoPage } from './StreamPages';
 import { useInputSettings } from './useInputSettings';
 import { useStreamSettingsDraft } from './useStreamSettingsDraft';
 
@@ -40,7 +39,6 @@ export type SettingsCategory =
   | 'video'
   | 'latency'
   | 'network'
-  | 'overlay'
   | 'devices'
   | 'controller'
   | 'mouse'
@@ -62,7 +60,6 @@ const CATEGORIES: Array<{
   { id: 'video', label: 'Hình ảnh', detail: 'Độ phân giải, FPS, codec, bitrate và lớp phủ', icon: MonitorPlay, stream: true, color: appleColors.blue },
   { id: 'latency', label: 'Độ trễ & độ mượt', detail: 'Bộ đệm, frame pacing và V-Sync', icon: Gauge, stream: true, color: appleColors.orange },
   { id: 'network', label: 'Mạng', detail: 'Khu vực và kiểm tra đường truyền', icon: Wifi, stream: true, color: appleColors.blue },
-  { id: 'overlay', label: 'Trong lúc stream', detail: 'Performance HUD và viền phát sóng', icon: Layers, stream: true, color: appleColors.green },
   { id: 'devices', label: 'Thiết bị', detail: 'Thiết bị đang nối với máy này', icon: Monitor, stream: false, color: appleColors.gray },
   { id: 'controller', label: 'Tay cầm', detail: 'Bố cục nút, rung và vùng chết', icon: Gamepad2, stream: false, color: appleColors.red },
   { id: 'mouse', label: 'Chuột', detail: 'Tốc độ con trỏ và cuộn', icon: Mouse, stream: false, color: appleColors.teal },
@@ -190,10 +187,8 @@ export default function ConsoleSettings({
         <VideoPage {...props} />
       ) : category === 'latency' ? (
         <LatencyPage {...props} />
-      ) : category === 'network' ? (
-        <NetworkPage {...props} notify={notify} />
       ) : (
-        <OverlayPage {...props} />
+        <NetworkPage {...props} notify={notify} />
       );
   }
 
@@ -276,27 +271,35 @@ export default function ConsoleSettings({
                     key={entry.id}
                     onPress={() => select(entry.id)}
                     autoFocus={active}
-                    pressScale={0.99}
+                    pressScale={0.985}
                     accessibilityState={{ selected: active }}
                     style={{
-                      height: s(38),
+                      height: s(40),
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: s(10),
                       paddingHorizontal: s(10),
-                      borderRadius: s(8),
-                      marginVertical: s(1),
-                      backgroundColor: active ? 'rgba(0, 0, 0, 0.08)' : 'transparent',
+                      borderRadius: s(10),
+                      marginVertical: s(1.5),
+                      backgroundColor: active ? 'rgba(31, 111, 235, 0.22)' : 'transparent',
+                      borderWidth: active ? 1 : 0,
+                      borderColor: active ? 'rgba(102, 168, 255, 0.35)' : 'transparent',
                     }}
                   >
                     <View
                       style={{
                         width: s(28),
                         height: s(28),
-                        borderRadius: s(7),
+                        borderRadius: s(8),
                         alignItems: 'center',
                         justifyContent: 'center',
                         backgroundColor: entry.color,
+                        borderWidth: StyleSheet.hairlineWidth,
+                        borderColor: 'rgba(255, 255, 255, 0.35)',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.2,
+                        shadowRadius: 2,
                       }}
                     >
                       <Icon size={s(15)} color="#FFFFFF" strokeWidth={2.2} />
@@ -331,27 +334,35 @@ export default function ConsoleSettings({
                     key={entry.id}
                     onPress={() => select(entry.id)}
                     autoFocus={active}
-                    pressScale={0.99}
+                    pressScale={0.985}
                     accessibilityState={{ selected: active }}
                     style={{
-                      height: s(38),
+                      height: s(40),
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: s(10),
                       paddingHorizontal: s(10),
-                      borderRadius: s(8),
-                      marginVertical: s(1),
-                      backgroundColor: active ? 'rgba(0, 0, 0, 0.08)' : 'transparent',
+                      borderRadius: s(10),
+                      marginVertical: s(1.5),
+                      backgroundColor: active ? 'rgba(31, 111, 235, 0.22)' : 'transparent',
+                      borderWidth: active ? 1 : 0,
+                      borderColor: active ? 'rgba(102, 168, 255, 0.35)' : 'transparent',
                     }}
                   >
                     <View
                       style={{
                         width: s(28),
                         height: s(28),
-                        borderRadius: s(7),
+                        borderRadius: s(8),
                         alignItems: 'center',
                         justifyContent: 'center',
                         backgroundColor: entry.color,
+                        borderWidth: StyleSheet.hairlineWidth,
+                        borderColor: 'rgba(255, 255, 255, 0.35)',
+                        shadowColor: '#000',
+                        shadowOffset: { width: 0, height: 1 },
+                        shadowOpacity: 0.2,
+                        shadowRadius: 2,
                       }}
                     >
                       <Icon size={s(15)} color="#FFFFFF" strokeWidth={2.2} />
@@ -398,7 +409,7 @@ export default function ConsoleSettings({
                     paddingVertical: s(6),
                     paddingHorizontal: s(12),
                     borderRadius: s(14),
-                    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+                    backgroundColor: 'rgba(31, 111, 235, 0.2)',
                   }}
                 >
                   <T size={13.5} weight="semibold" color={appleColors.blue}>
@@ -440,7 +451,7 @@ export default function ConsoleSettings({
                 borderRadius: s(10),
                 gap: s(10),
                 borderColor: notice.tone === 'error' ? appleColors.red : appleColors.cardBorder,
-                backgroundColor: '#FFFFFF',
+                backgroundColor: '#18202c',
               },
             ]}
           >

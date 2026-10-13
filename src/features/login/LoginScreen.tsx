@@ -6,12 +6,14 @@ import { Eye, EyeOff } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 
 import { supabaseConfigured } from '@/lib/config';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { createClient } from '@/lib/supabase';
-import { colors, fonts } from '@/theme';
+import { colors, fonts, glass, glassShadow, glassShadowSubtle } from '@/theme';
 import { Img } from '@/ui/Img';
+import { LiquidAmbientAurora } from '@/ui/LiquidGlass';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -50,10 +52,11 @@ export default function LoginScreen() {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const field = [styles.input, { height: s(44), borderRadius: s(12), paddingHorizontal: s(14), fontSize: s(13.6) }];
+  const field = [styles.input, { height: s(46), borderRadius: s(14), paddingHorizontal: s(16), fontSize: s(13.6) }];
 
   return (
     <LinearGradient colors={['#10101a', '#090810', '#08070d']} locations={[0, 0.5, 1]} style={styles.root}>
+      <LiquidAmbientAurora />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView
           contentContainerStyle={{
@@ -66,7 +69,9 @@ export default function LoginScreen() {
           {!compact ? (
             <View style={{ flex: 1, maxWidth: s(420) }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(14) }}>
-                <Img source={LOGO} style={{ width: s(50), height: s(50), borderRadius: s(25), borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)' }} contentFit="cover" transition={0} />
+                <View style={{ width: s(52), height: s(52), borderRadius: s(26), borderWidth: 1, borderColor: glass.borderSpecular, overflow: 'hidden', ...glassShadowSubtle }}>
+                  <Img source={LOGO} style={{ width: '100%', height: '100%' }} contentFit="cover" transition={0} />
+                </View>
                 <View>
                   <T size={15} weight="bold" color={colors.accentSoft} tracking={0.14}>JETSONA</T>
                   <T size={11} color={colors.text3}>Game Console</T>
@@ -79,7 +84,14 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          <View style={[styles.card, { width: Math.min(s(380), width - s(48)), borderRadius: s(24), padding: s(24) }]}>
+          <View style={[styles.card, { width: Math.min(s(380), width - s(48)), borderRadius: s(28), padding: s(26) }]}>
+            <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+            <LinearGradient
+              colors={['rgba(255,255,255,0.32)', 'rgba(255,255,255,0.06)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, zIndex: 2 }}
+            />
             {!supabaseConfigured ? (
               <View>
                 <T size={18} weight="bold">Chưa thể kết nối</T>
@@ -89,7 +101,7 @@ export default function LoginScreen() {
               <>
                 <T size={22} weight="bold" tracking={-0.02}>Đăng nhập</T>
                 <T size={12} color={colors.text3} style={{ marginTop: s(4) }}>Tiếp tục vào console cá nhân của bạn.</T>
-                <View style={{ marginTop: s(18), gap: s(10) }}>
+                <View style={{ marginTop: s(20), gap: s(12) }}>
                   <TextInput
                     value={email}
                     onChangeText={setEmail}
@@ -127,7 +139,7 @@ export default function LoginScreen() {
                       onPress={() => setPasswordVisible((visible) => !visible)}
                       pressScale={0.9}
                       focusRadius={s(10)}
-                      style={[styles.passwordToggle, { width: s(44), height: s(44), borderRadius: s(10) }]}
+                      style={[styles.passwordToggle, { width: s(46), height: s(46), borderRadius: s(12) }]}
                     >
                       {passwordVisible ? (
                         <EyeOff size={s(18)} color={colors.text3} strokeWidth={1.8} />
@@ -138,7 +150,14 @@ export default function LoginScreen() {
                   </View>
                 </View>
                 {error ? <T size={11.2} color="#fecaca" leading={1.5} style={{ marginTop: s(10) }}>{error}</T> : null}
-                <Press onPress={() => void signIn()} disabled={busy} style={[styles.submit, { marginTop: s(16), height: s(46), borderRadius: s(23) }]}>
+                <Press onPress={() => void signIn()} disabled={busy} style={[styles.submit, { marginTop: s(18), height: s(46), borderRadius: s(23) }]}>
+                  <LinearGradient
+                    colors={['rgba(255,255,255,0.45)', 'rgba(255,255,255,0.05)', 'transparent']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={[StyleSheet.absoluteFill, { height: '55%' }]}
+                    pointerEvents="none"
+                  />
                   {busy ? <ActivityIndicator color="#0a111c" /> : <T size={13.4} weight="bold" color="#0a111c">Đăng nhập</T>}
                 </Press>
               </>
@@ -152,15 +171,29 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  card: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', backgroundColor: 'rgba(18,17,28,0.92)' },
+  card: {
+    borderWidth: 1,
+    borderColor: glass.borderSpecular,
+    backgroundColor: glass.modal,
+    overflow: 'hidden',
+    ...glassShadow,
+  },
   input: {
     fontFamily: fonts.medium,
     color: colors.white,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderColor: glass.borderSpecular,
+    backgroundColor: glass.surfaceUltraThin,
   },
   passwordField: { position: 'relative' },
   passwordToggle: { position: 'absolute', right: 0, top: 0, alignItems: 'center', justifyContent: 'center' },
-  submit: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
+  submit: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.9)',
+    overflow: 'hidden',
+    ...glassShadowSubtle,
+  },
 });

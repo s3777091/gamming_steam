@@ -23,6 +23,8 @@ import { PC_ROUTES, pcFetch } from '@/lib/pc-api';
 import { pointOnStream, streamStretchStyle } from '@/lib/stream-fit';
 import type { HostShortcutAction } from '@/lib/input-settings';
 import type { Resolution } from '@/lib/stream-settings';
+import { BlurView } from 'expo-blur';
+import { colors, glass, glassShadowSubtle } from '@/theme';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
@@ -359,8 +361,9 @@ export default function StreamScreen() {
       />
 
       {hint && live ? (
-        <View pointerEvents="none" style={[styles.hint, { bottom: s(24) + insets.bottom, paddingHorizontal: s(14), paddingVertical: s(6), borderRadius: s(16) }]}>
-          <T size={11.5} color="rgba(255,255,255,0.7)">{hint}</T>
+        <View pointerEvents="none" style={[styles.hint, { bottom: s(24) + insets.bottom, paddingHorizontal: s(16), paddingVertical: s(8), borderRadius: s(18) }]}>
+          <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
+          <T size={11.8} weight="medium" color="rgba(255,255,255,0.85)">{hint}</T>
         </View>
       ) : null}
 
@@ -408,7 +411,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     alignSelf: 'center',
     zIndex: 90,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: glass.surfaceRaised,
+    borderWidth: 1,
+    borderColor: glass.borderSpecular,
+    overflow: 'hidden',
+    ...glassShadowSubtle,
   },
   keyboardBridge: { position: 'absolute', left: -1000, top: 0, width: 1, height: 1, opacity: 0 },
 });

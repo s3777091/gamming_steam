@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ChevronRight, Gamepad2, Info, Newspaper, ShoppingBag, Trash2, Trophy, X, type LucideIcon } from 'lucide-react-native';
 
@@ -8,7 +8,8 @@ import { isSteamAppId } from '@/features/library/format';
 import type { LibraryPanel, PcGame } from '@/features/library/types';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { openExternal } from '@/lib/open-external';
-import { colors } from '@/theme';
+import { colors, glass } from '@/theme';
+import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -40,7 +41,7 @@ function ActionItem({
   autoFocus?: boolean;
 }) {
   const { s } = useUi();
-  const tint = danger ? '#f87171' : iconColor || 'rgba(255,255,255,0.88)';
+  const tint = danger ? '#f87171' : iconColor || 'rgba(255,255,255,0.92)';
 
   return (
     <Press
@@ -48,22 +49,36 @@ function ActionItem({
       onPress={onPress}
       autoFocus={autoFocus}
       sound={danger ? 'confirm' : 'navigate'}
-      pressScale={0.98}
+      focusTint={danger ? 'danger' : 'accent'}
+      pressScale={0.975}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: s(12),
-        paddingVertical: s(9),
+        paddingVertical: s(8.5),
         marginHorizontal: s(10),
-        marginVertical: s(2.5),
+        marginVertical: s(2),
         borderRadius: s(12),
-        backgroundColor: danger ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.03)',
+        backgroundColor: danger ? 'rgba(111,31,31,0.50)' : glass.surfaceThin,
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: danger ? 'rgba(239,68,68,0.22)' : 'rgba(255,255,255,0.06)',
+        borderColor: danger ? 'rgba(239,68,68,0.30)' : glass.borderSubtle,
         opacity: disabled ? 0.5 : 1,
+        overflow: 'hidden',
       }}
     >
+      {/* Specular top sheen */}
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: StyleSheet.hairlineWidth,
+          backgroundColor: danger ? 'rgba(248,113,113,0.28)' : 'rgba(255,255,255,0.12)',
+        }}
+        pointerEvents="none"
+      />
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10), flex: 1, minWidth: 0 }}>
         <View
           style={{
@@ -72,16 +87,18 @@ function ActionItem({
             borderRadius: s(8),
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: danger ? 'rgba(239,68,68,0.14)' : 'rgba(255,255,255,0.07)',
+            backgroundColor: danger ? 'rgba(239,68,68,0.18)' : glass.surface,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: danger ? 'rgba(239,68,68,0.34)' : glass.border,
           }}
         >
-          <Icon size={s(15)} color={tint} strokeWidth={1.9} />
+          <Icon size={s(15)} color={tint} strokeWidth={2} />
         </View>
-        <T size={12} weight="medium" color={danger ? '#fca5a5' : 'rgba(255,255,255,0.92)'} numberOfLines={1}>
+        <T size={12.2} weight="medium" color={danger ? '#fca5a5' : 'rgba(255,255,255,0.95)'} numberOfLines={1}>
           {label}
         </T>
       </View>
-      <ChevronRight size={s(14)} color={danger ? '#f87171' : 'rgba(255,255,255,0.28)'} strokeWidth={1.8} />
+      <ChevronRight size={s(14)} color={danger ? '#f87171' : 'rgba(255,255,255,0.35)'} strokeWidth={1.8} />
     </Press>
   );
 }
@@ -101,37 +118,58 @@ export function GameOptionsModal({
 }: GameOptionsModalProps) {
   const { s, width, height, insets } = useUi();
   const [enter] = useState(() => new Animated.Value(0));
+  const closingRef = useRef(false);
 
-  useBack(onClose);
+  const closeWithAnimation = useCallback((after?: () => void) => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    enter.stopAnimation();
+    Animated.timing(enter, {
+      toValue: 0,
+      duration: 150,
+      easing: Easing.bezier(0.4, 0, 1, 1),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) {
+        closingRef.current = false;
+        return;
+      }
+      onClose();
+      after?.();
+    });
+  }, [enter, onClose]);
+
+  useBack(() => closeWithAnimation());
 
   useEffect(() => {
-    Animated.timing(enter, {
+    closingRef.current = false;
+    enter.setValue(0);
+    const animation = Animated.timing(enter, {
       toValue: 1,
-      duration: 200,
-      easing: Easing.out(Easing.cubic),
+      duration: 220,
+      easing: Easing.bezier(0.16, 1, 0.3, 1),
       useNativeDriver: true,
-    }).start();
+    });
+    animation.start();
+    return () => animation.stop();
   }, [enter]);
 
   const choose = (panel: LibraryPanel) => {
-    onClose();
-    onOpenPanel(panel);
+    closeWithAnimation(() => onOpenPanel(panel));
   };
 
   const handleStore = () => {
-    onClose();
-    if (game.storeUrl) {
-      void openExternal(game.storeUrl);
-    }
+    closeWithAnimation(() => {
+      if (game.storeUrl) void openExternal(game.storeUrl);
+    });
   };
 
   const handleUninstall = () => {
-    onClose();
-    onUninstall();
+    closeWithAnimation(onUninstall);
   };
 
-  const cardWidth = Math.min(s(390), width - s(32) - insets.left - insets.right);
-  const cardMaxHeight = Math.min(s(360), height - s(20) - insets.top - insets.bottom);
+  const cardWidth = Math.min(s(380), width - s(32) - insets.left - insets.right);
+  const cardMaxHeight = Math.min(s(440), height - s(24) - insets.top - insets.bottom);
   const artwork = game.artworkUrl || game.heroUrl;
 
   return (
@@ -139,7 +177,8 @@ export function GameOptionsModal({
       <View style={[StyleSheet.absoluteFill, styles.layer]}>
         {/* Nền mờ nhận chạm để đóng */}
         <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, { opacity: enter }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => { playUiSound('back'); onClose(); }} accessibilityLabel="Đóng tùy chọn" />
+          <GlassBackdrop material="scrim" />
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => { playUiSound('back'); closeWithAnimation(); }} accessibilityLabel="Đóng tùy chọn" />
         </Animated.View>
 
         {/* Khung nội dung modal */}
@@ -155,17 +194,19 @@ export function GameOptionsModal({
                 {
                   scale: enter.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0.93, 1],
+                    outputRange: [0.975, 1],
                   }),
                 },
               ],
             },
           ]}
         >
+          <GlassBackdrop material="panel" intensity={36} radius={s(22)} />
+
           {/* Header với ảnh bìa nhỏ, tên game và nút đóng */}
-          <View style={[styles.header, { paddingHorizontal: s(16), paddingTop: s(14), paddingBottom: s(12) }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(12), flex: 1, minWidth: 0 }}>
-              <View style={[styles.avatar, { width: s(40), height: s(40), borderRadius: s(10) }]}>
+          <View style={[styles.header, { paddingHorizontal: s(16), paddingTop: s(13), paddingBottom: s(11) }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(11), flex: 1, minWidth: 0 }}>
+              <View style={[styles.avatar, { width: s(38), height: s(38), borderRadius: s(10) }]}>
                 {artwork ? (
                   <Img source={{ uri: artwork }} style={StyleSheet.absoluteFill} contentFit="cover" />
                 ) : (
@@ -173,7 +214,7 @@ export function GameOptionsModal({
                 )}
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <T size={14.5} weight="semibold" numberOfLines={1} tracking={-0.02}>
+                <T size={14} weight="semibold" numberOfLines={1} tracking={-0.02}>
                   {game.title}
                 </T>
                 <T size={10} color={colors.text3} numberOfLines={1} style={{ marginTop: s(1.5) }}>
@@ -183,12 +224,12 @@ export function GameOptionsModal({
             </View>
 
             <Press
-              onPress={() => { playUiSound('back'); onClose(); }}
+              onPress={() => { playUiSound('back'); closeWithAnimation(); }}
               sound="back"
               accessibilityLabel="Đóng"
               style={[styles.close, { width: s(28), height: s(28), borderRadius: s(14) }]}
             >
-              <X size={s(14)} color={colors.text3} strokeWidth={2} />
+              <X size={s(14)} color="rgba(255,255,255,0.75)" strokeWidth={2} />
             </Press>
           </View>
 
@@ -196,9 +237,10 @@ export function GameOptionsModal({
 
           {/* Danh sách hành động hỗ trợ cuộn nếu màn hình quá nhỏ */}
           <ScrollView
+            style={{ flexShrink: 1 }}
             showsVerticalScrollIndicator={false}
             bounces={false}
-            contentContainerStyle={{ paddingVertical: s(6) }}
+            contentContainerStyle={{ paddingTop: s(4), paddingBottom: s(12) }}
           >
             <ActionItem
               icon={Info}
@@ -262,16 +304,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scrim: {
-    backgroundColor: 'rgba(2, 6, 14, 0.72)',
+    backgroundColor: 'transparent',
   },
   card: {
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: '#0d1522',
+    borderColor: glass.panelBorder,
+    backgroundColor: glass.modal,
     shadowColor: '#000',
-    shadowOpacity: 0.5,
-    shadowRadius: 28,
+    shadowOpacity: 0.58,
+    shadowRadius: 30,
     shadowOffset: { width: 0, height: 14 },
     elevation: 20,
   },
@@ -285,17 +327,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: glass.surface,
+    borderWidth: 1,
+    borderColor: glass.border,
   },
   close: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: glass.control,
+    borderWidth: 1,
+    borderColor: glass.controlBorder,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: glass.border,
   },
 });

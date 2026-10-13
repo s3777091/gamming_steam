@@ -341,6 +341,17 @@ export function FocusLayer({ children }: { children: ReactNode }) {
   );
 }
 
+const SuspendContext = createContext(false);
+
+/**
+ * Tạm tắt điều hướng tay cầm cho phần nội dung vẫn đang mount nhưng không hiển thị
+ * (tab ẩn giữ nguyên trong cây để ảnh không phải tải lại). Mọi `Press` bên trong thôi
+ * đăng ký cho tới khi `suspended` về false.
+ */
+export function FocusSuspend({ suspended, children }: { suspended: boolean; children: ReactNode }) {
+  return <SuspendContext.Provider value={suspended}>{children}</SuspendContext.Provider>;
+}
+
 type FocusableOptions = {
   ref: RefObject<View | null>;
   onPress: () => void;
@@ -354,6 +365,7 @@ type FocusableOptions = {
 export function useFocusable({ ref, onPress, disabled = false, enabled = true, autoFocus = false, adjust }: FocusableOptions): boolean {
   const layer = useContext(LayerContext);
   const scroll = useContext(ScrollContext);
+  const suspended = useContext(SuspendContext);
   const idRef = useRef(0);
   if (!idRef.current) idRef.current = nextId++;
   const id = idRef.current;
@@ -362,7 +374,7 @@ export function useFocusable({ ref, onPress, disabled = false, enabled = true, a
   latest.current = { onPress, disabled, adjust };
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || suspended) return;
     const node: FocusNode = {
       id, layer, ref, scroll, autoFocus,
       press: () => latest.current.onPress(),
@@ -374,7 +386,7 @@ export function useFocusable({ ref, onPress, disabled = false, enabled = true, a
       nodes.delete(id);
       if (focusedId === id) scheduleRepick();
     };
-  }, [autoFocus, enabled, id, layer, ref, scroll]);
+  }, [autoFocus, enabled, id, layer, ref, scroll, suspended]);
 
   return useSyncExternalStore(
     subscribe,

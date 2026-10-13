@@ -1,8 +1,8 @@
 // Ngăn kéo chi tiết game phong cách Apple: Thông tin game, Bản cập nhật & bản sửa lỗi, Thành tựu.
 // Thiết kế tối giản, sạch sẽ, chuẩn mực giao diện Apple (SF typography, squircle, inset grouped specs, glance metrics).
 
-import { useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 import {
   ArrowLeft,
   Building2,
@@ -37,6 +37,13 @@ import { useCachedResource } from './useCachedResource';
 
 export type GameDetailTab = 'info' | 'news' | 'achievements';
 
+type DetailTabItem = {
+  id: GameDetailTab;
+  label: string;
+  icon: LucideIcon;
+  badge?: string | number | null;
+};
+
 // Giữ cache suốt vòng đời app để mở lại là có ngay
 const newsCache = { current: new Map<number, NewsResponse>() };
 
@@ -53,12 +60,125 @@ function fetchNews(appId: number, signal: AbortSignal) {
 // APPLE SEGMENTED CONTROL (Thanh chuyển tab phong cách Apple iOS 18)
 // ============================================================================
 
+function AppleTabItem({
+  tab,
+  active,
+  onPress,
+}: {
+  tab: DetailTabItem;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const { s } = useUi();
+  const [activeAnim] = useState(() => new Animated.Value(active ? 1 : 0));
+  const Icon = tab.icon;
+
+  useEffect(() => {
+    const animation = Animated.timing(activeAnim, {
+      toValue: active ? 1 : 0,
+      duration: 180,
+      easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [active, activeAnim]);
+
+  return (
+    <Press
+      onPress={onPress}
+      pressScale={0.985}
+      sound="focus"
+      style={{
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: s(7),
+        paddingHorizontal: s(8),
+        borderRadius: s(9),
+        gap: s(6),
+        overflow: 'hidden',
+      }}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          StyleSheet.absoluteFill,
+          {
+            borderRadius: s(9),
+            backgroundColor: 'rgba(255,255,255,0.15)',
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: 'rgba(255,255,255,0.18)',
+            opacity: activeAnim,
+            transform: [{ scale: activeAnim.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }) }],
+          },
+        ]}
+      />
+      <Icon
+        size={s(13)}
+        color={active ? '#ffffff' : 'rgba(255,255,255,0.5)'}
+        strokeWidth={active ? 2.2 : 1.8}
+      />
+      <T
+        size={11.5}
+        weight={active ? 'semibold' : 'medium'}
+        color={active ? '#ffffff' : 'rgba(255,255,255,0.55)'}
+        numberOfLines={1}
+      >
+        {tab.label}
+      </T>
+      {tab.badge != null ? (
+        <View
+          style={{
+            paddingHorizontal: s(5),
+            paddingVertical: s(1),
+            borderRadius: s(6),
+            backgroundColor: active ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)',
+          }}
+        >
+          <T size={9.5} weight="bold" color={active ? '#ffffff' : 'rgba(255,255,255,0.45)'} tabular>
+            {String(tab.badge)}
+          </T>
+        </View>
+      ) : null}
+    </Press>
+  );
+}
+
+function PanelTabContent({ children }: { children: ReactNode }) {
+  const { s } = useUi();
+  const [enter] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    const animation = Animated.timing(enter, {
+      toValue: 1,
+      duration: 190,
+      easing: Easing.bezier(0.2, 0.8, 0.2, 1),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [enter]);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: enter.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }),
+        transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [s(4), 0] }) }],
+      }}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
 function AppleTabBar({
   tabs,
   activeTab,
   onSelectTab,
 }: {
-  tabs: { id: GameDetailTab; label: string; icon: LucideIcon; badge?: string | number | null }[];
+  tabs: DetailTabItem[];
   activeTab: GameDetailTab;
   onSelectTab: (tab: GameDetailTab) => void;
 }) {
@@ -87,55 +207,13 @@ function AppleTabBar({
       >
         {tabs.map((tab) => {
           const active = activeTab === tab.id;
-          const Icon = tab.icon;
           return (
-            <Press
+            <AppleTabItem
               key={tab.id}
+              tab={tab}
+              active={active}
               onPress={() => onSelectTab(tab.id)}
-              pressScale={0.98}
-              sound="focus"
-              style={{
-                flex: 1,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingVertical: s(7),
-                paddingHorizontal: s(8),
-                borderRadius: s(9),
-                backgroundColor: active ? 'rgba(255,255,255,0.15)' : 'transparent',
-                borderWidth: active ? StyleSheet.hairlineWidth : 0,
-                borderColor: active ? 'rgba(255,255,255,0.18)' : 'transparent',
-                gap: s(6),
-              }}
-            >
-              <Icon
-                size={s(13)}
-                color={active ? '#ffffff' : 'rgba(255,255,255,0.5)'}
-                strokeWidth={active ? 2.2 : 1.8}
-              />
-              <T
-                size={11.5}
-                weight={active ? 'semibold' : 'medium'}
-                color={active ? '#ffffff' : 'rgba(255,255,255,0.55)'}
-                numberOfLines={1}
-              >
-                {tab.label}
-              </T>
-              {tab.badge != null ? (
-                <View
-                  style={{
-                    paddingHorizontal: s(5),
-                    paddingVertical: s(1),
-                    borderRadius: s(6),
-                    backgroundColor: active ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)',
-                  }}
-                >
-                  <T size={9.5} weight="bold" color={active ? '#ffffff' : 'rgba(255,255,255,0.45)'} tabular>
-                    {String(tab.badge)}
-                  </T>
-                </View>
-              ) : null}
-            </Press>
+            />
           );
         })}
       </View>
@@ -1064,15 +1142,17 @@ export function GameDetailPanel({
         ) : null
       }
     >
-      {effectiveTab === 'info' && <GameInfoView game={game} />}
-      {effectiveTab === 'news' && appId !== null && <GameNewsView appId={appId} />}
-      {effectiveTab === 'achievements' && (
-        <GameAchievementsView
-          data={achievementsData || null}
-          loading={achievementsLoading}
-          error={achievementsError}
-        />
-      )}
+      <PanelTabContent key={effectiveTab}>
+        {effectiveTab === 'info' && <GameInfoView game={game} />}
+        {effectiveTab === 'news' && appId !== null && <GameNewsView appId={appId} />}
+        {effectiveTab === 'achievements' && (
+          <GameAchievementsView
+            data={achievementsData || null}
+            loading={achievementsLoading}
+            error={achievementsError}
+          />
+        )}
+      </PanelTabContent>
     </SidePanel>
   );
 }
