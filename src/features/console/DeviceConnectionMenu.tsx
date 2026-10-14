@@ -47,7 +47,7 @@ function DeviceTile({
   onPress,
 }: {
   device: LocalDevice;
-  width: number;
+  width?: number;
   height: number;
   autoFocus: boolean;
   onPress: () => void;
@@ -67,6 +67,7 @@ function DeviceTile({
         styles.tile,
         {
           width,
+          flex: width ? undefined : 1,
           height,
           borderRadius: s(13),
           gap: s(4),
@@ -81,23 +82,30 @@ function DeviceTile({
   );
 }
 
-/** Tính kích thước khung menu và tile theo số lượng thiết bị thực tế đang nối */
+/** Tính kích thước khung menu và tile theo số lượng thiết bị thực tế đang nối (luôn trên 1 hàng ngang) */
 function getMenuDimensions(count: number, s: (v: number) => number) {
-  if (count === 0) {
-    return { cardWidth: s(160), tileWidth: s(50), tileGap: s(8), paddingX: s(12) };
+  if (count <= 0) {
+    return { cardWidth: s(168), tileWidth: s(50), tileGap: s(8), paddingX: s(12) };
   }
   if (count === 1) {
-    return { cardWidth: s(150), tileWidth: s(56), tileGap: s(8), paddingX: s(12) };
+    return { cardWidth: s(152), tileWidth: s(56), tileGap: s(8), paddingX: s(12) };
   }
   if (count === 2) {
-    // 2 thiết bị: vừa vặn 2 tile 54dp + gap 8dp + padding 12dp
-    return { cardWidth: s(152), tileWidth: s(54), tileGap: s(8), paddingX: s(12) };
+    return { cardWidth: s(160), tileWidth: s(54), tileGap: s(8), paddingX: s(12) };
   }
   if (count === 3) {
-    return { cardWidth: s(190), tileWidth: s(50), tileGap: s(8), paddingX: s(12) };
+    return { cardWidth: s(204), tileWidth: s(50), tileGap: s(8), paddingX: s(12) };
   }
-  // count >= 4
-  return { cardWidth: s(230), tileWidth: s(46), tileGap: s(7), paddingX: s(11) };
+  if (count === 4) {
+    return { cardWidth: s(252), tileWidth: s(48), tileGap: s(7), paddingX: s(12) };
+  }
+  // count >= 5
+  const tileWidth = s(44);
+  const tileGap = s(6);
+  const paddingX = s(10);
+  const contentWidth = count * tileWidth + (count - 1) * tileGap;
+  const cardWidth = contentWidth + paddingX * 2 + s(10);
+  return { cardWidth, tileWidth, tileGap, paddingX };
 }
 
 /**
@@ -254,7 +262,7 @@ export function DeviceConnectionMenu({ open, anchorRef, devices, onClose, onOpen
                 <DeviceTile
                   key={device.id}
                   device={device}
-                  width={tileWidth}
+                  width={sorted.length === 1 ? tileWidth : undefined}
                   height={tileHeight}
                   autoFocus={index === 0}
                   onPress={openSettings}
@@ -301,14 +309,15 @@ const styles = StyleSheet.create({
   },
   tileRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'flex-end',
+    flexWrap: 'nowrap',
+    alignItems: 'center',
     justifyContent: 'center',
   },
   tile: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
+    flexShrink: 1,
   },
   gaugeShell: {
     borderWidth: 1,

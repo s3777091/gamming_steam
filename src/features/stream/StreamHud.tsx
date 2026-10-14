@@ -7,6 +7,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import type { NativeMoonlightClient } from '@/lib/moonlight-native';
+import { getCurrentMultipathStatus } from 'jetsona-multipath';
 import { colors, glass, glassShadowSubtle } from '@/theme';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -119,6 +120,17 @@ export function StreamHud({ client, enabled, top, left }: { client: NativeMoonli
       <Cell label="BITRATE" value={fmt(stats.bitrateMbps, 1, ' Mbps')} />
       <Cell label="RỚT" value={fmt(stats.dropped, 0)} warn={(stats.dropped ?? 0) > 30} />
       <Cell label="ĐƯỜNG" value={stats.route ?? '—'} />
+      {(() => {
+        const mp = getCurrentMultipathStatus();
+        const label = mp.mode === 'hbs_dual_wifi'
+          ? 'HBS 5G+5G'
+          : mp.mode === 'wifi_cellular'
+          ? 'Wi-Fi+5G'
+          : mp.mode === 'dual_wifi'
+          ? 'Dual Wi-Fi'
+          : '1-Wi-Fi AI';
+        return <Cell label="MẠNG AI" value={label} />;
+      })()}
       {stats.width && stats.height ? <Cell label="ẢNH" value={`${stats.width}×${stats.height}`} /> : null}
     </View>
   );

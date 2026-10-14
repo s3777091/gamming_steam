@@ -69,6 +69,7 @@ export type JetsonaInputModuleEvents = {
   onBluetoothChanged: (params: NativeBluetoothInfo) => void;
   onGamepadState: (params: NativeGamepadState) => void;
   onGamepadButton: (params: NativeGamepadButton) => void;
+  onGuideKey: (params: { down: boolean }) => void;
   onKey: (params: NativeKeyEvent) => void;
   onMouse: (params: NativeMouseEvent) => void;
 };

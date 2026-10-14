@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { Animated, Easing, StyleSheet, View, ScrollView } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, View, ScrollView } from 'react-native';
 import { FocusScroll } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Download, Ellipsis, FileText, HardDrive, Monitor, Pause, Play, Trash2, Trophy } from 'lucide-react-native';
@@ -378,7 +378,7 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
         {!error && showDownload && download ? (
           <DownloadStatusLine download={download} canControl={downloads.canControl} onOpenEula={onOpenPrompt} />
         ) : null}
-        {!error && uninstall ? (
+        {!error && uninstall && uninstall.status !== 'uninstalled' ? (
           <View style={{ marginTop: s(10), maxWidth: s(460), gap: s(6) }}>
             <T size={10.4} weight="medium" color={uninstall.status === 'failed' ? '#fecaca' : 'rgba(255,255,255,0.78)'} numberOfLines={1}>
               {uninstall.error || uninstall.label}
@@ -491,11 +491,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     backgroundColor: 'rgba(17, 24, 33, 0.85)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 18,
-    elevation: 10,
+    // Android elevation renders a rectangular black backing behind translucent,
+    // clipped cards. Keep the soft shadow only on iOS; the focus ring and glass
+    // edge provide the selected state on Android without obscuring the artwork.
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.4,
+        shadowRadius: 18,
+      },
+      default: {},
+    }),
   },
   glassEdge: {
     ...StyleSheet.absoluteFill,

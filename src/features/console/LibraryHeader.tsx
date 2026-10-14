@@ -15,6 +15,7 @@ import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 import { ProgressRing } from './DownloadViews';
+import { TAB_MOTION_EASING, TAB_MOTION_MS } from './tabMotion';
 
 const TABS: { id: StoreTab; label: string }[] = [
   { id: 'games', label: 'Games' },
@@ -328,17 +329,17 @@ function ConsoleTabItem({
   const [anim] = useState(() => new Animated.Value(active ? 1 : 0));
 
   useEffect(() => {
-    Animated.spring(anim, {
+    Animated.timing(anim, {
       toValue: active ? 1 : 0,
-      stiffness: 300,
-      damping: 24,
-      mass: 0.8,
+      duration: TAB_MOTION_MS,
+      easing: TAB_MOTION_EASING,
       useNativeDriver: true,
     }).start();
   }, [active, anim]);
 
   return (
     <Press
+      focusable={false}
       sound="navigate"
       pressScale={0.96}
       onPress={onPress}
@@ -356,7 +357,7 @@ function ConsoleTabItem({
         style={{
           opacity: anim.interpolate({
             inputRange: [0, 1],
-            outputRange: [0.6, 1],
+            outputRange: [0.65, 1],
           }),
           transform: [
             {
@@ -391,28 +392,25 @@ function ConsoleTabs({
 
   const targetX = tabIndex * tabWidth;
   const [indicatorX] = useState(() => new Animated.Value(targetX));
-  const hasMounted = useRef(false);
   const prevTabIndex = useRef(tabIndex);
+  const prevTabWidth = useRef(tabWidth);
 
   useEffect(() => {
-    if (!hasMounted.current) {
-      hasMounted.current = true;
+    if (prevTabWidth.current !== tabWidth) {
+      prevTabWidth.current = tabWidth;
       indicatorX.setValue(targetX);
-      prevTabIndex.current = tabIndex;
-      return;
     }
+  }, [indicatorX, targetX, tabWidth]);
 
+  useEffect(() => {
     if (prevTabIndex.current !== tabIndex) {
       prevTabIndex.current = tabIndex;
-      Animated.spring(indicatorX, {
+      Animated.timing(indicatorX, {
         toValue: targetX,
-        damping: 26,
-        stiffness: 300,
-        mass: 0.7,
+        duration: TAB_MOTION_MS,
+        easing: TAB_MOTION_EASING,
         useNativeDriver: true,
       }).start();
-    } else {
-      indicatorX.setValue(targetX);
     }
   }, [indicatorX, tabIndex, targetX]);
 
@@ -599,7 +597,7 @@ export function LibraryHeader({
             />
           </View>
         ) : null}
-        <View ref={bellRef} collapsable={false}>
+        <View ref={bellRef} collapsable={false} style={styles.notificationButtonWrap}>
           <Press
             onPress={onOpenNotifications}
             sound="navigate"
@@ -617,21 +615,32 @@ export function LibraryHeader({
           >
             <GlassBackdrop material="control" intensity={40} radius={s(16)} />
             {downloadPercent !== null ? <ProgressRing size={s(32)} percent={downloadPercent} color={colors.accent} /> : null}
-            <View style={{ position: 'relative', width: s(18), height: s(18), alignItems: 'center', justifyContent: 'center' }}>
-              <Bell
-                size={s(16)}
-                color={totalNotifications > 0 ? colors.white : 'rgba(255,255,255,0.72)'}
-                strokeWidth={1.8}
-              />
-              {totalNotifications > 0 ? (
-                <View style={[styles.cornerNumber, { top: -s(5), left: s(13) }]} pointerEvents="none">
-                  <T size={9.5} weight="bold" color={colors.white} tabular>
-                    {totalNotifications}
-                  </T>
-                </View>
-              ) : null}
-            </View>
+            <Bell
+              size={s(16)}
+              color={totalNotifications > 0 ? colors.white : 'rgba(255,255,255,0.72)'}
+              strokeWidth={1.8}
+            />
           </Press>
+          {totalNotifications > 0 ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.notificationBadge,
+                {
+                  top: -s(3),
+                  right: -s(4),
+                  minWidth: s(14),
+                  height: s(14),
+                  borderRadius: s(7),
+                  paddingHorizontal: s(3),
+                },
+              ]}
+            >
+              <T size={8} weight="bold" color={colors.white} tabular>
+                {totalNotifications > 99 ? '99+' : totalNotifications}
+              </T>
+            </View>
+          ) : null}
         </View>
         <Press
           onPress={() => onOpenSettings('quality')}
@@ -705,11 +714,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     backgroundColor: colors.primary,
   },
-  cornerNumber: {
+  notificationButtonWrap: {
+    position: 'relative',
+    overflow: 'visible',
+  },
+  notificationBadge: {
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(7, 16, 28, 0.9)',
+    backgroundColor: colors.primary,
   },
   avatar: {
     alignItems: 'center',

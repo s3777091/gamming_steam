@@ -55,6 +55,7 @@ function BackdropImage({ url, store }: { url: string | null | undefined; store: 
             contentFit="cover"
             transition={0}
             onDisplay={() => reveal(layer)}
+            onLoad={() => reveal(layer)}
           />
         </Animated.View>
       ))}

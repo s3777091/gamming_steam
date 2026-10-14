@@ -203,5 +203,15 @@ export type GameUpdateNotification = {
   rawNews: SteamNewsItem;
 };
 
-export type AppNotification = GameDiscountNotification | GameUpdateNotification;
+export type GameUninstallNotification = {
+  id: string;
+  type: 'uninstall';
+  appId: number;
+  gameTitle: string;
+  gameImageUrl?: string | null;
+  message?: string | null;
+  createdAt: number;
+};
+
+export type AppNotification = GameDiscountNotification | GameUpdateNotification | GameUninstallNotification;
 

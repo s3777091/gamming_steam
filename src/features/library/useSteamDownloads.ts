@@ -158,7 +158,7 @@ export type SteamDownloads = {
 export function useSteamDownloads(
   userId: string,
   onInstalled?: (appid: number) => void,
-  onUninstalled?: (appid: number) => void,
+  onUninstalled?: (appid: number, name?: string | null) => void,
 ): SteamDownloads {
   const [state, setState] = useState<DownloadsState | null>(null);
   const [agentOnline, setAgentOnline] = useState(false);
@@ -200,7 +200,7 @@ export function useSteamDownloads(
     for (const flow of next.uninstalls ?? []) {
       if (flow.phase !== 'uninstalled' || uninstalledRef.current.has(flow.appid)) continue;
       uninstalledRef.current.add(flow.appid);
-      onUninstalledRef.current?.(flow.appid);
+      onUninstalledRef.current?.(flow.appid, flow.name);
     }
     setExpectedAppId((current) => (
       current && next.installs.some((flow) => flow.appid === current) ? null : current

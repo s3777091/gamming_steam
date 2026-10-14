@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, TextInput, View } from 'react-native';
+import { PanResponder, StyleSheet, View } from 'react-native';
 import { RTCView } from 'react-native-webrtc';
 import * as Clipboard from 'expo-clipboard';
 import { addListener, grabFrame } from 'jetsona-input';
@@ -22,14 +22,12 @@ import { NativeMouseButton } from '@/lib/moonlight-native';
 import { PC_ROUTES, pcFetch } from '@/lib/pc-api';
 import { pointOnStream, streamStretchStyle } from '@/lib/stream-fit';
 import type { HostShortcutAction } from '@/lib/input-settings';
-import type { Resolution } from '@/lib/stream-settings';
 import { BlurView } from 'expo-blur';
-import { colors, glass, glassShadowSubtle } from '@/theme';
+import { glass, glassShadowSubtle } from '@/theme';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 import { GuideMenu } from './GuideMenu';
-import { StreamBar } from './StreamBar';
 import { StreamHud } from './StreamHud';
 import { StreamLoading } from './StreamLoading';
 import { useGameLaunchGate } from './useGameLaunchGate';
@@ -38,10 +36,6 @@ import { useStreamSession } from './useStreamSession';
 import { useWatchPartyHost } from './useWatchPartyHost';
 
 const TAP_THRESHOLD = 9;
-const VK_BACK = 8;
-const VK_RETURN = 13;
-const KEYBOARD_SENTINEL = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
-
 type GestureState = {
   startX: number; startY: number; lastX: number; lastY: number; moved: number;
   twoFinger: boolean; scrolling: boolean; leftDown: boolean;
@@ -60,11 +54,8 @@ export default function StreamScreen() {
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideStatus, setGuideStatus] = useState<string | null>(null);
   const [hasFrame, setHasFrame] = useState(false);
-  const [barVisible, setBarVisible] = useState(true);
   const [hint, setHint] = useState<string | null>(null);
   const [stage, setStage] = useState({ width: 1, height: 1 });
-  const [keyboardValue, setKeyboardValue] = useState(KEYBOARD_SENTINEL);
-  const inputRef = useRef<TextInput | null>(null);
   const exitingRef = useRef(false);
   const guideGenerationRef = useRef(0);
   const resumeAfterPendingPauseRef = useRef(true);
@@ -79,8 +70,8 @@ export default function StreamScreen() {
 
   const session = useStreamSession({ userId, attempt, onBackground: exit });
   const {
-    phase, status, progress, streamURL, videoSize, inputReady, audioReady, errorDetail,
-    streamSettings, moonlightSettings, loadingThemeId, client, clientRef, sessionId, inputSettingsRef, rumbleRef, persistSettings,
+    phase, status, progress, streamURL, videoSize, inputReady, errorDetail,
+    streamSettings, loadingThemeId, client, clientRef, sessionId, inputSettingsRef, rumbleRef, persistSettings,
   } = session;
   const live = phase === 'live';
   const gate = useGameLaunchGate(launch, live);
@@ -191,8 +182,7 @@ export default function StreamScreen() {
       case 'settings': reload(); break;
       case 'hud': persistHud(!streamSettings?.hud_enabled); break;
       case 'clipboard': void pullClipboard(); break;
-      case 'topbar': setBarVisible(true); break;
-      case 'shutdown': flashHint('Dùng menu Home để tắt máy an toàn'); break;
+      case 'shutdown': flashHint('Dùng menu tay cầm để tắt máy an toàn'); break;
       case 'zoom': flashHint('Khung hình luôn vừa màn hình'); break;
     }
   }, [exit, flashHint, persistHud, pullClipboard, reload, streamSettings?.hud_enabled]);
@@ -281,11 +271,6 @@ export default function StreamScreen() {
     onPanResponderTerminationRequest: () => true,
   })).current;
 
-  const sendVirtualKey = (key: number) => {
-    clientRef.current?.sendKey(true, key);
-    clientRef.current?.sendKey(false, key);
-  };
-
   const stretch = useMemo(() => streamStretchStyle(videoSize, stage), [stage, videoSize]);
   const controller = useMemo(
     () => ({ name: profile.displayName, avatarUrl: profile.avatarUrl }),
@@ -301,10 +286,17 @@ export default function StreamScreen() {
   return (
     <View
       style={styles.root}
+      collapsable={false}
       onLayout={(event) => setStage({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}
     >
       {streamURL ? (
-        <RTCView streamURL={streamURL} style={[styles.video, stretch]} objectFit="contain" zOrder={0} />
+        <RTCView
+          collapsable={false}
+          streamURL={streamURL}
+          style={[styles.video, stretch]}
+          objectFit="contain"
+          zOrder={0}
+        />
       ) : <View style={styles.black} />}
 
       {live ? <View collapsable={false} style={styles.touch} {...panResponder.panHandlers} /> : null}
@@ -322,28 +314,6 @@ export default function StreamScreen() {
         onExit={exit}
         onReveal={covering && gate.skippable ? gate.skip : undefined}
       />
-
-      {live && !covering ? (
-        <StreamBar
-          visible={barVisible}
-          onVisibleChange={setBarVisible}
-          inputReady={inputReady}
-          audioReady={audioReady}
-          streamSettings={streamSettings}
-          moonlightSettings={moonlightSettings}
-          controller={controller}
-          hudEnabled={Boolean(streamSettings?.hud_enabled)}
-          onGuide={openGuide}
-          onReconnect={reload}
-          onKeyboard={() => inputRef.current?.focus()}
-          onExit={exit}
-          onToggleHud={() => persistHud(!streamSettings?.hud_enabled)}
-          onSaveResolution={(resolution: Resolution) => {
-            void persistSettings({ resolution }).then((next) => { if (next) setAttempt((value) => value + 1); });
-          }}
-          onSleep={() => { void pcFetch(PC_ROUTES.sleep, { method: 'POST' }).catch(() => {}).finally(exit); }}
-        />
-      ) : null}
 
       <StreamHud client={client} enabled={live && !covering && Boolean(streamSettings?.hud_enabled)} top={s(8) + Math.min(insets.top, 8)} left={insets.left + s(12)} />
 
@@ -367,37 +337,6 @@ export default function StreamScreen() {
         </View>
       ) : null}
 
-      <TextInput
-        ref={inputRef}
-        value={keyboardValue}
-        selection={{ start: KEYBOARD_SENTINEL.length, end: KEYBOARD_SENTINEL.length }}
-        onFocus={() => setKeyboardValue(KEYBOARD_SENTINEL)}
-        onChangeText={(value) => {
-          if (value.startsWith(KEYBOARD_SENTINEL)) {
-            const inserted = value.slice(KEYBOARD_SENTINEL.length);
-            if (inserted) clientRef.current?.sendText(inserted);
-          } else if (KEYBOARD_SENTINEL.startsWith(value)) {
-            const removed = KEYBOARD_SENTINEL.length - value.length;
-            for (let index = 0; index < removed; index += 1) sendVirtualKey(VK_BACK);
-          } else if (value) {
-            clientRef.current?.sendText(value);
-          }
-          setKeyboardValue(KEYBOARD_SENTINEL);
-        }}
-        onSubmitEditing={() => {
-          sendVirtualKey(VK_RETURN);
-          setKeyboardValue(KEYBOARD_SENTINEL);
-          inputRef.current?.focus();
-        }}
-        blurOnSubmit={false}
-        autoCorrect={false}
-        autoCapitalize="none"
-        caretHidden
-        contextMenuHidden
-        selectTextOnFocus={false}
-        spellCheck={false}
-        style={styles.keyboardBridge}
-      />
     </View>
   );
 }
@@ -417,6 +356,5 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...glassShadowSubtle,
   },
-  keyboardBridge: { position: 'absolute', left: -1000, top: 0, width: 1, height: 1, opacity: 0 },
 });
 

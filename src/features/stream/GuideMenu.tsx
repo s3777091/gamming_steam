@@ -1,4 +1,4 @@
-// Menu Guide: mở bằng nút Home của tay cầm (hoặc nút trên thanh stream).
+// Menu Guide: mở bằng Alt hoặc Start + Select.
 // Tab game đang chạy, phòng xem, thiết bị đã nối, tài khoản; hành động: Home,
 // chụp ảnh, sao chép (clipboard hai chiều với PC), tải lại, thoát game. Bản native của
 // components/StreamGuideMenu.tsx.
@@ -192,7 +192,7 @@ export function GuideMenu({
     return addListener('onGamepadButton', (event) => {
       if (!event.down) return;
       const current = stateRef.current;
-      // Guide/Start+Select is handled once by useInputBridge; handling it here too
+      // Start + Select is handled once by useInputBridge; handling it here too
       // would close the menu twice and issue two resume requests.
       if (event.button === 'b') {
         playUiSound('back');

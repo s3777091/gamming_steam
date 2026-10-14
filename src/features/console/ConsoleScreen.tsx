@@ -4,8 +4,10 @@
 
 import { useRouter } from 'expo-router';
 import { BlurTargetView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
+import { Trash2, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { Animated, StyleSheet, TextInput, View } from 'react-native';
 
 import { useSignedInUser } from '@/features/auth';
 import { useBack, useGamepadTabs } from '@/features/gamepad/hooks';
@@ -29,7 +31,8 @@ import { clearPendingGameLaunch, savePendingGameLaunch } from '@/lib/game-launch
 import { type GameDownload, allDownloads, downloadForApp, isDownloadActive, uninstallForApp } from '@/lib/steam-downloads';
 import { type PurchaseOffer, type PurchaseTarget, purchaseKind } from '@/lib/steam-purchase';
 import { useUi } from '@/ui/scale';
-import { GlassBlurProvider } from '@/ui/GlassMaterial';
+import { GlassBackdrop, GlassBlurProvider } from '@/ui/GlassMaterial';
+import { Press } from '@/ui/Press';
 
 import { DeviceConnectionMenu } from './DeviceConnectionMenu';
 import { type Flight, type FlightRect, DownloadFlight } from './DownloadFlight';
@@ -50,6 +53,88 @@ import { UninstallSheet } from './UninstallSheet';
 import { GameOptionsModal } from './GameOptionsModal';
 import { ConsoleTabTransition } from './ConsoleTabTransition';
 import { T } from '@/ui/Text';
+
+function ToastNotification({
+  notice,
+  onPress,
+  onClose,
+}: {
+  notice: { id: number; title: string; message: string; gameImageUrl?: string | null };
+  onPress?: () => void;
+  onClose: () => void;
+}) {
+  const { s, width, insets } = useUi();
+  const [anim] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    Animated.spring(anim, {
+      toValue: 1,
+      damping: 18,
+      stiffness: 220,
+      mass: 0.8,
+      useNativeDriver: true,
+    }).start();
+  }, [anim]);
+
+  return (
+    <Animated.View
+      style={{
+        position: 'absolute',
+        top: insets.top + s(10),
+        alignSelf: 'center',
+        zIndex: 90,
+        elevation: 90,
+        opacity: anim,
+        transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }],
+      }}
+    >
+      <Press
+        onPress={onPress}
+        sound="confirm"
+        pressScale={0.98}
+        accessibilityLabel={notice.title}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: 'rgba(15, 23, 42, 0.92)',
+          borderWidth: 1,
+          borderColor: 'rgba(255, 255, 255, 0.2)',
+          borderRadius: s(20),
+          paddingHorizontal: s(14),
+          paddingVertical: s(8),
+          gap: s(10),
+          shadowColor: '#000',
+          shadowOpacity: 0.35,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 6 },
+          maxWidth: Math.min(s(440), width - s(32)),
+        }}
+      >
+        <GlassBackdrop material="panel" intensity={40} radius={s(20)} />
+        <View style={{ width: s(28), height: s(28), borderRadius: s(14), backgroundColor: 'rgba(239, 68, 68, 0.16)', alignItems: 'center', justifyContent: 'center' }}>
+          <Trash2 size={s(14)} color="#f87171" strokeWidth={2} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <T size={11} weight="semibold" color="#ffffff" numberOfLines={1}>
+            {notice.title}
+          </T>
+          <T size={9.5} color="rgba(255, 255, 255, 0.75)" numberOfLines={1}>
+            {notice.message}
+          </T>
+        </View>
+        <Press
+          onPress={onClose}
+          sound="back"
+          hitSlop={8}
+          accessibilityLabel="Đóng thông báo"
+          style={{ width: s(20), height: s(20), alignItems: 'center', justifyContent: 'center', borderRadius: s(10), backgroundColor: 'rgba(255, 255, 255, 0.08)' }}
+        >
+          <X size={s(11)} color="rgba(255, 255, 255, 0.7)" />
+        </Press>
+      </Press>
+    </Animated.View>
+  );
+}
 
 export default function ConsoleScreen() {
   const { s, insets } = useUi();
@@ -84,6 +169,39 @@ export default function ConsoleScreen() {
   const { userId } = useSignedInUser();
   const library = usePcLibrary();
   const { selected } = library;
+  const notifications = useNotifications(library.games);
+  const [toastNotice, setToastNotice] = useState<{
+    id: number;
+    title: string;
+    message: string;
+    gameImageUrl?: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!toastNotice) return;
+    const timer = setTimeout(() => setToastNotice(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toastNotice]);
+
+  const onUninstalled = useCallback((appid: number, name?: string | null) => {
+    void library.reload(true);
+    const game = library.games.find((g) => g.steamAppId === String(appid));
+    const gameTitle = name || game?.title || 'Trò chơi Steam';
+    const gameImageUrl = game?.artworkUrl || game?.heroUrl || null;
+    void notifications.addUninstallNotification({
+      appId: appid,
+      gameTitle,
+      gameImageUrl,
+    });
+    setToastNotice({
+      id: Date.now(),
+      title: 'Đã gỡ khỏi máy tính',
+      message: `${gameTitle} đã được gỡ cài đặt thành công.`,
+      gameImageUrl,
+    });
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  }, [library, notifications]);
+
   const deviceStatus = useDeviceStatus();
   const inputDevices = useInputDevices();
   const { sleepPcAndExit, wakePc } = usePcSleepWake(useCallback(() => {
@@ -93,7 +211,7 @@ export default function ConsoleScreen() {
   const downloads = useSteamDownloads(
     userId,
     () => void library.reload(true),
-    () => void library.reload(true),
+    onUninstalled,
   );
   // Việc Steam đang chờ người bấm Tải trả lời (chọn ổ đĩa, đồng ý điều khoản): tự mở hộp
   // thoại; đóng thì mở lại từ nút "Chọn nơi cài đặt" / "Xem điều khoản".
@@ -114,7 +232,6 @@ export default function ConsoleScreen() {
   const store = useSteamStore(activeTab === 'store');
   const storeSearch = useStoreSearch(storeQuery, storeSearchOpen);
   const storeDetail = useStoreGameDetail(selectedStoreItem);
-  const notifications = useNotifications(library.games);
   // Mua game: Steam client trên PC lo thanh toán, app chờ game vào thư viện rồi mời Tải.
   const purchase = useSteamPurchase(() => void library.reload(true));
   const storeOwnership = useStoreOwnership(selectedStoreItem?.appId ?? null);
@@ -144,9 +261,21 @@ export default function ConsoleScreen() {
 
   const storeFeatured = store.data?.featured || null;
   const storePreview = storePreviewItem || storeFeatured;
-  const backdropUrl = activeTab === 'store'
-    ? storePreview?.backgroundImage || storePreview?.headerImage
-    : selected?.heroUrl;
+  const lastActiveBackdrop = useRef<string | null | undefined>(selected?.heroUrl);
+
+  const backdropUrl = useMemo(() => {
+    if (activeTab === 'store') {
+      const url = storePreview?.backgroundImage || storePreview?.headerImage;
+      if (url) lastActiveBackdrop.current = url;
+      return url || lastActiveBackdrop.current;
+    }
+    if (activeTab === 'games') {
+      const url = selected?.heroUrl;
+      if (url) lastActiveBackdrop.current = url;
+      return url || lastActiveBackdrop.current;
+    }
+    return lastActiveBackdrop.current;
+  }, [activeTab, selected?.heroUrl, storePreview?.backgroundImage, storePreview?.headerImage]);
   const uninstallAppId = isSteamAppId(uninstallTarget?.steamAppId) ? Number(uninstallTarget.steamAppId) : null;
   const uninstallOperation = uninstallForApp(downloads.state, uninstallAppId) ?? (
     uninstallAppId && downloads.expectedUninstallAppId === uninstallAppId ? {
@@ -576,6 +705,10 @@ export default function ConsoleScreen() {
           loading={notifications.loading}
           error={notifications.error}
           onOpenStoreGame={openStoreGame}
+          onSelectGame={(appId) => {
+            const game = library.games.find((g) => g.steamAppId === String(appId));
+            if (game) selectGame(game.id);
+          }}
           onClose={() => setPanel(null)}
         />
       ) : null}
@@ -678,6 +811,17 @@ export default function ConsoleScreen() {
             setMenuOpen(false);
             setUninstallTarget(selected);
           }}
+        />
+      ) : null}
+
+      {toastNotice ? (
+        <ToastNotification
+          notice={toastNotice}
+          onPress={() => {
+            setToastNotice(null);
+            openNotifications();
+          }}
+          onClose={() => setToastNotice(null)}
         />
       ) : null}
 

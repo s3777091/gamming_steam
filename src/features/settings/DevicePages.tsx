@@ -705,7 +705,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
   const [openCode, setOpenCode] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [draftCode, setDraftCode] = useState('');
-  const [draftAction, setDraftAction] = useState<HostShortcutAction>('topbar');
+  const [draftAction, setDraftAction] = useState<HostShortcutAction>('exit');
   const [remapSource, setRemapSource] = useState('');
   const [remapTarget, setRemapTarget] = useState('');
   const shortcuts = Object.entries(settings.hostShortcuts);

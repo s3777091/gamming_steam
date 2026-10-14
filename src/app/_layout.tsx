@@ -14,6 +14,7 @@ import { AuthProvider, useAuth } from '@/features/auth';
 import { deactivateFocus } from '@/features/gamepad/focus';
 import GamepadNavigator from '@/features/gamepad/GamepadNavigator';
 import { useHardwareBack } from '@/features/gamepad/hooks';
+import { useTemporarySystemBars } from '@/features/gamepad/useTemporarySystemBars';
 import LoginScreen from '@/features/login/LoginScreen';
 import { playUiSound, UiSoundProvider } from '@/features/sound/UiSoundProvider';
 import { colors } from '@/theme';
@@ -27,6 +28,7 @@ function Gate() {
   const pathname = usePathname();
   const previousPathname = useRef(pathname);
   useHardwareBack();
+  useTemporarySystemBars(pathname !== '/stream');
 
   useEffect(() => {
     if (previousPathname.current !== pathname) playUiSound('transition');

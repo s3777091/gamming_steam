@@ -25,6 +25,7 @@ import { cleanSteamText, formatRelative, formatShortDate, formatStorePrice } fro
 import type {
   AppNotification,
   GameDiscountNotification,
+  GameUninstallNotification,
   GameUpdateNotification,
   SteamNewsItem,
   SteamStoreItem,
@@ -252,6 +253,86 @@ function UpdateNotificationCard({
   );
 }
 
+function UninstallNotificationCard({
+  item,
+  onPress,
+  onDismiss,
+}: {
+  item: GameUninstallNotification;
+  onPress?: () => void;
+  onDismiss?: () => void;
+}) {
+  const { s } = useUi();
+  const timeAgo = formatRelative(item.createdAt ? new Date(item.createdAt).toISOString() : null);
+
+  return (
+    <View style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(16), gap: s(8) }]}>
+      {/* Specular top rim */}
+      <LinearGradient
+        colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.02)', 'transparent']}
+        locations={[0, 0.4, 1]}
+        style={[StyleSheet.absoluteFill, { height: '35%' }]}
+        pointerEvents="none"
+      />
+
+      <Press
+        onPress={onPress}
+        pressScale={0.98}
+        accessibilityLabel={`Xem trò chơi ${item.gameTitle}`}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(12) }}
+      >
+        <View style={[styles.imageBox, { width: s(96), height: s(54), borderRadius: s(9) }]}>
+          {item.gameImageUrl ? (
+            <Img source={{ uri: item.gameImageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+          ) : (
+            <View style={{ width: '100%', height: '100%', backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' }}>
+              <Trash2 size={s(20)} color="rgba(255,255,255,0.4)" />
+            </View>
+          )}
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(6) }}>
+            <View style={[styles.pillBadgeUninstall, { borderRadius: s(5), paddingHorizontal: s(6), paddingVertical: s(1.5) }]}>
+              <Trash2 size={s(9)} color="#f87171" strokeWidth={2} />
+              <T size={8.5} weight="semibold" color="#f87171">
+                ĐÃ GỠ CÀI ĐẶT
+              </T>
+            </View>
+            {timeAgo ? (
+              <T size={9} color={colors.text4} tabular>
+                {timeAgo}
+              </T>
+            ) : null}
+          </View>
+
+          <T size={12} weight="semibold" color={colors.text} numberOfLines={1} style={{ marginTop: s(4) }}>
+            {item.gameTitle}
+          </T>
+
+          <T size={10} color={colors.text3} numberOfLines={2} leading={1.35} style={{ marginTop: s(2) }}>
+            {item.message || 'Đã gỡ khỏi máy tính. Trò chơi vẫn còn trong thư viện Steam.'}
+          </T>
+        </View>
+
+        <ChevronRight size={s(16)} color={colors.text4} strokeWidth={1.8} style={{ alignSelf: 'center' }} />
+      </Press>
+
+      {onDismiss ? (
+        <Press
+          onPress={onDismiss}
+          sound="confirm"
+          pressScale={0.92}
+          accessibilityLabel={`Xóa thông báo ${item.gameTitle}`}
+          style={[styles.dismissBtn, { width: s(28), height: s(28), borderRadius: s(14) }]}
+        >
+          <X size={s(13)} color={colors.text3} strokeWidth={2} />
+        </Press>
+      ) : null}
+    </View>
+  );
+}
+
 function ListSkeleton({ rows = 4 }: { rows?: number }) {
   const { s } = useUi();
   return (
@@ -272,6 +353,7 @@ export function NotificationsPanel({
   loading,
   error,
   onOpenStoreGame,
+  onSelectGame,
   onPauseDownload,
   onResumeDownload,
   onOpenDownloadPrompt,
@@ -287,6 +369,7 @@ export function NotificationsPanel({
   loading: boolean;
   error: string | null;
   onOpenStoreGame: (item: SteamStoreItem) => void;
+  onSelectGame?: (appId: number) => void;
   onPauseDownload: (appid: number) => void;
   onResumeDownload: (appid: number) => void;
   onOpenDownloadPrompt: (appid: number) => void;
@@ -420,6 +503,21 @@ export function NotificationsPanel({
                   />
                 );
               }
+              if (item.type === 'uninstall') {
+                return (
+                  <UninstallNotificationCard
+                    key={item.id}
+                    item={item}
+                    onPress={() => {
+                      if (onSelectGame) {
+                        onSelectGame(item.appId);
+                        onClose();
+                      }
+                    }}
+                    onDismiss={onClearNotification ? () => onClearNotification(item.id) : undefined}
+                  />
+                );
+              }
               return (
                 <UpdateNotificationCard
                   key={item.id}
@@ -499,6 +597,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.15)',
+  },
+  pillBadgeUninstall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(239,68,68,0.14)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(239,68,68,0.3)',
   },
   tabPill: {
     alignItems: 'center',

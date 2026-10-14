@@ -82,15 +82,18 @@ export default function GamepadNavigator({ enabled }: { enabled: boolean }) {
       else if (event.button === 'a') activateFocus();
       else if (event.button === 'lb') dispatchTab(-1);
       else if (event.button === 'rb') dispatchTab(1);
-      else if (event.button === 'guide') dispatchGuide();
     });
 
+    const offGuideKey = addListener('onGuideKey', (event) => {
+      if (event.down) dispatchGuide();
+    });
     const offCombo = listenGuideCombo(dispatchGuide);
 
     return () => {
       offState();
       offDevices();
       offButton();
+      offGuideKey();
       offCombo();
       clearTimeout(repeat);
       if (frame !== null) cancelAnimationFrame(frame);

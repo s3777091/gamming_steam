@@ -31,7 +31,6 @@ export const HOST_SHORTCUT_OPTIONS: SettingsSelectOption<HostShortcutAction>[] =
   { value: 'clipboard', label: 'Đồng bộ clipboard', description: 'Kéo clipboard từ PC về đây' },
   { value: 'settings', label: 'Đồng bộ cài đặt', description: 'Đọc lại cấu hình từ cloud' },
   { value: 'shutdown', label: 'Tắt máy', description: 'Tắt Windows sau bước xác nhận' },
-  { value: 'topbar', label: 'Mở top header', description: 'Hiện thanh điều khiển trên' },
   { value: 'zoom', label: 'Zoom in / zoom out', description: 'Đổi nhanh toàn màn hình và vừa khung' },
 ];
 

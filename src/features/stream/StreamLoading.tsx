@@ -1,10 +1,10 @@
 // Màn hình loading của stream lấy cảm hứng từ MetroHero (locked scroll-scrub video hero).
-// Hiệu ứng đoàn tàu (subway train) chạy mượt mà ở nền, kết hợp zoom điện ảnh vào Game hoặc PC máy tính.
-// Tại vị trí trung tâm hiển thị trạng thái kết nối ngắn gọn, sắc nét (không có description rườm rà).
+// Đồng bộ tiến độ đoàn tàu (subway train) mở cửa và đi vào chính xác theo progress loading.
+// Cắt bỏ cánh cửa thứ 2 và cảnh thành phố, chuyển tiếp mượt mà vào Background + Logo Title Game ở giữa.
+// Không có chữ "Đang kết nối" hay status text rườm rà. Nền đậm hoàn toàn đặc không bị lộ desktop phía sau.
 
-import React, { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import React, { Component, useEffect, useState, type ReactNode } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   Easing,
   Platform,
@@ -16,7 +16,7 @@ import { Monitor, RefreshCw, X } from 'lucide-react-native';
 
 import type { PendingGameLaunch } from '@/lib/game-launch';
 import type { LoadingThemeId } from '@/lib/loading-themes';
-import { colors, glass, glassShadowSubtle } from '@/theme';
+import { glass, glassShadowSubtle } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -27,83 +27,14 @@ export type LoadingPhase = 'connecting' | 'waiting' | 'live' | 'error';
 const METRO_TRAIN_VIDEO =
   'https://cdn.21st.dev/assets/mirror/21/21a77eac28eacbb7e142016eefeaa0b4a766619e51113629a3bc6df6af066c0f.mp4';
 
+// Thời điểm tối đa của đoàn tàu: 3.4 giây (cửa mở và đi vào toa tàu, cắt hẳn cánh cửa thứ hai và cảnh thành phố ở 3.8s+)
+const TRAIN_MAX_TIME = 3.4;
+
 const DEFAULT_PC_BACKDROP =
   'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1920&q=80';
 
 const COL_BG = '#05070D';
 const COL_TEXT = '#F2F4F8';
-
-/**
- * Rút gọn các dòng trạng thái dài dòng (như giải phóng RAM, khởi chạy quy trình...)
- * thành các trạng thái ngắn gọn, sắc nét chuẩn giao diện điện ảnh.
- */
-export function formatLoadingStatus(rawStatus: string, phase: LoadingPhase): string {
-  if (phase === 'error') return 'MẤT KẾT NỐI';
-  if (!rawStatus) return 'ĐANG KẾT NỐI';
-
-  const lower = rawStatus.toLowerCase();
-
-  // Nhóm tối ưu RAM / Game Booster / Hệ thống
-  if (
-    lower.includes('giải phóng ram') ||
-    lower.includes('tối ưu') ||
-    lower.includes('optimize') ||
-    lower.includes('ram') ||
-    lower.includes('booster') ||
-    lower.includes('dọn dẹp')
-  ) {
-    return 'ĐANG TỐI ƯU';
-  }
-
-  // Nhóm mở game / khởi động game
-  if (
-    lower.includes('đang mở') ||
-    lower.includes('vào game') ||
-    lower.includes('khởi động') ||
-    lower.includes('starting') ||
-    lower.includes('launching')
-  ) {
-    return 'ĐANG VÀO GAME';
-  }
-
-  // Nhóm chờ người dùng / phòng stream
-  if (
-    lower.includes('chờ người dùng') ||
-    lower.includes('chờ') ||
-    lower.includes('waiting') ||
-    lower.includes('yêu cầu')
-  ) {
-    return 'ĐANG CHỜ PHẢN HỒI';
-  }
-
-  // Nhóm hoàn tất / khung hình đầu tiên
-  if (
-    lower.includes('khung hình') ||
-    lower.includes('sẵn sàng') ||
-    lower.includes('truyền trực tiếp')
-  ) {
-    return 'SẴN SÀNG';
-  }
-
-  // Nhóm kết nối mạng / WebRTC / xác thực
-  if (
-    lower.includes('xác nhận') ||
-    lower.includes('quyền sử dụng') ||
-    lower.includes('tìm host') ||
-    lower.includes('kết nối') ||
-    lower.includes('webrtc') ||
-    lower.includes('đường truyền')
-  ) {
-    return 'ĐANG KẾT NỐI';
-  }
-
-  // Nếu chữ ngắn gọn (< 24 ký tự)
-  if (rawStatus.length <= 24) {
-    return rawStatus.replace(/[.…]+$/, '').trim().toUpperCase();
-  }
-
-  return 'ĐANG THIẾT LẬP';
-}
 
 // Bọc an toàn trong trường hợp native module chưa được biên dịch trong binary dev-client
 class VideoErrorBoundary extends Component<
@@ -127,13 +58,16 @@ class VideoErrorBoundary extends Component<
 }
 
 /**
- * Phát video đoàn tàu ngầm mượt mà bằng expo-video.
+ * Phát video đoàn tàu ngầm đồng bộ với tiến trình loading:
+ * Khi progress từ 0% đến 50%, tàu chạy từ 0s đến 3.4s (cửa mở ra và đi vào toa tàu).
+ * Tuyệt đối cắt bỏ cửa thứ 2 và cảnh thành phố phía sau.
  */
-function NativeMetroVideo({ videoUrl }: { videoUrl: string }) {
+function NativeMetroVideo({ videoUrl, progress }: { videoUrl: string; progress: number }) {
   let VideoViewComponent: any = null;
   let useVideoPlayerHook: any = null;
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const ExpoVideo = require('expo-video');
     VideoViewComponent = ExpoVideo.VideoView;
     useVideoPlayerHook = ExpoVideo.useVideoPlayer;
@@ -145,27 +79,91 @@ function NativeMetroVideo({ videoUrl }: { videoUrl: string }) {
     throw new Error('expo-video module not available');
   }
 
-  return <NativeMetroVideoInner VideoView={VideoViewComponent} useVideoPlayer={useVideoPlayerHook} videoUrl={videoUrl} />;
+  return (
+    <NativeMetroVideoInner
+      VideoView={VideoViewComponent}
+      useVideoPlayer={useVideoPlayerHook}
+      videoUrl={videoUrl}
+      progress={progress}
+    />
+  );
+}
+
+function safeSetPlayerTime(playerInstance: any, time: number) {
+  try {
+    playerInstance.currentTime = time;
+  } catch {
+    // Ignore
+  }
 }
 
 function NativeMetroVideoInner({
   VideoView,
   useVideoPlayer,
   videoUrl,
+  progress,
 }: {
   VideoView: any;
   useVideoPlayer: any;
   videoUrl: string;
+  progress: number;
 }) {
   const player = useVideoPlayer(videoUrl, (p: any) => {
     try {
-      p.loop = true;
+      p.loop = false;
       p.muted = true;
       p.play();
     } catch {
       // Ignore initial setup warning
     }
   });
+
+  // Đồng bộ tiến độ đoàn tàu trực tiếp theo progress (0% - 50% tiến trình loading)
+  useEffect(() => {
+    if (!player) return;
+    try {
+      // 0% -> 50% loading tương đương 0s -> 3.4s video
+      const ratio = Math.min(Math.max(progress / 50, 0), 1);
+      const targetTime = ratio * TRAIN_MAX_TIME;
+      const current = player.currentTime || 0;
+
+      // Cắt bỏ hoàn toàn cảnh cửa thứ 2 và cảnh thành phố
+      if (current >= TRAIN_MAX_TIME) {
+        player.pause();
+        safeSetPlayerTime(player, TRAIN_MAX_TIME);
+        return;
+      }
+
+      // Điều chỉnh nếu chênh lệch đáng kể
+      if (Math.abs(targetTime - current) > 0.5) {
+        safeSetPlayerTime(player, Math.min(targetTime, TRAIN_MAX_TIME));
+      }
+
+      if (current < targetTime && !player.playing) {
+        player.play();
+      } else if (current >= targetTime && player.playing) {
+        player.pause();
+      }
+    } catch {
+      // Ignore
+    }
+  }, [player, progress]);
+
+  // Bộ chặn cứng: tuyệt đối không bao giờ để video chạy quá 3.4s để lộ cảnh thành phố
+  useEffect(() => {
+    if (!player) return;
+    const interval = setInterval(() => {
+      try {
+        if ((player.currentTime || 0) >= TRAIN_MAX_TIME) {
+          player.pause();
+          safeSetPlayerTime(player, TRAIN_MAX_TIME);
+        }
+      } catch {
+        // Ignore
+      }
+    }, 60);
+    return () => clearInterval(interval);
+  }, [player]);
 
   return (
     <VideoView
@@ -208,22 +206,25 @@ export function StreamLoading({
   const failure = phase === 'error';
 
   const [mounted, setMounted] = useState(visible);
-  const opacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  if (visible && !mounted) {
+    setMounted(true);
+  }
+  const [rootOpacity] = useState(() => new Animated.Value(visible ? 1 : 0));
 
-  // Zoom chậm mượt mà theo phong cách Ken Burns cho đoàn tàu
-  const trainZoom = useRef(new Animated.Value(0)).current;
-  // Zoom cho Game hoặc PC
-  const targetZoom = useRef(new Animated.Value(0)).current;
+  // Tiến trình dạng Animated.Value mượt mà không bị giật bước
+  const [animProgress] = useState(() => new Animated.Value(progress));
+
+  // Chuyển động thở nhẹ điện ảnh (Ken Burns) cho game backdrop
+  const [ambientZoom] = useState(() => new Animated.Value(0));
+
   // Sheen quét sáng qua thanh tiến trình
-  const sheen = useRef(new Animated.Value(0)).current;
-  // Hiệu ứng mờ/rõ trạng thái
-  const textScale = useRef(new Animated.Value(0.95)).current;
+  const [sheen] = useState(() => new Animated.Value(0));
 
+  // Mở / tắt màn loading với hiệu ứng tan biến điện ảnh
   useEffect(() => {
-    if (visible) setMounted(true);
-    const anim = Animated.timing(opacity, {
+    const anim = Animated.timing(rootOpacity, {
       toValue: visible ? 1 : 0,
-      duration: 550,
+      duration: 500,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     });
@@ -231,23 +232,34 @@ export function StreamLoading({
       if (finished && !visible) setMounted(false);
     });
     return () => anim.stop();
-  }, [opacity, visible]);
+  }, [rootOpacity, visible]);
 
-  // Hiệu ứng chuyển động đoàn tàu chạy mượt mà
+  // Làm mịn tiến trình loading
   useEffect(() => {
     if (!visible) return;
-    trainZoom.setValue(0);
+    Animated.timing(animProgress, {
+      toValue: Math.min(Math.max(progress, 2), 100),
+      duration: 450,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [animProgress, progress, visible]);
+
+  // Hiệu ứng Ken Burns thở nhẹ nhàng cho background game
+  useEffect(() => {
+    if (!visible) return;
+    ambientZoom.setValue(0);
     const anim = Animated.loop(
       Animated.sequence([
-        Animated.timing(trainZoom, {
+        Animated.timing(ambientZoom, {
           toValue: 1,
-          duration: 14_000,
+          duration: 12_000,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
-        Animated.timing(trainZoom, {
+        Animated.timing(ambientZoom, {
           toValue: 0,
-          duration: 14_000,
+          duration: 12_000,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
@@ -255,30 +267,7 @@ export function StreamLoading({
     );
     anim.start();
     return () => anim.stop();
-  }, [trainZoom, visible]);
-
-  // Hiệu ứng Zoom vào Game hoặc PC khi tiến trình tăng dần
-  useEffect(() => {
-    if (!visible) return;
-    const normalized = Math.min(Math.max(progress / 100, 0), 1);
-    Animated.timing(targetZoom, {
-      toValue: normalized,
-      duration: 450,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [progress, targetZoom, visible]);
-
-  // Hiệu ứng nhịp thở nhẹ cho chữ trạng thái
-  useEffect(() => {
-    if (!visible) return;
-    Animated.spring(textScale, {
-      toValue: 1,
-      friction: 6,
-      tension: 40,
-      useNativeDriver: true,
-    }).start();
-  }, [status, textScale, visible]);
+  }, [ambientZoom, visible]);
 
   // Shimmer hiệu ứng trên thanh tiến trình
   useEffect(() => {
@@ -299,42 +288,76 @@ export function StreamLoading({
     return () => anim.stop();
   }, [phase, sheen, visible]);
 
-  const displayStatus = useMemo(() => formatLoadingStatus(status, phase), [status, phase]);
-
   const targetBackdrop = launch?.heroUrl || DEFAULT_PC_BACKDROP;
 
   if (!mounted) return null;
 
-  const trainScaleInterpolation = trainZoom.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1.0, 1.07],
+  // 1. TÀU ĐI VÀO: 0% -> 50% tàu zoom tiến lên
+  const trainScale = animProgress.interpolate({
+    inputRange: [0, 50, 100],
+    outputRange: [1.0, 1.08, 1.12],
+    extrapolate: 'clamp',
   });
 
-  const targetScaleInterpolation = targetZoom.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1.0, 1.12],
+  // Tàu mờ dần từ 35% -> 55% để nhường chỗ cho Background Game
+  const trainOpacity = animProgress.interpolate({
+    inputRange: [0, 35, 55, 60],
+    outputRange: [1, 1, 0, 0],
+    extrapolate: 'clamp',
   });
 
-  // Độ mờ của Game/PC hiện dần khi tiến trình tăng cao
-  const targetOpacityInterpolation = targetZoom.interpolate({
-    inputRange: [0, 0.4, 0.85, 1],
-    outputRange: [0.12, 0.28, 0.65, 0.9],
+  // 2. BACKGROUND GAME: Hiện dần từ 35% -> 55%, và từ 55% trở đi là 100% ĐẶC HOÀN TOÀN (opacity = 1.0)
+  // Tuyệt đối không bị mờ mờ làm lộ ảnh màn hình desktop laptop phía sau
+  const backdropOpacity = animProgress.interpolate({
+    inputRange: [0, 35, 55, 100],
+    outputRange: [0, 0, 1, 1],
+    extrapolate: 'clamp',
   });
 
-  const progressPercent = Math.min(Math.max(progress, 4), 100);
+  const backdropBaseScale = animProgress.interpolate({
+    inputRange: [35, 60, 100],
+    outputRange: [1.08, 1.03, 1.0],
+    extrapolate: 'clamp',
+  });
+
+  // 3. LOGO TITLE GAME: Xuất hiện ở giữa sau khi cửa tàu mở và đi vào
+  const logoOpacity = animProgress.interpolate({
+    inputRange: [0, 30, 50, 100],
+    outputRange: [0, 0.2, 1, 1],
+    extrapolate: 'clamp',
+  });
+
+  const logoScale = animProgress.interpolate({
+    inputRange: [0, 30, 50, 100],
+    outputRange: [0.88, 0.94, 1, 1],
+    extrapolate: 'clamp',
+  });
+
+  const progressPercentWidth = animProgress.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+    extrapolate: 'clamp',
+  });
 
   return (
     <Animated.View
-      style={[styles.root, { opacity }]}
+      style={[styles.root, { opacity: rootOpacity }]}
       pointerEvents={visible ? 'auto' : 'none'}
       accessibilityViewIsModal
     >
-      {/* 1. LỚP ĐOÀN TÀU (Đoàn tàu phía sau chính là loading) */}
+      {/* 0. NỀN ĐEN ĐẶC TUYỆT ĐỐI KHÔNG BAO GIỜ LỘ LAPTOP PHÍA SAU */}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: COL_BG }]} />
+
+      {/* 1. LỚP ĐOÀN TÀU (Đoàn tàu tiến độ từ 0% đến 50%, mở cửa và đi vào) */}
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
-          { transform: [{ scale: trainScaleInterpolation }] },
+          {
+            opacity: trainOpacity,
+            transform: [{ scale: trainScale }],
+          },
         ]}
+        pointerEvents="none"
       >
         <VideoErrorBoundary
           fallback={
@@ -346,42 +369,44 @@ export function StreamLoading({
             />
           }
         >
-          <NativeMetroVideo videoUrl={METRO_TRAIN_VIDEO} />
+          <NativeMetroVideo videoUrl={METRO_TRAIN_VIDEO} progress={progress} />
         </VideoErrorBoundary>
       </Animated.View>
 
-      {/* 2. ZOOM VÀO GAME HOẶC PC MÁY TÍNH */}
-      {/* Lớp nền của Game/PC sẽ zoom dần vào tâm khi kết nối tiến triển */}
+      {/* 2. LỚP BACKGROUND GAME (HIỆN RA KHI VÀO TOA TÀU, ĐẶC 100% KHÔNG MỜ MỜ LỘ DESKTOP) */}
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
           {
-            opacity: targetOpacityInterpolation,
-            transform: [{ scale: targetScaleInterpolation }],
+            opacity: backdropOpacity,
+            transform: [{ scale: backdropBaseScale }],
           },
         ]}
         pointerEvents="none"
       >
+        {/* Nền đệm đen đặc */}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: COL_BG }]} />
+
+        {/* Ảnh nền game sắc nét */}
         <Img
           source={{ uri: targetBackdrop }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
           priority="high"
         />
-      </Animated.View>
 
-      {/* 3. LỚP PHỦ MÀU ĐẬM VIGNETTE CINEMATIC */}
-      <LinearGradient
-        colors={[
-          'rgba(5,7,13,0.5)',
-          'rgba(5,7,13,0.15)',
-          'rgba(5,7,13,0.3)',
-          'rgba(5,7,13,0.85)',
-        ]}
-        locations={[0, 0.3, 0.7, 1]}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
+        {/* Lớp phủ điện ảnh làm nổi bật Logo game ở giữa */}
+        <LinearGradient
+          colors={[
+            'rgba(5,7,13,0.45)',
+            'rgba(5,7,13,0.15)',
+            'rgba(5,7,13,0.3)',
+            'rgba(5,7,13,0.85)',
+          ]}
+          locations={[0, 0.35, 0.7, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
 
       {/* NÚT THOÁT PHIÊN Ở GÓC TRÊN BÊN PHẢI */}
       <View style={styles.topBar}>
@@ -391,30 +416,39 @@ export function StreamLoading({
           sound="back"
           style={styles.exitPill}
         >
-          <X size={s(14)} color="rgba(255,255,255,0.7)" />
-          <T size={11} weight="medium" color="rgba(255,255,255,0.75)">
+          <X size={s(14)} color="rgba(255,255,255,0.75)" />
+          <T size={11} weight="medium" color="rgba(255,255,255,0.85)">
             Thoát
           </T>
         </Press>
       </View>
 
-      {/* 4. CHỮ TRẠNG THÁI KẾT NỐI Ở CHÍNH GIỮA */}
-      <View style={styles.centerContainer} pointerEvents="none">
+      {/* 3. LOGO TITLE GAME CHÍNH GIỮA (KHÔNG CÓ CHỮ TRẮNG "ĐANG KẾT NỐI", CHỈ LOGO TITLE) */}
+      <Animated.View
+        style={[
+          styles.centerContainer,
+          {
+            opacity: logoOpacity,
+            transform: [{ scale: logoScale }],
+          },
+        ]}
+        pointerEvents="none"
+      >
         {launch ? (
           <View style={{ alignItems: 'center' }}>
             {launch.logoUrl ? (
               <Img
                 source={{ uri: launch.logoUrl }}
-                style={{ width: Math.min(s(280), width * 0.55), height: s(64) }}
+                style={{ width: Math.min(s(320), width * 0.6), height: s(76) }}
                 contentFit="contain"
                 transition={0}
               />
             ) : (
               <T
-                size={Platform.OS === 'web' ? 36 : s(26)}
+                size={Platform.OS === 'web' ? 40 : s(28)}
                 weight="bold"
                 color={COL_TEXT}
-                tracking={0.05}
+                tracking={0.06}
                 numberOfLines={2}
                 style={styles.centerTitle}
               >
@@ -422,70 +456,67 @@ export function StreamLoading({
               </T>
             )}
 
-            {/* Chỉ hiện trạng thái khi bị lỗi kết nối để người dùng biết */}
+            {/* Chỉ hiện thông báo đỏ khi bị lỗi mất kết nối */}
             {failure ? (
-              <Animated.View style={{ transform: [{ scale: textScale }], marginTop: s(12) }}>
+              <View style={{ marginTop: s(14), alignItems: 'center' }}>
                 <T
-                  size={Platform.OS === 'web' ? 24 : s(18)}
+                  size={Platform.OS === 'web' ? 20 : s(16)}
                   weight="bold"
                   color="#F87171"
-                  tracking={-0.015}
+                  tracking={-0.01}
                   style={styles.centerTitle}
                 >
-                  {displayStatus}
+                  MẤT KẾT NỐI
                 </T>
-              </Animated.View>
-            ) : null}
-
-            {/* Chi tiết lỗi khi thất bại */}
-            {failure && detail ? (
-              <T
-                size={11.5}
-                color="rgba(254,202,202,0.8)"
-                style={{ marginTop: s(8), textAlign: 'center', maxWidth: width * 0.6 }}
-              >
-                {detail}
-              </T>
+                {detail ? (
+                  <T
+                    size={11.5}
+                    color="rgba(254,202,202,0.85)"
+                    style={{ marginTop: s(6), textAlign: 'center', maxWidth: width * 0.6 }}
+                  >
+                    {detail}
+                  </T>
+                ) : null}
+              </View>
             ) : null}
           </View>
         ) : (
-          <>
+          <View style={{ alignItems: 'center' }}>
             <T
-              size={11}
+              size={Platform.OS === 'web' ? 36 : s(26)}
               weight="bold"
-              color="rgba(242,244,248,0.65)"
-              tracking={0.25}
-              style={{ marginBottom: s(8) }}
+              color={COL_TEXT}
+              tracking={0.08}
+              style={styles.centerTitle}
             >
               PC STREAMING
             </T>
 
-            {/* Trạng thái kết nối nổi bật khi không có game launch */}
-            <Animated.View style={{ transform: [{ scale: textScale }] }}>
-              <T
-                size={Platform.OS === 'web' ? 46 : s(32)}
-                weight="bold"
-                color={failure ? '#F87171' : COL_TEXT}
-                tracking={-0.015}
-                style={styles.centerTitle}
-              >
-                {displayStatus}
-              </T>
-            </Animated.View>
-
-            {/* Chỉ hiện chi tiết khi bị lỗi kết nối để người dùng biết khắc phục */}
-            {failure && detail ? (
-              <T
-                size={11.5}
-                color="rgba(254,202,202,0.8)"
-                style={{ marginTop: s(8), textAlign: 'center', maxWidth: width * 0.6 }}
-              >
-                {detail}
-              </T>
+            {failure ? (
+              <View style={{ marginTop: s(14), alignItems: 'center' }}>
+                <T
+                  size={Platform.OS === 'web' ? 20 : s(16)}
+                  weight="bold"
+                  color="#F87171"
+                  tracking={-0.01}
+                  style={styles.centerTitle}
+                >
+                  MẤT KẾT NỐI
+                </T>
+                {detail ? (
+                  <T
+                    size={11.5}
+                    color="rgba(254,202,202,0.85)"
+                    style={{ marginTop: s(6), textAlign: 'center', maxWidth: width * 0.6 }}
+                  >
+                    {detail}
+                  </T>
+                ) : null}
+              </View>
             ) : null}
-          </>
+          </View>
         )}
-      </View>
+      </Animated.View>
 
       {/* NÚT THAO TÁC KHI CÓ LỖI HOẶC CẦN MỞ DESKTOP */}
       {(failure || canReveal) ? (
@@ -509,18 +540,18 @@ export function StreamLoading({
         </View>
       ) : null}
 
-      {/* 5. THANH TIẾN TRÌNH THANH MẢNH Ở ĐÁY MÀN HÌNH (CHUẨN METROHERO) */}
+      {/* 4. THANH TIẾN TRÌNH THANH MẢNH Ở ĐÁY MÀN HÌNH (CHUẨN METROHERO) */}
       <View
         accessibilityRole="progressbar"
         accessibilityLabel="Tiến trình kết nối"
-        accessibilityValue={{ min: 0, max: 100, now: Math.round(progressPercent) }}
+        accessibilityValue={{ min: 0, max: 100, now: Math.round(progress) }}
         style={styles.progressTrack}
       >
-        <View
+        <Animated.View
           style={[
             styles.progressBar,
             {
-              width: `${progressPercent}%`,
+              width: progressPercentWidth,
               backgroundColor: failure
                 ? 'rgba(248,113,113,0.95)'
                 : 'rgba(255,255,255,0.92)',
@@ -584,9 +615,9 @@ const styles = StyleSheet.create({
   },
   centerTitle: {
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowColor: 'rgba(0,0,0,0.85)',
     textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 24,
+    textShadowRadius: 28,
   },
   bottomActions: {
     position: 'absolute',

@@ -1,8 +1,6 @@
-// Tổ hợp thay cho nút Home: giữ Start + Select khoảng nửa giây để mở menu của app.
-//
-// Nhiều tay cầm Bluetooth gửi nút Home/Xbox/PS dưới dạng phím HOME của Android.
-// Hệ thống thoát ra màn hình chính TRƯỚC khi app thấy phím đó, nên không app nào
-// chặn được; tổ hợp này đi qua đường phím tay cầm bình thường nên luôn tới app.
+// Giữ Start + Select khoảng nửa giây để mở menu của app.
+// Tổ hợp đi qua đường phím tay cầm bình thường nên không phụ thuộc nút đặc biệt
+// hoặc cách từng mẫu tay cầm ánh xạ phím.
 
 import { addListener } from 'jetsona-input';
 

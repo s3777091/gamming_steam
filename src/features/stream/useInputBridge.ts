@@ -7,7 +7,7 @@
 //  - Bàn phím vật lý: keycode Android -> Windows virtual-key; phím Host (mặc
 //    định Ctrl phải) giữ + phím = phím tắt của app, không gửi sang PC.
 //  - Chuột vật lý: chuyển động tương đối (pointer capture), nút, cuộn.
-//  - Nút Home/Guide của tay cầm (hoặc giữ Start + Select) mở menu của app (chụp màn hình, sao chép, tab game).
+//  - Nhấn Alt hoặc giữ Start + Select mở menu của app (chụp màn hình, sao chép, tab game).
 
 import { useEffect, useRef } from 'react';
 import {
@@ -68,13 +68,16 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
 } {
   const { devices } = useInputDevices();
   const clientRef = useRef(client);
-  clientRef.current = client;
   const guideOpenRef = useRef(guideOpen);
-  guideOpenRef.current = guideOpen;
   const onGuideRef = useRef(onGuide);
-  onGuideRef.current = onGuide;
   const onShortcutRef = useRef(onShortcut);
-  onShortcutRef.current = onShortcut;
+
+  useEffect(() => {
+    clientRef.current = client;
+    guideOpenRef.current = guideOpen;
+    onGuideRef.current = onGuide;
+    onShortcutRef.current = onShortcut;
+  }, [client, guideOpen, onGuide, onShortcut]);
 
   const slots = useRef(new Map<number, number>());
   const latest = useRef(new Map<number, NativeGamepadState>());
@@ -132,12 +135,12 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
       latest.current.set(state.deviceId, state);
       sendPad(state.deviceId, state);
     });
-    const offButton = addListener('onGamepadButton', (event) => {
-      if (event.button === 'guide' && event.down) onGuideRef.current();
+    const offGuideKey = addListener('onGuideKey', (event) => {
+      if (event.down) onGuideRef.current();
     });
-    // Tay cầm gửi Home dưới dạng phím HOME của Android thì app không bắt được: giữ Start + Select thay thế.
+    // Tay cầm vẫn dùng tổ hợp Start + Select, không phụ thuộc nút đặc biệt của từng loại.
     const offCombo = listenGuideCombo(() => onGuideRef.current());
-    return () => { off(); offButton(); offCombo(); };
+    return () => { off(); offGuideKey(); offCombo(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live]);
 
@@ -175,8 +178,10 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
       if (hostDown && code && event.down) {
         const action = settings.hostShortcuts[code];
         if (action) {
-          consumed.add(code);
-          onShortcutRef.current(action);
+          if (!consumed.has(code)) {
+            consumed.add(code);
+            onShortcutRef.current(action);
+          }
           return;
         }
       }

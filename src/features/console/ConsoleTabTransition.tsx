@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 
 import { FocusSuspend } from '@/features/gamepad/focus';
@@ -6,20 +6,12 @@ import { STORE_TAB_ORDER, type StoreTab } from '@/features/library/types';
 import { useUi } from '@/ui/scale';
 import { TAB_MOTION_EASING, TAB_MOTION_MS } from './tabMotion';
 
-type TransitionState = {
-  currentTab: StoreTab;
-  exitingTab: StoreTab | null;
-  direction: 'left' | 'right';
-  visitedTabs: Set<StoreTab>;
-  progress: Animated.Value;
-};
-
 /**
  * Hiệu ứng chuyển cảnh giữa các tab Games, Store và PC:
  * - Giữ các tab đã mở (mount) trong cây View để tránh giật lag, mất vị trí cuộn
  *   hoặc tải lại hình ảnh khi chuyển qua lại giữa các tab.
- * - Trượt nhẹ (slide) kết hợp mờ dần (crossfade) giữa tab cũ và tab mới.
- * - Tab không hoạt động được ẩn (display: 'none') để tối ưu tài nguyên và tránh xung đột tiêu điểm.
+ * - Trượt nhẹ (slide) kết hợp mờ dần (crossfade) đồng bộ giữa tab cũ và tab mới.
+ * - Tab không hoạt động được ẩn mờ và treo tiêu điểm (FocusSuspend).
  */
 export function ConsoleTabTransition({
   activeTab,
@@ -29,55 +21,56 @@ export function ConsoleTabTransition({
   renderTab: (tab: StoreTab) => ReactNode;
 }) {
   const { s } = useUi();
-  const [state, setState] = useState<TransitionState>(() => ({
-    currentTab: activeTab,
-    exitingTab: null,
-    direction: 'right',
-    visitedTabs: new Set([activeTab]),
-    progress: new Animated.Value(1),
-  }));
-
-  // Khi activeTab thay đổi: bắt đầu transition và thêm tab vào danh sách đã truy cập
-  if (activeTab !== state.currentTab) {
-    const isRight = STORE_TAB_ORDER.indexOf(activeTab) > STORE_TAB_ORDER.indexOf(state.currentTab);
-    const nextVisited = new Set(state.visitedTabs);
-    nextVisited.add(activeTab);
-
-    setState({
-      currentTab: activeTab,
-      exitingTab: state.currentTab,
-      direction: isRight ? 'right' : 'left',
-      visitedTabs: nextVisited,
-      // Dùng giá trị mới cho từng lượt chuyển để không mutate animation trong render.
-      progress: new Animated.Value(0),
-    });
-  }
+  const [visitedTabs, setVisitedTabs] = useState<Set<StoreTab>>(() => new Set([activeTab]));
+  const currentTabRef = useRef(activeTab);
+  const [displayTab, setDisplayTab] = useState(activeTab);
+  const [exitingTab, setExitingTab] = useState<StoreTab | null>(null);
+  const [direction, setDirection] = useState<'left' | 'right'>('right');
+  const [progress] = useState(() => new Animated.Value(1));
+  const animRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    if (state.exitingTab === null) return;
+    if (activeTab === currentTabRef.current) return;
 
-    const progress = state.progress;
+    const prev = currentTabRef.current;
+    currentTabRef.current = activeTab;
+
+    setVisitedTabs((current) => {
+      if (current.has(activeTab)) return current;
+      const next = new Set(current);
+      next.add(activeTab);
+      return next;
+    });
+
+    const isRight = STORE_TAB_ORDER.indexOf(activeTab) > STORE_TAB_ORDER.indexOf(prev);
+    setDirection(isRight ? 'right' : 'left');
+    setExitingTab(prev);
+    setDisplayTab(activeTab);
+
+    animRef.current?.stop();
+    progress.setValue(0);
+
     const animation = Animated.timing(progress, {
       toValue: 1,
       duration: TAB_MOTION_MS,
       easing: TAB_MOTION_EASING,
       useNativeDriver: true,
     });
+    animRef.current = animation;
+
     animation.start(({ finished }) => {
       if (finished) {
-        setState((prev) => ({
-          ...prev,
-          exitingTab: prev.progress === progress ? null : prev.exitingTab,
-        }));
+        setExitingTab(null);
       }
     });
-    return () => animation.stop();
-  }, [state.exitingTab, state.progress]);
 
-  const progress = state.progress;
-  const slideOffset = s(12);
-  const isMovingRight = state.direction === 'right';
+    return () => {
+      animation.stop();
+    };
+  }, [activeTab, progress]);
 
+  const slideOffset = s(16);
+  const isMovingRight = direction === 'right';
   const enterStart = isMovingRight ? slideOffset : -slideOffset;
   const exitEnd = isMovingRight ? -slideOffset : slideOffset;
 
@@ -85,12 +78,12 @@ export function ConsoleTabTransition({
     <View style={styles.container}>
       {STORE_TAB_ORDER.map((tab) => {
         // Chỉ mount các tab đã từng được mở ít nhất 1 lần
-        if (!state.visitedTabs.has(tab) && tab !== activeTab) {
+        if (!visitedTabs.has(tab) && tab !== activeTab) {
           return null;
         }
 
-        const isCurrent = tab === state.currentTab;
-        const isExiting = tab === state.exitingTab;
+        const isCurrent = tab === displayTab;
+        const isExiting = tab === exitingTab;
         const isVisible = isCurrent || isExiting;
 
         let animStyle = undefined;
@@ -109,7 +102,7 @@ export function ConsoleTabTransition({
               },
             ],
           };
-        } else if (isCurrent && state.exitingTab !== null) {
+        } else if (isCurrent && exitingTab !== null) {
           animStyle = {
             opacity: progress.interpolate({
               inputRange: [0, 1],
@@ -123,6 +116,11 @@ export function ConsoleTabTransition({
                 }),
               },
             ],
+          };
+        } else if (isCurrent) {
+          animStyle = {
+            opacity: 1,
+            transform: [{ translateX: 0 }],
           };
         }
 

@@ -8,6 +8,9 @@
       ],
       "jetsona-input": [
         "./modules/jetsona-input"
+      ],
+      "jetsona-multipath": [
+        "./modules/jetsona-multipath"
       ]
     }
   },

@@ -113,6 +113,7 @@ class JetsonaInputModule : Module(), InputSink {
       "onBluetoothChanged",
       "onGamepadState",
       "onGamepadButton",
+      "onGuideKey",
       "onKey",
       "onMouse",
     )
@@ -459,6 +460,15 @@ class JetsonaInputModule : Module(), InputSink {
     val down = event.action == KeyEvent.ACTION_DOWN
 
     if (captureMode == MODE_OFF) return false
+
+    // Alt là phím Guide riêng của app. Bắt ở native trước đường bàn phím gửi sang PC
+    // để vẫn hoạt động khi Moonlight client chưa sẵn sàng và không phụ thuộc JS key map.
+    if ((keyCode == KeyEvent.KEYCODE_ALT_LEFT || keyCode == KeyEvent.KEYCODE_ALT_RIGHT) &&
+      (source and InputDevice.SOURCE_KEYBOARD) == InputDevice.SOURCE_KEYBOARD
+    ) {
+      if (event.repeatCount == 0) sendEvent("onGuideKey", mapOf("down" to down))
+      return true
+    }
 
     // Nút Home/Guide: nhiều tay cầm báo KEYCODE_HOME thay vì KEYCODE_BUTTON_MODE.
     // Hệ thống thường nuốt HOME trước khi tới app; khi nó còn tới được thì giữ lại

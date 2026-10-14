@@ -6,6 +6,7 @@ import { isSteamAppId } from './format';
 import type {
   AppNotification,
   GameDiscountNotification,
+  GameUninstallNotification,
   GameUpdateNotification,
   NewsResponse,
   PcGame,
@@ -14,6 +15,7 @@ import type {
 
 const LAST_READ_KEY = 'jetsona:notifications:last_read:v1';
 const CLEARED_KEY = 'jetsona:notifications:cleared_v1';
+const LOCAL_NOTIFICATIONS_KEY = 'jetsona:notifications:local_v1';
 const MAX_GAMES_NEWS = 6;
 
 type ClearedState = {
@@ -40,9 +42,10 @@ export function useNotifications(games: PcGame[]) {
     setError(null);
 
     try {
-      const [lastReadStr, clearedRaw] = await Promise.all([
+      const [lastReadStr, clearedRaw, localRaw] = await Promise.all([
         AsyncStorage.getItem(LAST_READ_KEY).catch(() => null),
         AsyncStorage.getItem(CLEARED_KEY).catch(() => null),
+        AsyncStorage.getItem(LOCAL_NOTIFICATIONS_KEY).catch(() => null),
       ]);
       const lastReadTime = lastReadStr ? Number(lastReadStr) : 0;
 
@@ -54,6 +57,19 @@ export function useNotifications(games: PcGame[]) {
       }
       const clearedIds = new Set(clearedState.ids || []);
       const clearedAt = clearedState.clearedAt || 0;
+
+      let localNotifs: GameUninstallNotification[] = [];
+      if (localRaw) {
+        try {
+          const parsed = JSON.parse(localRaw);
+          if (Array.isArray(parsed)) {
+            localNotifs = parsed.filter(
+              (item): item is GameUninstallNotification =>
+                Boolean(item?.id && item.type === 'uninstall' && !clearedIds.has(item.id))
+            );
+          }
+        } catch {}
+      }
 
       // 1. Tải danh sách giảm giá Steam Store
       let storeData: StoreResponse | null = null;
@@ -169,8 +185,8 @@ export function useNotifications(games: PcGame[]) {
         return tB - tA;
       });
 
-      // Hợp nhất: đan xen hoặc gom nhóm (giảm giá nổi bật trước, sau đó là cập nhật)
-      const all: AppNotification[] = [...discounts, ...updates];
+      // Hợp nhất: thông báo gỡ cài đặt mới nhất trước, sau đó là giảm giá và cập nhật
+      const all: AppNotification[] = [...localNotifs, ...discounts, ...updates];
 
       if (!mounted.current) return;
       setNotifications(all);
@@ -181,6 +197,9 @@ export function useNotifications(games: PcGame[]) {
       } else {
         // Đã từng đọc: đếm số tin mới hơn thời điểm đọc lần trước
         const newItems = all.filter((item) => {
+          if (item.type === 'uninstall') {
+            return item.createdAt > lastReadTime;
+          }
           if (item.type === 'update' && item.publishedAt) {
             return Date.parse(item.publishedAt) > lastReadTime;
           }
@@ -208,6 +227,44 @@ export function useNotifications(games: PcGame[]) {
     }
   }, [games, loadNotifications]);
 
+  const addUninstallNotification = useCallback(async ({
+    appId,
+    gameTitle,
+    gameImageUrl,
+    message,
+  }: {
+    appId: number;
+    gameTitle: string;
+    gameImageUrl?: string | null;
+    message?: string | null;
+  }) => {
+    const notif: GameUninstallNotification = {
+      id: `uninstall-${appId}-${Date.now()}`,
+      type: 'uninstall',
+      appId,
+      gameTitle,
+      gameImageUrl: gameImageUrl || null,
+      message: message || 'Đã gỡ khỏi máy tính. Trò chơi vẫn còn trong thư viện Steam.',
+      createdAt: Date.now(),
+    };
+
+    setNotifications((prev) => [notif, ...prev.filter((item) => item.id !== notif.id)]);
+    setUnreadCount((prev) => prev + 1);
+
+    try {
+      const localRaw = await AsyncStorage.getItem(LOCAL_NOTIFICATIONS_KEY).catch(() => null);
+      let localList: GameUninstallNotification[] = [];
+      if (localRaw) {
+        try {
+          const parsed = JSON.parse(localRaw);
+          if (Array.isArray(parsed)) localList = parsed;
+        } catch {}
+      }
+      localList = [notif, ...localList.filter((item) => item.appId !== appId)];
+      await AsyncStorage.setItem(LOCAL_NOTIFICATIONS_KEY, JSON.stringify(localList));
+    } catch {}
+  }, []);
+
   const markAllAsRead = useCallback(async () => {
     setUnreadCount(0);
     await AsyncStorage.setItem(LAST_READ_KEY, String(Date.now())).catch(() => {});
@@ -217,12 +274,25 @@ export function useNotifications(games: PcGame[]) {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
     setUnreadCount((prev) => Math.max(0, prev - 1));
     try {
-      const raw = await AsyncStorage.getItem(CLEARED_KEY).catch(() => null);
-      const state: ClearedState = raw ? JSON.parse(raw) : { ids: [] };
+      const [clearedRaw, localRaw] = await Promise.all([
+        AsyncStorage.getItem(CLEARED_KEY).catch(() => null),
+        AsyncStorage.getItem(LOCAL_NOTIFICATIONS_KEY).catch(() => null),
+      ]);
+      const state: ClearedState = clearedRaw ? JSON.parse(clearedRaw) : { ids: [] };
       const set = new Set(state.ids || []);
       set.add(id);
       state.ids = Array.from(set);
       await AsyncStorage.setItem(CLEARED_KEY, JSON.stringify(state));
+
+      if (localRaw) {
+        try {
+          const parsed = JSON.parse(localRaw);
+          if (Array.isArray(parsed)) {
+            const nextLocal = parsed.filter((item) => item.id !== id);
+            await AsyncStorage.setItem(LOCAL_NOTIFICATIONS_KEY, JSON.stringify(nextLocal));
+          }
+        } catch {}
+      }
     } catch {}
   }, []);
 
@@ -242,6 +312,7 @@ export function useNotifications(games: PcGame[]) {
 
     if (category === 'all') {
       setUnreadCount(0);
+      void AsyncStorage.removeItem(LOCAL_NOTIFICATIONS_KEY).catch(() => {});
     } else {
       setUnreadCount((prev) => Math.max(0, prev - removedIds.length));
     }
@@ -271,5 +342,6 @@ export function useNotifications(games: PcGame[]) {
     markAllAsRead,
     clearNotification,
     clearAll,
+    addUninstallNotification,
   };
 }

@@ -22,6 +22,8 @@ import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
+import { MultipathSection } from './MultipathSection';
+
 import {
   ActionRow,
   appleColors,
@@ -322,6 +324,8 @@ export function NetworkPage({ draft, settings, notify }: PageProps & { notify: N
           }
         />
       </SettingsGroup>
+ 
+      <MultipathSection />
 
       <SettingsGroup
         title="Kiểm tra kết nối"

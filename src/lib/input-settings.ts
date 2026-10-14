@@ -21,7 +21,6 @@ export type HostShortcutAction =
   | 'clipboard'
   | 'settings'
   | 'shutdown'
-  | 'topbar'
   | 'zoom';
 
 export const DEFAULT_HOST_SHORTCUTS: Record<string, HostShortcutAction> = {
@@ -31,7 +30,6 @@ export const DEFAULT_HOST_SHORTCUTS: Record<string, HostShortcutAction> = {
   KeyC: 'clipboard',
   KeyS: 'settings',
   KeyP: 'shutdown',
-  KeyT: 'topbar',
   KeyZ: 'zoom',
 };
 
@@ -132,12 +130,11 @@ function cleanKeyCode(value: unknown, fallback: string): string {
 }
 
 const HOST_SHORTCUT_ACTIONS: readonly HostShortcutAction[] = [
-  'exit', 'reload', 'hud', 'clipboard', 'settings', 'shutdown', 'topbar', 'zoom',
+  'exit', 'reload', 'hud', 'clipboard', 'settings', 'shutdown', 'zoom',
 ];
 
 function cleanHostShortcuts(value: unknown, hostKey: string): Record<string, HostShortcutAction> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  return Object.fromEntries(
+  const shortcuts = !value || typeof value !== 'object' || Array.isArray(value) ? {} : Object.fromEntries(
     Object.entries(value as Record<string, unknown>)
       .filter(([code, action]) => (
         code !== hostKey
@@ -148,6 +145,7 @@ function cleanHostShortcuts(value: unknown, hostKey: string): Record<string, Hos
       ))
       .slice(0, 24) as Array<[string, HostShortcutAction]>,
   );
+  return shortcuts;
 }
 
 export function normalizeInputSettings(value?: Partial<InputSettings> | null): InputSettings {

@@ -14,8 +14,8 @@ import {
 import { getBackendBaseUrl } from '@/lib/config';
 import type { DeviceId } from '@/lib/devices';
 import { buildRtcIceConfig } from '@/lib/ice-config';
-import type { IceMode } from '@/lib/stream-settings';
-import type { MoonlightSettings } from '@/lib/stream-settings';
+import type { IceMode, MoonlightSettings } from '@/lib/stream-settings';
+import { optimizeSdpForUltraSmooth } from '@/lib/stream-sdp';
 
 type RTCDataChannel = ReturnType<RTCPeerConnection['createDataChannel']>;
 type NativeWebSocketConstructor = new (
@@ -109,6 +109,10 @@ const INPUT_CHANNELS = [
   CHANNEL.MOUSE_ABSOLUTE,
   CHANNEL.MOUSE_RELATIVE,
   CHANNEL.KEYBOARD,
+  // Controller registration must reach the host before any state packet on
+  // CONTROLLER0..15. Data channels can open in any order, so treating input as
+  // ready before this channel opens can make the host drop the gamepad entirely.
+  CHANNEL.CONTROLLERS,
 ] as const;
 
 function prefixFor(targetId: DeviceId): '/pc' | '/vm' {
@@ -637,6 +641,7 @@ export class NativeMoonlightClient {
       }
       if (stream && track?.kind === 'video') {
         this.remoteVideoTrack = (track as unknown as MediaStreamTrack) ?? null;
+        this.applyPlayoutPacing();
         const dimensions = track.getSettings?.();
         if (
           dimensions
@@ -719,6 +724,28 @@ export class NativeMoonlightClient {
     });
   }
 
+  private applyPlayoutPacing(): void {
+    if (!this.pc) return;
+    try {
+      const receivers = this.pc.getReceivers?.() ?? [];
+      // Đệm đúng 1 khung hình (8ms ở 120fps, 16ms ở 60fps) làm bộ giảm xóc triệt tiêu micro-stutter
+      const delaySeconds = this.settings.fps >= 120 ? 0.008 : 0.016;
+      for (const rx of receivers) {
+        const receiver = rx as unknown as {
+          playoutDelayHint?: number;
+          track?: { kind?: string };
+          _track?: { kind?: string };
+        };
+        const kind = receiver.track?.kind ?? receiver._track?.kind;
+        if (kind === 'video' && 'playoutDelayHint' in receiver) {
+          receiver.playoutDelayHint = delaySeconds;
+        }
+      }
+    } catch {
+      // Bỏ qua nếu native layer không hỗ trợ playoutDelayHint
+    }
+  }
+
   private async handleWebRtcSignal(message: WebRtcSignal): Promise<void> {
     if ('Description' in message) {
       const pc = this.pc;
@@ -730,17 +757,26 @@ export class NativeMoonlightClient {
       await pc.setRemoteDescription(remote);
       if (message.Description.ty === 'offer') {
         const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        const local = pc.localDescription;
+        const optimizedSdp = optimizeSdpForUltraSmooth(answer.sdp, {
+          bitrateKbps: this.settings.bitrate,
+          fps: this.settings.fps,
+        });
+        const tunedAnswer = new RTCSessionDescription({
+          type: answer.type,
+          sdp: optimizedSdp,
+        });
+        await pc.setLocalDescription(tunedAnswer);
+        const local = pc.localDescription ?? tunedAnswer;
         if (!local) throw new Error('Không tạo được SDP answer.');
         this.sendControl({
           WebRtc: {
             Description: {
               ty: local.type,
-              sdp: local.sdp,
+              sdp: optimizedSdp,
             },
           },
         });
+        this.applyPlayoutPacing();
       }
       await this.flushPendingCandidates();
       return;
