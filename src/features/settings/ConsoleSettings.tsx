@@ -1,11 +1,12 @@
-// Màn hình Cài đặt theo ngôn ngữ thiết kế Apple (iPadOS / iOS Settings Split View):
-// Bố cục chia hai cột Master - Detail: Cột trái liệt kê danh mục với biểu tượng squircle
-// nhiều màu bo góc mềm, hàng đang chọn tô nền xanh Apple Blue (#007AFF) với chữ trắng
-// (như mục FaceTime ở góc dưới ảnh mẫu); cột phải hiển thị các card Inset Grouped bo tròn
-// viền mảnh, công tắc UISwitch xanh lá (#34C759) và dấu tích xanh #007AFF.
+// Màn hình Cài đặt theo ngôn ngữ thiết kế Apple Liquid Glass (iOS 26 / Console Glass):
+// Bố cục chia hai cột Master - Detail: Kính mờ quang học (GlassBackdrop / BlurView),
+// nền cực quang chất lỏng (Liquid Ambient Aurora), viền phản quang specular rim,
+// icon squircle kính đa sắc và nút đóng viên thuốc kính nổi bật.
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Easing, StyleSheet, View } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import {
   Check,
@@ -24,6 +25,8 @@ import {
 } from 'lucide-react-native';
 
 import { useBack } from '@/features/gamepad/hooks';
+import { GlassBackdrop } from '@/ui/GlassMaterial';
+import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -33,6 +36,7 @@ import { AudioPage, ControllerPage, DevicesPage, KeyboardPage, MousePage } from 
 import { LatencyPage, NetworkPage, QualityPage, VideoPage } from './StreamPages';
 import { useInputSettings } from './useInputSettings';
 import { useStreamSettingsDraft } from './useStreamSettingsDraft';
+import { SettingsRestoreButton, SettingsRestoreContext, type SettingsRestoreAction } from './SettingsRestore';
 
 export type SettingsCategory =
   | 'quality'
@@ -48,14 +52,14 @@ export type SettingsCategory =
 type Tone = 'error' | 'success' | 'info';
 type Notice = { id: number; tone: Tone; title: string; detail?: string };
 
-const CATEGORIES: Array<{
+const CATEGORIES: {
   id: SettingsCategory;
   label: string;
   detail: string;
   icon: LucideIcon;
   stream: boolean;
   color: string;
-}> = [
+}[] = [
   { id: 'quality', label: 'Chất lượng stream', detail: 'Chọn profile hợp với cách bạn chơi', icon: Sparkles, stream: true, color: appleColors.purple },
   { id: 'video', label: 'Hình ảnh', detail: 'Độ phân giải, FPS, codec, bitrate và lớp phủ', icon: MonitorPlay, stream: true, color: appleColors.blue },
   { id: 'latency', label: 'Độ trễ & độ mượt', detail: 'Bộ đệm, frame pacing và V-Sync', icon: Gauge, stream: true, color: appleColors.orange },
@@ -71,23 +75,130 @@ function SaveStatus({ saving, saved, failed }: { saving: boolean; saved: boolean
   const { s } = useUi();
   if (!saving && !saved && !failed) return null;
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(5) }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: s(5),
+        paddingHorizontal: s(8),
+        paddingVertical: s(4),
+        borderRadius: s(8),
+        backgroundColor: failed
+          ? 'rgba(239, 68, 68, 0.14)'
+          : saved
+            ? 'rgba(52, 199, 89, 0.14)'
+            : 'rgba(255, 255, 255, 0.06)',
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: failed
+          ? 'rgba(248, 113, 113, 0.30)'
+          : saved
+            ? 'rgba(52, 199, 89, 0.30)'
+            : 'rgba(255, 255, 255, 0.10)',
+      }}
+    >
       {saving ? (
         <ActivityIndicator size="small" color={appleColors.textTertiary} />
       ) : failed ? (
-        <X size={s(14)} color={appleColors.red} strokeWidth={2.4} />
+        <X size={s(13)} color={appleColors.red} strokeWidth={2.4} />
       ) : (
-        <Check size={s(14)} color={appleColors.green} strokeWidth={2.6} />
+        <Check size={s(13)} color={appleColors.green} strokeWidth={2.6} />
       )}
-      <T size={10.8} weight="medium" color={failed ? appleColors.red : appleColors.textTertiary}>
+      <T size={10.4} weight="medium" color={failed ? '#fca5a5' : saved ? '#86efac' : appleColors.textTertiary}>
         {saving ? 'Đang lưu…' : failed ? 'Chưa lưu được' : 'Đã lưu'}
       </T>
     </View>
   );
 }
 
+/**
+ * Mục sidebar. Hai trạng thái phải nhìn khác nhau ngay lập tức:
+ * - Đã chọn: kính hổ phách ấm (nền + viền ấm, chữ đậm).
+ * - Tay cầm đang trỏ vào: viền trắng sắc của FocusRing, không tô màu.
+ */
+function NavItem({
+  entry,
+  active,
+  onPress,
+}: {
+  entry: (typeof CATEGORIES)[number];
+  active: boolean;
+  onPress: () => void;
+}) {
+  const { s } = useUi();
+  const Icon = entry.icon;
+  return (
+    <Press
+      onPress={onPress}
+      autoFocus={active}
+      pressScale={0.985}
+      accessibilityState={{ selected: active }}
+      style={{
+        height: s(42),
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: s(10),
+        paddingHorizontal: s(10),
+        borderRadius: s(12),
+        marginVertical: s(2),
+        backgroundColor: active ? appleColors.selectedBg : 'transparent',
+        borderWidth: 1,
+        borderColor: active ? appleColors.selectedBorder : 'transparent',
+      }}
+    >
+      {active ? (
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: s(12), overflow: 'hidden' }]}>
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.16)', 'rgba(255, 255, 255, 0.02)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.45)', 'rgba(255, 255, 255, 0.06)', 'transparent']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1 }}
+          />
+        </View>
+      ) : null}
+      <View
+        style={{
+          width: s(28),
+          height: s(28),
+          borderRadius: s(8),
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: entry.color,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: 'rgba(255, 255, 255, 0.40)',
+          overflow: 'hidden',
+        }}
+      >
+        <LinearGradient
+          colors={['rgba(255, 255, 255, 0.35)', 'rgba(255, 255, 255, 0)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 0.7 }}
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+        />
+        <Icon size={s(15)} color="#FFFFFF" strokeWidth={2.2} />
+      </View>
+      <T
+        size={13}
+        weight={active ? 'semibold' : 'regular'}
+        color={active ? '#FFFFFF' : 'rgba(255, 255, 255, 0.70)'}
+        numberOfLines={1}
+        style={{ flex: 1, backgroundColor: 'transparent' }}
+      >
+        {entry.label}
+      </T>
+    </Press>
+  );
+}
+
 export default function ConsoleSettings({
   initialCategory = 'quality',
+  backdropUrl,
   onClose,
 }: {
   initialCategory?: SettingsCategory;
@@ -97,6 +208,8 @@ export default function ConsoleSettings({
   const { s, width, insets } = useUi();
   const [category, setCategory] = useState<SettingsCategory>(initialCategory);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [restore, setRestore] = useState<SettingsRestoreAction | null>(null);
+  const restoreContext = useMemo(() => ({ category, setRestore }), [category]);
   const content = useRef<any>(null);
   const [enter] = useState(() => new Animated.Value(0));
 
@@ -125,11 +238,6 @@ export default function ConsoleSettings({
 
   const draft = useStreamSettingsDraft(notify);
   const input = useInputSettings();
-  const [inputTouched, setInputTouched] = useState(false);
-
-  useEffect(() => {
-    if (input.syncState === 'saving') setInputTouched(true);
-  }, [input.syncState]);
 
   const select = (next: SettingsCategory) => {
     setCategory(next);
@@ -194,7 +302,7 @@ export default function ConsoleSettings({
 
   const saving = draft.saveState === 'saving' || input.syncState === 'saving';
   const failed = draft.saveState === 'error';
-  const saved = !saving && !failed && (draft.saveState === 'saved' || inputTouched);
+  const saved = !saving && !failed && (draft.saveState === 'saved' || input.dirty);
   const navWidth = Math.min(s(280), Math.max(s(210), width * 0.28));
 
   const streamCategories = CATEGORIES.filter((c) => c.stream);
@@ -213,6 +321,45 @@ export default function ConsoleSettings({
           },
         ]}
       >
+        {/* 1. Lớp hình nền trò chơi (nếu có) được làm mờ quang học */}
+        {backdropUrl ? (
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <Img
+              source={{ uri: backdropUrl }}
+              style={[StyleSheet.absoluteFill, { opacity: 0.4 }]}
+              contentFit="cover"
+            />
+            <BlurView
+              intensity={60}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+            />
+          </View>
+        ) : null}
+
+        {/* 2. Ánh sáng môi trường xanh console mát dịu (Console Ambient Blue Glow) */}
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <LinearGradient
+            colors={['rgba(31, 111, 235, 0.12)', 'rgba(31, 111, 235, 0.02)', 'transparent']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0.75, y: 0.8 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(102, 168, 255, 0.05)', 'transparent']}
+            start={{ x: 0.3, y: 0 }}
+            end={{ x: 1, y: 0.55 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+
+        {/* 3. Scrim kính tối đồng bộ hoàn toàn với SidePanel */}
+        <View
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(7, 10, 16, 0.85)' }]}
+          pointerEvents="none"
+        />
+
+        {/* 4. Bố cục hai cột Master - Detail Liquid Glass */}
         <View
           style={{
             flex: 1,
@@ -223,27 +370,67 @@ export default function ConsoleSettings({
             paddingBottom: insets.bottom,
           }}
         >
-          {/* CỘT TRÁI (MASTER / SIDEBAR): Chuẩn Apple iPadOS Settings */}
+          {/* CỘT TRÁI (MASTER / SIDEBAR): Liquid Glass Panel */}
           <View
             style={{
               width: navWidth,
               backgroundColor: appleColors.sidebarBg,
-              borderRightWidth: StyleSheet.hairlineWidth,
+              borderRightWidth: 1,
               borderRightColor: appleColors.cardBorder,
+              overflow: 'hidden',
             }}
           >
-            {/* Top Bar của Sidebar: Tiêu đề Cài đặt chuẩn iPadOS */}
+            <BlurView intensity={36} tint="dark" style={StyleSheet.absoluteFill} />
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.04)', 'rgba(255, 255, 255, 0.01)', 'rgba(255, 255, 255, 0.02)']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              pointerEvents="none"
+              style={StyleSheet.absoluteFill}
+            />
+
+            {/* Vệt sáng viền phải (Specular right edge rim) */}
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.04)', 'transparent']}
+              start={{ x: 1, y: 0 }}
+              end={{ x: 0, y: 0 }}
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                bottom: 0,
+                width: 1.5,
+                zIndex: 2,
+              }}
+            />
+
+            {/* Top Bar của Sidebar: Tiêu đề Cài đặt chuẩn Glass */}
             <View
               style={{
-                height: s(50),
+                height: s(52),
                 flexDirection: 'row',
                 alignItems: 'center',
                 paddingHorizontal: s(16),
                 borderBottomWidth: StyleSheet.hairlineWidth,
-                borderBottomColor: appleColors.cardBorder,
+                borderBottomColor: 'rgba(255, 255, 255, 0.10)',
+                gap: s(8),
               }}
             >
-              <T size={17} weight="bold" color={appleColors.text}>
+              <LinearGradient
+                colors={['rgba(255, 255, 255, 0.35)', 'transparent']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 1,
+                }}
+              />
+              <T size={17} weight="bold" color="#FFFFFF" tracking={-0.02}>
                 Cài đặt
               </T>
             </View>
@@ -252,7 +439,7 @@ export default function ConsoleSettings({
             <FocusScroll
               style={{ flex: 1 }}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: s(10), paddingVertical: s(8) }}
+              contentContainerStyle={{ paddingHorizontal: s(10), paddingVertical: s(10) }}
             >
               <T
                 size={9.6}
@@ -263,59 +450,14 @@ export default function ConsoleSettings({
               >
                 STREAMING
               </T>
-              {streamCategories.map((entry) => {
-                const Icon = entry.icon;
-                const active = entry.id === category;
-                return (
-                  <Press
-                    key={entry.id}
-                    onPress={() => select(entry.id)}
-                    autoFocus={active}
-                    pressScale={0.985}
-                    accessibilityState={{ selected: active }}
-                    style={{
-                      height: s(40),
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: s(10),
-                      paddingHorizontal: s(10),
-                      borderRadius: s(10),
-                      marginVertical: s(1.5),
-                      backgroundColor: active ? 'rgba(31, 111, 235, 0.22)' : 'transparent',
-                      borderWidth: active ? 1 : 0,
-                      borderColor: active ? 'rgba(102, 168, 255, 0.35)' : 'transparent',
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: s(28),
-                        height: s(28),
-                        borderRadius: s(8),
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: entry.color,
-                        borderWidth: StyleSheet.hairlineWidth,
-                        borderColor: 'rgba(255, 255, 255, 0.35)',
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.2,
-                        shadowRadius: 2,
-                      }}
-                    >
-                      <Icon size={s(15)} color="#FFFFFF" strokeWidth={2.2} />
-                    </View>
-                    <T
-                      size={13}
-                      weight={active ? 'semibold' : 'regular'}
-                      color={appleColors.text}
-                      numberOfLines={1}
-                      style={{ flex: 1 }}
-                    >
-                      {entry.label}
-                    </T>
-                  </Press>
-                );
-              })}
+              {streamCategories.map((entry) => (
+                <NavItem
+                  key={entry.id}
+                  entry={entry}
+                  active={entry.id === category}
+                  onPress={() => select(entry.id)}
+                />
+              ))}
 
               <T
                 size={9.6}
@@ -326,95 +468,90 @@ export default function ConsoleSettings({
               >
                 THIẾT BỊ
               </T>
-              {deviceCategories.map((entry) => {
-                const Icon = entry.icon;
-                const active = entry.id === category;
-                return (
-                  <Press
-                    key={entry.id}
-                    onPress={() => select(entry.id)}
-                    autoFocus={active}
-                    pressScale={0.985}
-                    accessibilityState={{ selected: active }}
-                    style={{
-                      height: s(40),
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: s(10),
-                      paddingHorizontal: s(10),
-                      borderRadius: s(10),
-                      marginVertical: s(1.5),
-                      backgroundColor: active ? 'rgba(31, 111, 235, 0.22)' : 'transparent',
-                      borderWidth: active ? 1 : 0,
-                      borderColor: active ? 'rgba(102, 168, 255, 0.35)' : 'transparent',
-                    }}
-                  >
-                    <View
-                      style={{
-                        width: s(28),
-                        height: s(28),
-                        borderRadius: s(8),
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: entry.color,
-                        borderWidth: StyleSheet.hairlineWidth,
-                        borderColor: 'rgba(255, 255, 255, 0.35)',
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.2,
-                        shadowRadius: 2,
-                      }}
-                    >
-                      <Icon size={s(15)} color="#FFFFFF" strokeWidth={2.2} />
-                    </View>
-                    <T
-                      size={13}
-                      weight={active ? 'semibold' : 'regular'}
-                      color={appleColors.text}
-                      numberOfLines={1}
-                      style={{ flex: 1 }}
-                    >
-                      {entry.label}
-                    </T>
-                  </Press>
-                );
-              })}
+              {deviceCategories.map((entry) => (
+                <NavItem
+                  key={entry.id}
+                  entry={entry}
+                  active={entry.id === category}
+                  onPress={() => select(entry.id)}
+                />
+              ))}
             </FocusScroll>
           </View>
 
-          {/* CỘT PHẢI (DETAIL): Chuẩn Inset Grouped của Apple */}
-          <View style={{ flex: 1, backgroundColor: appleColors.bg }}>
+          {/* CỘT PHẢI (DETAIL): Liquid Glass Background & Panels */}
+          <View style={{ flex: 1, backgroundColor: 'rgba(8, 12, 18, 0.40)', overflow: 'hidden' }}>
+
             {/* Top Bar của Detail */}
             <View
               style={{
-                height: s(50),
+                height: s(52),
                 flexDirection: 'row',
                 alignItems: 'center',
                 paddingHorizontal: s(24),
                 borderBottomWidth: StyleSheet.hairlineWidth,
-                borderBottomColor: appleColors.cardBorder,
+                borderBottomColor: 'rgba(255, 255, 255, 0.08)',
               }}
             >
-              <T size={16} weight="semibold" color={appleColors.text}>
-                {meta.label}
-              </T>
-              <View style={{ flex: 1 }} />
+              <LinearGradient
+                colors={['rgba(255, 255, 255, 0.20)', 'rgba(255, 255, 255, 0.03)', 'transparent']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 1,
+                }}
+              />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <T size={16} weight="bold" color="#FFFFFF" tracking={-0.015}>
+                  {meta.label}
+                </T>
+                {meta.detail ? (
+                  <T size={10.2} color={appleColors.textSecondary} numberOfLines={1} style={{ marginTop: s(1) }}>
+                    {meta.detail}
+                  </T>
+                ) : null}
+              </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(12) }}>
                 <SaveStatus saving={saving} saved={saved} failed={failed} />
+                {restore?.category === category ? (
+                  <SettingsRestoreButton key={category} action={restore} notify={notify} />
+                ) : null}
+                {/* Nút đóng tròn đồng bộ SidePanel / Thông tin game */}
                 <Press
                   onPress={onClose}
                   sound="back"
+                  pressScale={0.92}
                   accessibilityLabel="Đóng cài đặt"
                   style={{
-                    paddingVertical: s(6),
-                    paddingHorizontal: s(12),
-                    borderRadius: s(14),
-                    backgroundColor: 'rgba(31, 111, 235, 0.2)',
+                    width: s(32),
+                    height: s(32),
+                    borderRadius: s(16),
+                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 255, 255, 0.16)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  <T size={13.5} weight="semibold" color={appleColors.blue}>
-                    Xong
-                  </T>
+                  <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: s(16), overflow: 'hidden' }]}>
+                    <BlurView
+                      intensity={24}
+                      tint="dark"
+                      style={StyleSheet.absoluteFill}
+                    />
+                    <LinearGradient
+                      colors={['rgba(255, 255, 255, 0.20)', 'transparent']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 0, y: 0.8 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                  </View>
+                  <X size={s(15)} color="rgba(255, 255, 255, 0.85)" strokeWidth={2.2} />
                 </Press>
               </View>
             </View>
@@ -432,13 +569,15 @@ export default function ConsoleSettings({
               keyboardShouldPersistTaps="handled"
             >
               <View key={category} style={{ maxWidth: s(680) }}>
-                {page}
+                <SettingsRestoreContext.Provider value={restoreContext}>
+                  {page}
+                </SettingsRestoreContext.Provider>
               </View>
             </FocusScroll>
           </View>
         </View>
 
-        {/* Thông báo dạng Apple Banner */}
+        {/* Thông báo dạng Apple Glass Toast */}
         {notice ? (
           <View
             style={[
@@ -446,17 +585,32 @@ export default function ConsoleSettings({
               {
                 right: s(20) + insets.right,
                 bottom: s(16) + insets.bottom,
-                maxWidth: s(340),
+                maxWidth: s(360),
                 padding: s(12),
-                borderRadius: s(10),
+                borderRadius: s(14),
                 gap: s(10),
-                borderColor: notice.tone === 'error' ? appleColors.red : appleColors.cardBorder,
-                backgroundColor: '#18202c',
+                borderColor: notice.tone === 'error' ? 'rgba(248, 113, 113, 0.50)' : 'rgba(255, 255, 255, 0.18)',
+                backgroundColor: 'rgba(13, 21, 32, 0.92)',
+                overflow: 'hidden',
               },
             ]}
           >
+            <GlassBackdrop material="panel" intensity={42} radius={s(14)} />
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.30)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 1.5,
+              }}
+            />
             <View style={{ flex: 1 }}>
-              <T size={12} weight="semibold" color={notice.tone === 'error' ? appleColors.red : appleColors.text}>
+              <T size={12} weight="semibold" color={notice.tone === 'error' ? '#fca5a5' : '#FFFFFF'}>
                 {notice.title}
               </T>
               {notice.detail ? (
@@ -468,9 +622,19 @@ export default function ConsoleSettings({
             <Press
               onPress={() => setNotice(null)}
               accessibilityLabel="Đóng thông báo"
-              style={{ width: s(22), height: s(22), alignItems: 'center', justifyContent: 'center' }}
+              pressScale={0.92}
+              style={{
+                width: s(24),
+                height: s(24),
+                borderRadius: s(12),
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: 'rgba(255, 255, 255, 0.18)',
+              }}
             >
-              <X size={s(14)} color={appleColors.textTertiary} />
+              <X size={s(13)} color="rgba(255, 255, 255, 0.8)" />
             </Press>
           </View>
         ) : null}
@@ -487,9 +651,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     zIndex: 10,
     shadowColor: '#000000',
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
   },
 });

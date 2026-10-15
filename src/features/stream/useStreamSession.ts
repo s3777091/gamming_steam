@@ -7,7 +7,7 @@
 //  - Chờ chủ phiên chấp nhận yêu cầu dùng máy bằng Realtime (không lặp 2,5 giây).
 //  - Cài đặt đọc theo loại màn hình (điện thoại / lớn) như bản web mới.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { ensureClientDeviceId } from '@/lib/client-device';
@@ -49,7 +49,7 @@ import {
 } from '@/lib/stream-settings';
 import { subscribeStreamSettings } from '@/lib/stream-settings-events';
 import { createClient } from '@/lib/supabase';
-import { startSpeakerRoute, stopSpeakerRoute } from 'jetsona-input';
+import { setStreamFrameRate, startSpeakerRoute, stopSpeakerRoute } from 'jetsona-input';
 
 export type StreamPhase = 'connecting' | 'waiting' | 'live' | 'error';
 
@@ -57,7 +57,7 @@ type Options = {
   userId: string;
   /** Đổi giá trị này để mở lại phiên từ đầu (Kết nối lại, đổi độ phân giải). */
   attempt: number;
-  /** Phiên bị đóng từ bên ngoài (app xuống nền): màn gọi sẽ thoát. */
+  /** App xuống nền hoặc host chủ động kết thúc phiên: màn gọi sẽ thoát. */
   onBackground: () => void;
   onSessionChanged?: () => void;
 };
@@ -87,7 +87,18 @@ async function fetchHostDisplay(): Promise<HostDisplay | null> {
     if (!data.ok || width < 640 || height < 480) return null;
     const modes = Array.isArray(data.modes)
       ? data.modes
-        .map((mode) => ({ width: Number((mode as { width?: unknown }).width), height: Number((mode as { height?: unknown }).height) }))
+        .map((raw) => {
+          const mode = raw as { width?: unknown; height?: unknown; refreshRates?: unknown };
+          // Agent cũ không gửi `refreshRates`; thiếu thì để trống, không đoán.
+          const refreshRates = Array.isArray(mode.refreshRates)
+            ? mode.refreshRates.map(Number).filter((rate) => Number.isFinite(rate) && rate > 0)
+            : [];
+          return {
+            width: Number(mode.width),
+            height: Number(mode.height),
+            ...(refreshRates.length ? { refreshRates } : {}),
+          };
+        })
         .filter((mode) => Number.isFinite(mode.width) && Number.isFinite(mode.height))
       : undefined;
     return {
@@ -105,8 +116,8 @@ async function fetchHostDisplay(): Promise<HostDisplay | null> {
 
 export function useStreamSession({ userId, attempt, onBackground, onSessionChanged }: Options) {
   const [phase, setPhase] = useState<StreamPhase>('connecting');
-  const [status, setStatus] = useState('Đang chuẩn bị phiên điều khiển…');
-  const [progress, setProgress] = useState(3);
+  const [status, setStatus] = useState('Đang xác nhận tài khoản…');
+  const [progress, setProgress] = useState(4);
   const [streamURL, setStreamURL] = useState<string | null>(null);
   const [videoSize, setVideoSize] = useState({ width: 16, height: 9 });
   const [inputReady, setInputReady] = useState(false);
@@ -120,18 +131,39 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
   const clientRef = useRef<NativeMoonlightClient | null>(null);
   const [client, setClient] = useState<NativeMoonlightClient | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionKey, setSessionKey] = useState({ userId, attempt });
+  // A new attempt starts with clean UI before the connection effect runs.
+  if (sessionKey.userId !== userId || sessionKey.attempt !== attempt) {
+    setSessionKey({ userId, attempt });
+    setPhase('connecting');
+    setStatus('Đang xác nhận tài khoản…');
+    setProgress(4);
+    setStreamURL(null);
+    setInputReady(false);
+    setAudioReady(false);
+    setErrorDetail(null);
+    setStreamSettings(null);
+    setMoonlightSettings(null);
+    setHostDisplay(null);
+    setSessionId(null);
+  }
   // Màn stream gắn xử lý rung (slot tay cầm -> thiết bị thật) sau khi dựng cầu nhập liệu.
   const rumbleRef = useRef<((rumble: { slot: number; low: number; high: number }) => void) | null>(null);
   const inputSettingsRef = useRef<InputSettings>(DEFAULT_INPUT_SETTINGS);
   const onBackgroundRef = useRef(onBackground);
   const onSessionChangedRef = useRef(onSessionChanged);
-  onBackgroundRef.current = onBackground;
-  onSessionChangedRef.current = onSessionChanged;
+  useLayoutEffect(() => {
+    onBackgroundRef.current = onBackground;
+    onSessionChangedRef.current = onSessionChanged;
+  }, [onBackground, onSessionChanged]);
 
   useEffect(() => {
     let cancelled = false;
     void loadInputSettings().then((value) => { if (!cancelled) inputSettingsRef.current = value; });
-    const off = subscribeInputSettings((value) => { inputSettingsRef.current = value; });
+    const off = subscribeInputSettings((value) => {
+      inputSettingsRef.current = value;
+      clientRef.current?.setAudio({ muted: value.audioMuted, volume: value.audioVolume });
+    });
     return () => { cancelled = true; off(); };
   }, []);
 
@@ -154,18 +186,6 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
     const clientId = `native-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const setupToken = createStreamSetupToken();
     const deviceClass = detectStreamDeviceClass();
-
-    setPhase('connecting');
-    setStatus('Đang xác nhận tài khoản…');
-    setProgress(4);
-    setStreamURL(null);
-    setInputReady(false);
-    setAudioReady(false);
-    setErrorDetail(null);
-    setStreamSettings(null);
-    setMoonlightSettings(null);
-    setHostDisplay(null);
-    setSessionId(null);
 
     const release = async (handle: (LeaseHandle & { clientDeviceId: string }) | null, reason: string) => {
       if (!handle || releasing) return;
@@ -191,6 +211,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
       if (disposed) return;
       activeClient?.stop();
       stopSpeakerRoute();
+      setStreamFrameRate(0);
       activeClient = null;
       clientRef.current = null;
       setClient(null);
@@ -319,6 +340,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
           TARGET_ID,
         ) as MoonlightSettings;
         setMoonlightSettings(resolved);
+        setStreamFrameRate(resolved.fps);
         setVideoSize({ width: resolved.videoSizeCustom.width, height: resolved.videoSizeCustom.height });
 
         setStatus('Đang đăng ký quyền sử dụng thiết bị…');
@@ -376,6 +398,17 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
               setAudioReady(!inputSettings.audioMuted);
             },
             onError: (message) => fail(message),
+            onTerminated: () => {
+              if (disposed) return;
+              stopSpeakerRoute();
+              setStreamFrameRate(0);
+              activeClient = null;
+              clientRef.current = null;
+              setClient(null);
+              setStreamURL(null);
+              void release(activeHandle, 'host_terminated');
+              onBackgroundRef.current();
+            },
             onRumble: (rumble) => rumbleRef.current?.(rumble),
           },
           settings.ice_mode,
@@ -396,6 +429,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
     const appState = AppState.addEventListener('change', (next) => {
       if (next === 'background' && activeHandle && !disposed) {
         activeClient?.stop();
+        setStreamFrameRate(0);
         activeClient = null;
         clientRef.current = null;
         setClient(null);
@@ -413,6 +447,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
       heartbeatTimer = null;
       activeClient?.stop();
       stopSpeakerRoute();
+      setStreamFrameRate(0);
       activeClient = null;
       clientRef.current = null;
       setClient(null);

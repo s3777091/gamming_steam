@@ -1,4 +1,4 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { memo, useCallback, useEffect, useState, type RefObject } from 'react';
 import { Animated, Easing, StyleSheet, TextInput, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { FocusScroll } from '@/features/gamepad/focus';
@@ -11,6 +11,7 @@ import type { useStoreSearch } from '@/features/library/useSteamStore';
 import { colors, fonts } from '@/theme';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
+import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
 import { Skeleton } from '@/ui/Skeleton';
 import { useUi } from '@/ui/scale';
@@ -36,10 +37,22 @@ export function StoreSearchField({ open, query, inputRef, onOpen, onQueryChange,
   onClose: () => void;
 }) {
   const { s, width } = useUi();
-  const grow = useRef(new Animated.Value(open ? 1 : 0)).current;
+  const { reduceMotion } = useMotion();
+  const fieldHeight = s(32);
+  const fieldRadius = s(16);
+  const [grow] = useState(() => new Animated.Value(open ? 1 : 0));
+
   useEffect(() => {
-    Animated.timing(grow, { toValue: open ? 1 : 0, duration: 300, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-  }, [grow, open]);
+    const animation = Animated.timing(grow, {
+      toValue: open ? 1 : 0,
+      duration: reduceMotion ? 0 : open ? 280 : 220,
+      easing: open ? Easing.out(Easing.cubic) : Easing.inOut(Easing.cubic),
+      useNativeDriver: false,
+      isInteraction: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [grow, open, reduceMotion]);
 
   const openWidth = Math.min(s(272), Math.max(s(176), width * 0.28));
   return (
@@ -47,24 +60,58 @@ export function StoreSearchField({ open, query, inputRef, onOpen, onQueryChange,
       style={[
         styles.field,
         {
-          height: s(36),
-          borderRadius: s(18),
-          width: grow.interpolate({ inputRange: [0, 1], outputRange: [s(36), openWidth] }),
-          borderColor: grow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.18)', 'rgba(102,168,255,0.7)'] }),
-          backgroundColor: grow.interpolate({ inputRange: [0, 1], outputRange: ['rgba(12,20,32,0.5)', 'rgba(10,18,30,0.88)'] }),
+          height: fieldHeight,
+          borderRadius: fieldRadius,
+          width: grow.interpolate({ inputRange: [0, 1], outputRange: [fieldHeight, openWidth] }),
+          borderColor: grow.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['rgba(255,255,255,0.18)', 'rgba(102,168,255,0.7)'],
+          }),
+          backgroundColor: grow.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['rgba(12,20,32,0.5)', 'rgba(10,18,30,0.88)'],
+          }),
         },
       ]}
     >
-      <GlassBackdrop material="control" intensity={40} radius={s(18)} />
-      <Press
-        onPress={() => (open ? inputRef.current?.focus() : onOpen())}
-        accessibilityLabel={open ? 'Ô tìm kiếm' : 'Mở tìm kiếm Steam'}
-        style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: s(36), alignItems: 'center', justifyContent: 'center', zIndex: 2 }}
-      >
-        <Search size={s(16)} color="rgba(255,255,255,0.66)" strokeWidth={1.8} />
-      </Press>
-      {open ? (
+      <GlassBackdrop material="control" intensity={40} radius={fieldRadius} />
+
+      {!open ? (
+        <Press
+          onPress={onOpen}
+          sound="confirm"
+          focusRadius={fieldRadius}
+          accessibilityLabel="Mở tìm kiếm Steam"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              borderRadius: fieldRadius,
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2,
+            },
+          ]}
+        >
+          <Search size={s(15)} color="rgba(255,255,255,0.72)" strokeWidth={1.8} />
+        </Press>
+      ) : (
         <>
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: fieldHeight,
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2,
+            }}
+          >
+            <Search size={s(15)} color="rgba(255,255,255,0.66)" strokeWidth={1.8} />
+          </View>
+
           <TextInput
             ref={inputRef}
             value={query}
@@ -82,21 +129,44 @@ export function StoreSearchField({ open, query, inputRef, onOpen, onQueryChange,
             selectionColor={colors.accent}
             accessibilityLabel="Tìm game trên Steam"
             style={{
-              flex: 1, paddingLeft: s(36), paddingRight: s(36), paddingVertical: 0,
-              fontFamily: fonts.medium, fontSize: s(10.9), color: colors.white,
+              flex: 1,
+              paddingLeft: fieldHeight,
+              paddingRight: fieldHeight,
+              paddingVertical: 0,
+              fontFamily: fonts.medium,
+              fontSize: s(10.9),
+              color: colors.white,
             }}
           />
+
           <Press
+            focusable={false}
+            sound="confirm"
             onPress={() => {
-              if (query) { onQueryChange(''); inputRef.current?.focus(); } else onClose();
+              if (query) {
+                onQueryChange('');
+                inputRef.current?.focus();
+              } else {
+                onClose();
+              }
             }}
             accessibilityLabel={query ? 'Xóa nội dung tìm kiếm' : 'Đóng tìm kiếm'}
-            style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: s(36), alignItems: 'center', justifyContent: 'center' }}
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: fieldHeight,
+              borderRadius: fieldRadius,
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 2,
+            }}
           >
             <X size={s(14)} color="rgba(255,255,255,0.58)" strokeWidth={1.8} />
           </Press>
         </>
-      ) : null}
+      )}
     </Animated.View>
   );
 }
@@ -122,11 +192,12 @@ function SearchMessage({ icon: Icon, title, detail, accent = false }: { icon: Lu
   );
 }
 
-function SearchResultCard({ item, onOpen }: { item: SteamStoreItem; onOpen: () => void }) {
+const SearchResultCard = memo(function SearchResultCard({ item, onOpen }: { item: SteamStoreItem; onOpen: (item: SteamStoreItem) => void }) {
   const { s, width } = useUi();
+  const open = useCallback(() => onOpen(item), [item, onOpen]);
   const cardWidth = Math.min(s(106), Math.max(s(86), width * 0.11));
   return (
-    <Press onPress={onOpen} pressScale={0.97} accessibilityLabel={item.name} style={[styles.result, { width: cardWidth, borderRadius: s(14) }]}>
+    <Press onPress={open} pressScale={0.97} accessibilityLabel={item.name} style={[styles.result, { width: cardWidth, borderRadius: s(14) }]}>
       <Img
         source={{ uri: item.portraitImage || item.smallImage || item.largeImage }}
         style={StyleSheet.absoluteFill}
@@ -174,9 +245,9 @@ function SearchResultCard({ item, onOpen }: { item: SteamStoreItem; onOpen: () =
       </View>
     </Press>
   );
-}
+});
 
-function SearchResults({ query, search, onOpenGame }: { query: string; search: SearchState; onOpenGame: (item: SteamStoreItem) => void }) {
+const SearchResults = memo(function SearchResults({ query, search, onOpenGame }: { query: string; search: SearchState; onOpenGame: (item: SteamStoreItem) => void }) {
   const { s, width } = useUi();
   if (query.length < 2) {
     return <SearchMessage icon={Search} accent title="Nhập ít nhất 2 ký tự" detail="Kết quả Steam sẽ xuất hiện theo hàng ngang." />;
@@ -193,10 +264,10 @@ function SearchResults({ query, search, onOpenGame }: { query: string; search: S
   if (!search.results.length) return <SearchMessage icon={Search} title="Không tìm thấy game phù hợp" detail="Thử một tên ngắn hơn hoặc kiểm tra lại chính tả." />;
   return (
     <FocusScroll horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: s(8), paddingHorizontal: s(2) }}>
-      {search.results.map((item) => <SearchResultCard key={item.appId} item={item} onOpen={() => onOpenGame(item)} />)}
+      {search.results.map((item) => <SearchResultCard key={item.appId} item={item} onOpen={onOpenGame} />)}
     </FocusScroll>
   );
-}
+});
 
 function Key({ label, onPress, flex = 1, accent = false, disabled = false }: {
   label: string; onPress: () => void; flex?: number; accent?: boolean; disabled?: boolean;
@@ -246,7 +317,7 @@ function Key({ label, onPress, flex = 1, accent = false, disabled = false }: {
   );
 }
 
-function StoreKeyboard({ canSubmit, onKey, onErase, onSubmit }: {
+const StoreKeyboard = memo(function StoreKeyboard({ canSubmit, onKey, onErase, onSubmit }: {
   canSubmit: boolean;
   onKey: (key: string) => void;
   onErase: () => void;
@@ -281,7 +352,7 @@ function StoreKeyboard({ canSubmit, onKey, onErase, onSubmit }: {
       </View>
     </View>
   );
-}
+});
 
 export function StoreSearchPanel({ query, search, onOpenGame, onKey, onErase, onSubmit }: {
   query: string;

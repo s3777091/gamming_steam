@@ -129,7 +129,7 @@ function recommendPhoneProfile(ping: number, loss: number, bandwidth: number): N
       storedValue: 'Quality, 1080p60 (điện thoại)',
       profile: 'quality',
       title: 'Có thể dùng Quality',
-      detail: 'Đường truyền đủ cho 1080p, 60 FPS ở 30 Mbps — nét nhất màn điện thoại hiển thị được.',
+      detail: 'Đường truyền đủ cho preset 1080p, 60 FPS ở 30 Mbps. Auto có thể tận dụng panel độ phân giải cao hơn.',
     };
   }
   if (ping < 45 && bandwidth >= 32) {
@@ -141,7 +141,7 @@ function recommendPhoneProfile(ping: number, loss: number, bandwidth: number): N
     };
   }
   return {
-    storedValue: 'Auto, tối đa 1080p120 (điện thoại)',
+    storedValue: 'Auto, theo màn hình thiết bị',
     profile: 'auto',
     title: 'Nên giữ chế độ Auto',
     detail: 'Tự khớp màn điện thoại và tần số quét, hạ dần khi mạng dao động.',
@@ -180,10 +180,10 @@ export function recommendNetworkProfile(
     };
   }
   return {
-    storedValue: 'Auto, 1080p60',
+    storedValue: 'Auto, theo màn hình thiết bị',
     profile: 'auto',
     title: 'Nên giữ chế độ Auto',
-    detail: '1080p, 60 FPS là điểm khởi đầu phù hợp với kết nối hiện tại.',
+    detail: 'Khớp số pixel và Hz màn hình hỗ trợ, tự điều chỉnh theo đường truyền.',
   };
 }
 
@@ -291,7 +291,7 @@ export const PROFILE_GUIDANCE: Record<StreamProfile, {
 }> = {
   auto: {
     resolution: 'Tự khớp với màn hình; mạng yếu chỉ hạ chất lượng nén.',
-    fps: 'Mặc định 60 FPS, ưu tiên nhịp ổn định.',
+    fps: 'Theo Hz màn hình hỗ trợ (60/90/120/144), tự hạ khi mạng không đủ.',
     bitrate: 'Tự động',
     bitrateDetail: 'Theo dõi băng thông và chỉ dùng mức cần thiết.',
     bestFor: 'Phù hợp khi bạn đổi mạng hoặc đổi màn hình thường xuyên.',
@@ -388,7 +388,7 @@ export const RESOLUTION_GUIDANCE: Record<StreamSettings['resolution'], string> =
 ) as Record<StreamSettings['resolution'], string>;
 
 export const FPS_GUIDANCE: Record<FrameRateChoice, string> = {
-  auto: 'Máy bạn sẽ đo tần số quét thật của màn hình đang xem rồi khớp nhịp khung hình theo đó (60/90/120/144), và chỉ vượt 60 khi băng thông đo được còn đủ để hình không bị mềm.',
+  auto: 'Khớp Hz màn hình hỗ trợ (60/90/120/144), yêu cầu chế độ phù hợp khi chơi và tự hạ FPS nếu băng thông đo được không đủ.',
   '30': 'Máy bạn sẽ giảm gần một nửa lượng khung hình so với 60 FPS để tiết kiệm mạng.',
   '60': 'Máy bạn sẽ có chuyển động mượt cho đa số trò chơi mà không tăng tải quá mức.',
   '90': 'Máy bạn sẽ phản hồi mượt hơn 60 FPS, đổi lại cần thêm băng thông và khả năng giải mã.',
@@ -421,7 +421,7 @@ const PHONE_PROFILE_VISUAL: Record<StreamProfile, typeof PROFILE_VISUAL[StreamPr
   ...PROFILE_VISUAL,
   auto: {
     ...PROFILE_VISUAL.auto,
-    note: 'Khớp màn điện thoại, tối đa 1080p · 120 FPS',
+    note: 'Khớp số pixel và Hz màn hình thiết bị này',
   },
   competitive: {
     ...PROFILE_VISUAL.competitive,
@@ -430,7 +430,7 @@ const PHONE_PROFILE_VISUAL: Record<StreamProfile, typeof PROFILE_VISUAL[StreamPr
   quality: {
     ...PROFILE_VISUAL.quality,
     resolution: '1080p',
-    note: 'Nét nhất màn điện thoại hiển thị được',
+    note: '1080p với bitrate cao, ưu tiên chi tiết',
   },
 };
 
@@ -438,8 +438,8 @@ const PHONE_PROFILE_GUIDANCE: Record<StreamProfile, typeof PROFILE_GUIDANCE[Stre
   ...PROFILE_GUIDANCE,
   auto: {
     ...PROFILE_GUIDANCE.auto,
-    resolution: 'Khớp màn điện thoại, trần 1080p — hơn nữa mắt không thấy mà máy vẫn phải giải mã.',
-    fps: 'Bám tần số quét thật (60/90/120 Hz), tự hạ khi mạng không đủ giữ nét.',
+    resolution: 'Theo số pixel thật của màn hình, kể cả thiết bị nhỏ có panel độ phân giải cao.',
+    fps: 'Theo Hz màn hình hỗ trợ (60/90/120/144), tự hạ khi mạng không đủ giữ nét.',
     bestFor: 'Lựa chọn tốt nhất cho đa số điện thoại, cả Wi-Fi lẫn 5G.',
   },
   competitive: {
@@ -452,7 +452,7 @@ const PHONE_PROFILE_GUIDANCE: Record<StreamProfile, typeof PROFILE_GUIDANCE[Stre
     tradeoff: 'Kém Quality một chút ở cảnh chuyển động nhanh, đổi lại ít giật khi Wi-Fi dao động.',
   },
   quality: {
-    resolution: '1080p là mức nét nhất màn 6–7" hiển thị được.',
+    resolution: 'Preset dùng 1080p; Auto có thể tận dụng độ phân giải panel cao hơn.',
     fps: '60 FPS giữ nhịp đều, máy mát và ít tốn pin.',
     bitrate: '30 Mbps',
     bitrateDetail: 'Nên dùng Wi-Fi ổn định từ khoảng 40 Mbps.',
@@ -468,8 +468,8 @@ const PHONE_PROFILE_GUIDANCE: Record<StreamProfile, typeof PROFILE_GUIDANCE[Stre
 
 const PHONE_RESOLUTION_COPY: Partial<Record<Resolution, { device: string; guidance: string }>> = {
   auto: {
-    device: 'Khớp màn điện thoại, tối đa 1080p',
-    guidance: 'Máy bạn sẽ chọn bậc gần nhất với màn hình, không vượt 1080p: màn 6–7" không hiện được thêm chi tiết mà chỉ tốn pin để giải mã.',
+    device: 'Khớp số pixel thật của màn hình',
+    guidance: 'Auto dựa trên panel, không áp trần 1080p chỉ vì thiết bị nhỏ. Máy chủ cần hỗ trợ độ phân giải tương ứng.',
   },
   '720p': {
     device: '4G/5G yếu · tiết kiệm data',
@@ -528,7 +528,7 @@ const PHONE_COPY: StreamSettingsCopy = {
     }),
   regionGuidance: {
     ...REGION_GUIDANCE,
-    vn: 'Auto có thể chọn tới 1080p/120 FPS nếu màn hình và băng thông cho phép.',
+    vn: 'Auto có thể chọn tới 4K/144 FPS theo panel và băng thông, kể cả trên thiết bị nhỏ.',
   },
 };
 

@@ -56,13 +56,13 @@ export type SteamUserDetails = SteamProfile & {
   ownedGames: number | null;
   totalPlaytimeMinutes: number | null;
   friends: number | null;
-  recentGames: Array<{
+  recentGames: {
     appId: number;
     name: string;
     iconUrl: string | null;
     playtime2WeeksMinutes: number;
     playtimeMinutes: number;
-  }>;
+  }[];
 };
 
 export type SteamProfileResponse = {

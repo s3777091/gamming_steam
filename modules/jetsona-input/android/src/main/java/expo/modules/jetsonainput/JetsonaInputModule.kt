@@ -74,6 +74,8 @@ class JetsonaInputModule : Module(), InputSink {
   private var lastFrame: Bitmap? = null
   private var previousAudioMode: Int? = null
   private var previousSpeakerphone: Boolean? = null
+  private var previousDisplayModeId: Int? = null
+  private var previousRefreshRate: Float? = null
 
   private val inputManager: InputManager?
     get() = appContext.reactContext?.getSystemService(Context.INPUT_SERVICE) as? InputManager
@@ -120,13 +122,20 @@ class JetsonaInputModule : Module(), InputSink {
 
     OnCreate { attach() }
     OnActivityEntersForeground { attach() }
-    OnActivityEntersBackground { releaseAllInput() }
+    OnActivityEntersBackground {
+      releaseAllInput()
+      runOnUi { applyStreamFrameRate(it, 0.0) }
+    }
     OnDestroy { detach() }
 
     Function("getDevices") { listDevices() }
     Function("getBluetooth") { bluetoothInfo() }
 
     Function("setCaptureMode") { mode: String ->
+      // ReactActivity/React Native có thể thay Window.Callback sau lúc module
+      // được tạo. Kiểm tra và gắn lại đúng lúc chuyển vào màn stream, nếu không
+      // danh sách Bluetooth vẫn thấy tay cầm nhưng app không nhận được sự kiện.
+      attach()
       captureMode = if (mode == MODE_STREAM || mode == MODE_OFF) mode else MODE_UI
       if (captureMode != MODE_STREAM) setPointerCapture(false)
       releaseAllInput()
@@ -151,6 +160,7 @@ class JetsonaInputModule : Module(), InputSink {
     Function("describeDevice") { deviceId: Int -> describeDevice(deviceId) }
 
     Function("getDisplayInfo") { displayInfo() }
+    Function("setStreamFrameRate") { fps: Double -> runOnUi { applyStreamFrameRate(it, fps) } }
 
     // Chụp khung hình đang hiện trên cửa sổ (kể cả video RTCView) bằng PixelCopy.
     // Tách hai bước: grabFrame giữ bitmap NGAY (trước khi menu che), exportFrame
@@ -164,7 +174,7 @@ class JetsonaInputModule : Module(), InputSink {
 
   private fun attach() {
     val activity = appContext.currentActivity ?: return
-    if (attachedActivity === activity && windowCallback != null) return
+    if (attachedActivity === activity && windowCallback != null && activity.window.callback === windowCallback) return
     detachWindow()
     attachedActivity = activity
     runOnUi { target ->
@@ -192,6 +202,7 @@ class JetsonaInputModule : Module(), InputSink {
     val activity = attachedActivity ?: return
     val wrapper = windowCallback
     runOnUi {
+      applyStreamFrameRate(activity, 0.0)
       if (wrapper != null && activity.window.callback === wrapper) activity.window.callback = wrapper.base
       captureView?.let { (it.parent as? ViewGroup)?.removeView(it) }
       captureView = null
@@ -257,9 +268,8 @@ class JetsonaInputModule : Module(), InputSink {
   private fun classify(device: InputDevice): String? {
     val sources = device.sources
     return when {
-      isGamepadSource(sources) -> "controller"
-      (sources and InputDevice.SOURCE_KEYBOARD) == InputDevice.SOURCE_KEYBOARD &&
-        device.keyboardType == InputDevice.KEYBOARD_TYPE_ALPHABETIC -> "keyboard"
+      isGamepadDevice(device) -> "controller"
+      isAlphabeticKeyboardDevice(device) -> "keyboard"
       (sources and InputDevice.SOURCE_MOUSE) == InputDevice.SOURCE_MOUSE ||
         (sources and InputDevice.SOURCE_TOUCHPAD) == InputDevice.SOURCE_TOUCHPAD -> "mouse"
       else -> null
@@ -281,7 +291,7 @@ class JetsonaInputModule : Module(), InputSink {
     val bonded = bondedNames()
     for (id in InputDevice.getDeviceIds()) {
       val device = InputDevice.getDevice(id) ?: continue
-      if (device.isVirtual) continue
+      if (device.isVirtual && !isGamepadDevice(device)) continue
       val kind = classify(device) ?: continue
       result += mapOf(
         "id" to "input:$id",
@@ -377,9 +387,15 @@ class JetsonaInputModule : Module(), InputSink {
     val metrics = DisplayMetrics()
     @Suppress("DEPRECATION")
     display?.getRealMetrics(metrics)
+    val currentMode = display?.mode
+    val refreshRates = display?.supportedModes?.filter {
+      it.physicalWidth == currentMode?.physicalWidth && it.physicalHeight == currentMode?.physicalHeight
+    }?.map { it.refreshRate.toDouble() }?.distinct()?.sorted().orEmpty()
     val cutout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) activity?.window?.decorView?.rootWindowInsets?.displayCutout else null
     return mapOf(
       "refreshRate" to (display?.refreshRate?.toDouble() ?: 60.0),
+      "supportedRefreshRates" to refreshRates,
+      "smallestScreenWidthDp" to (context?.resources?.configuration?.smallestScreenWidthDp ?: 0),
       "widthPx" to metrics.widthPixels,
       "heightPx" to metrics.heightPixels,
       "insets" to mapOf(
@@ -389,6 +405,43 @@ class JetsonaInputModule : Module(), InputSink {
         "bottom" to (cutout?.safeInsetBottom ?: 0),
       ),
     )
+  }
+
+
+  private fun applyStreamFrameRate(activity: Activity, fps: Double) {
+    val window = activity.window
+    val attributes = window.attributes
+    if (!fps.isFinite() || fps <= 0.0) {
+      val previousMode = previousDisplayModeId ?: return
+      attributes.preferredDisplayModeId = previousMode
+      attributes.preferredRefreshRate = previousRefreshRate ?: 0f
+      previousDisplayModeId = null
+      previousRefreshRate = null
+      window.attributes = attributes
+      return
+    }
+    @Suppress("DEPRECATION")
+    val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) activity.display else window.windowManager.defaultDisplay
+    val currentMode = display?.mode ?: return
+    // Never trade panel resolution for Hz. Prefer an integer multiple of FPS
+    // (60 on 120 Hz), then the nearest available rate above the stream rate.
+    val modes = display.supportedModes.filter {
+      it.physicalWidth == currentMode.physicalWidth && it.physicalHeight == currentMode.physicalHeight
+    }
+    val fitting = modes.filter { it.refreshRate + 1.0 >= fps }
+    val multiple = fitting.filter {
+      val ratio = it.refreshRate / fps
+      kotlin.math.abs(ratio - kotlin.math.round(ratio)) < 0.03
+    }
+    val chosen = (multiple.ifEmpty { fitting }).minByOrNull { it.refreshRate }
+      ?: modes.maxByOrNull { it.refreshRate } ?: return
+    if (previousDisplayModeId == null) {
+      previousDisplayModeId = attributes.preferredDisplayModeId
+      previousRefreshRate = attributes.preferredRefreshRate
+    }
+    attributes.preferredDisplayModeId = chosen.modeId
+    attributes.preferredRefreshRate = chosen.refreshRate
+    window.attributes = attributes
   }
 
 
@@ -461,9 +514,20 @@ class JetsonaInputModule : Module(), InputSink {
 
     if (captureMode == MODE_OFF) return false
 
+    val device = event.device ?: InputDevice.getDevice(event.deviceId)
+    val route = inputKeyRoute(
+      source = source,
+      controllerDevice = isGamepadDevice(device),
+      typingKeyboard = isPhysicalKeyboard(event),
+      gamepadButton = KeyEvent.isGamepadButton(keyCode),
+      gamepadKey = isGamepadKey(keyCode) || keyCode == KeyEvent.KEYCODE_HOME,
+    )
+    val isPad = route == InputKeyRoute.CONTROLLER
+    val isKeyboard = route == InputKeyRoute.KEYBOARD
+
     // Alt là phím Guide riêng của app. Bắt ở native trước đường bàn phím gửi sang PC
     // để vẫn hoạt động khi Moonlight client chưa sẵn sàng và không phụ thuộc JS key map.
-    if ((keyCode == KeyEvent.KEYCODE_ALT_LEFT || keyCode == KeyEvent.KEYCODE_ALT_RIGHT) &&
+    if (!isPad && (keyCode == KeyEvent.KEYCODE_ALT_LEFT || keyCode == KeyEvent.KEYCODE_ALT_RIGHT) &&
       (source and InputDevice.SOURCE_KEYBOARD) == InputDevice.SOURCE_KEYBOARD
     ) {
       if (event.repeatCount == 0) sendEvent("onGuideKey", mapOf("down" to down))
@@ -473,7 +537,7 @@ class JetsonaInputModule : Module(), InputSink {
     // Nút Home/Guide: nhiều tay cầm báo KEYCODE_HOME thay vì KEYCODE_BUTTON_MODE.
     // Hệ thống thường nuốt HOME trước khi tới app; khi nó còn tới được thì giữ lại
     // để mở menu của app thay vì để Android thoát ra màn hình chính.
-    if (keyCode == KeyEvent.KEYCODE_HOME && isGamepadSource(source)) {
+    if (keyCode == KeyEvent.KEYCODE_HOME && isPad) {
       if (event.repeatCount == 0) {
         sendEvent("onGamepadButton", mapOf("deviceId" to event.deviceId, "button" to "guide", "down" to down))
       }
@@ -481,7 +545,8 @@ class JetsonaInputModule : Module(), InputSink {
     }
 
     // 1) Tay cầm
-    if (isGamepadSource(source) && isGamepadKey(keyCode)) {
+    val isGamepadButtonEvent = isPad && isGamepadKey(keyCode)
+    if (isGamepadButtonEvent) {
       val pad = pad(event.deviceId)
       val name = PadButton.nameOf(keyCode)
       val changed = pad.applyKey(keyCode, down)
@@ -493,7 +558,7 @@ class JetsonaInputModule : Module(), InputSink {
     }
 
     // 2) Bàn phím vật lý, chỉ khi đang stream
-    if (captureMode == MODE_STREAM && isPhysicalKeyboard(event)) {
+    if (captureMode == MODE_STREAM && isKeyboard) {
       if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_HOME) return false
       val vk = KeyMap.virtualKey(keyCode)
       if (vk == 0) return false
@@ -520,15 +585,16 @@ class JetsonaInputModule : Module(), InputSink {
   private fun isPhysicalKeyboard(event: KeyEvent): Boolean {
     if ((event.source and InputDevice.SOURCE_KEYBOARD) != InputDevice.SOURCE_KEYBOARD) return false
     val device = event.device ?: return false
-    return !device.isVirtual && device.keyboardType == InputDevice.KEYBOARD_TYPE_ALPHABETIC
+    return !device.isVirtual && isAlphabeticKeyboardDevice(device)
   }
 
   override fun onMotion(event: MotionEvent): Boolean {
     if (captureMode == MODE_OFF) return false
     val source = event.source
+    val device = event.device ?: InputDevice.getDevice(event.deviceId)
+    val isPad = isControllerMotion(source, isGamepadDevice(device))
 
-    if (isGamepadSource(source) && event.actionMasked == MotionEvent.ACTION_MOVE) {
-      val device = event.device
+    if (isPad && event.actionMasked == MotionEvent.ACTION_MOVE) {
       val pad = pad(event.deviceId)
       if (pad.applyMotion(event, device)) emitPad(pad, force = false)
       return true
@@ -739,23 +805,49 @@ class JetsonaInputModule : Module(), InputSink {
   }
 
   /**
-   * WebRTC dùng route âm thanh kiểu cuộc gọi trên Android; không ép ra loa thì
-   * tiếng game nhỏ và chui vào loa thoại. Port từ AudioRouteModule của jetson-phone.
+   * Đảm bảo âm thanh stream luôn phát ra Media Stream (Loa ngoài hoặc Tai nghe Bluetooth/Dây)
+   * thay vì bị ép sang chế độ đàm thoại cuộc gọi (MODE_IN_COMMUNICATION) làm Samsung/Android Telecom
+   * can thiệp tắt loa hoặc hạ chất lượng âm thanh game.
    */
   private fun startSpeakerRoute() {
     val audio = audioManager ?: return
     if (previousAudioMode == null) previousAudioMode = audio.mode
     if (previousSpeakerphone == null) previousSpeakerphone = @Suppress("DEPRECATION") audio.isSpeakerphoneOn
+
+    // Kiểm tra thiết bị có loa thoại (earpiece) hay không
+    val outputs = audio.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+    val hasEarpiece = outputs.any { it.type == AudioDeviceInfo.TYPE_BUILTIN_EARPIECE }
+    val hasHeadphones = outputs.any {
+      it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+        it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+        it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+        it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+        it.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+        it.type == AudioDeviceInfo.TYPE_USB_HEADSET ||
+        it.type == AudioDeviceInfo.TYPE_USB_DEVICE
+    }
+
+    // Trên máy tính bảng (như Galaxy Tab S9), TV hoặc khi có tai nghe (kể cả Bluetooth A2DP):
+    // Phải giữ MODE_NORMAL để âm thanh game đi qua luồng Media (STREAM_MUSIC) 48kHz stereo,
+    // không bị Telecom can thiệp ngắt tiếng hoặc chuyển thành âm thanh cuộc gọi mono.
+    if (!hasEarpiece || hasHeadphones) {
+      if (audio.mode != AudioManager.MODE_NORMAL) {
+        audio.mode = AudioManager.MODE_NORMAL
+      }
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        audio.clearCommunicationDevice()
+      } else {
+        @Suppress("DEPRECATION")
+        audio.isSpeakerphoneOn = false
+      }
+      return
+    }
+
+    // Chỉ khi là điện thoại có loa thoại và không cắm tai nghe:
+    // Đảm bảo âm thanh phát ra loa ngoài thay vì loa thoại
     audio.mode = AudioManager.MODE_IN_COMMUNICATION
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-      // Có tai nghe Bluetooth thì để hệ thống chọn tai nghe; chỉ ép loa khi không có.
-      val external = audio.availableCommunicationDevices.firstOrNull {
-        it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
-          it.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
-          it.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
-          it.type == AudioDeviceInfo.TYPE_USB_HEADSET
-      }
-      val target = external ?: audio.availableCommunicationDevices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
+      val target = audio.availableCommunicationDevices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }
       if (target != null) audio.setCommunicationDevice(target)
     } else {
       @Suppress("DEPRECATION")

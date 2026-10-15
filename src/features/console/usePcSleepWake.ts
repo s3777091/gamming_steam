@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { AppState, BackHandler, Platform, type AppStateStatus } from 'react-native';
 
 import { apiFetch } from '@/lib/api';
@@ -13,7 +13,7 @@ export const WAKE_ON_APP_OPEN_KEY = 'jetsona:wake_on_app_open';
  */
 export function usePcSleepWake(onWakeTriggered?: () => void) {
   const onWakeTriggeredRef = useRef(onWakeTriggered);
-  onWakeTriggeredRef.current = onWakeTriggered;
+  useLayoutEffect(() => { onWakeTriggeredRef.current = onWakeTriggered; }, [onWakeTriggered]);
 
   const checkAndWake = useCallback(async () => {
     try {

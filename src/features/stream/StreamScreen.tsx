@@ -4,11 +4,10 @@
 // Luồng chơi game: Play -> kết nối vào máy tính (PC đã bật booster) -> chờ PC báo
 // cửa sổ game đã lên foreground -> vào thẳng màn hình loading của game.
 
-import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
 import { RTCView } from 'react-native-webrtc';
 import * as Clipboard from 'expo-clipboard';
 import { addListener, grabFrame } from 'jetsona-input';
@@ -16,11 +15,9 @@ import { addListener, grabFrame } from 'jetsona-input';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useSignedInUser } from '@/features/auth';
 import { useBack } from '@/features/gamepad/hooks';
-import { DEFAULT_INPUT_SETTINGS } from '@/lib/input-settings';
 import { readPendingGameLaunch, type PendingGameLaunch } from '@/lib/game-launch';
-import { NativeMouseButton } from '@/lib/moonlight-native';
 import { PC_ROUTES, pcFetch } from '@/lib/pc-api';
-import { pointOnStream, streamStretchStyle } from '@/lib/stream-fit';
+import { streamStretchStyle } from '@/lib/stream-fit';
 import type { HostShortcutAction } from '@/lib/input-settings';
 import { BlurView } from 'expo-blur';
 import { glass, glassShadowSubtle } from '@/theme';
@@ -29,17 +26,13 @@ import { T } from '@/ui/Text';
 
 import { GuideMenu } from './GuideMenu';
 import { StreamHud } from './StreamHud';
+import { StreamTouchpad } from './StreamTouchpad';
+import { StreamTelemetry } from './useStreamTelemetry';
 import { StreamLoading } from './StreamLoading';
 import { useGameLaunchGate } from './useGameLaunchGate';
 import { createRumbleHandler, useInputBridge } from './useInputBridge';
 import { useStreamSession } from './useStreamSession';
 import { useWatchPartyHost } from './useWatchPartyHost';
-
-const TAP_THRESHOLD = 9;
-type GestureState = {
-  startX: number; startY: number; lastX: number; lastY: number; moved: number;
-  twoFinger: boolean; scrolling: boolean; leftDown: boolean;
-};
 
 export default function StreamScreen() {
   const { s, insets } = useUi();
@@ -55,12 +48,11 @@ export default function StreamScreen() {
   const [guideStatus, setGuideStatus] = useState<string | null>(null);
   const [hasFrame, setHasFrame] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
+  const [dismissedNotice, setDismissedNotice] = useState<string | null>(null);
   const [stage, setStage] = useState({ width: 1, height: 1 });
   const exitingRef = useRef(false);
   const guideGenerationRef = useRef(0);
   const resumeAfterPendingPauseRef = useRef(true);
-  const stageRef = useRef(stage);
-  stageRef.current = stage;
 
   const exit = useCallback(() => {
     if (exitingRef.current) return;
@@ -76,8 +68,6 @@ export default function StreamScreen() {
   const live = phase === 'live';
   const gate = useGameLaunchGate(launch, live);
   const covering = live && gate.covering;
-  const videoRef = useRef(videoSize);
-  videoRef.current = videoSize;
 
   // Tay cầm không điều khiển được màn loading: sau khi che đủ lâu, A tan nó để thao tác launcher.
   const { skippable, skip } = gate;
@@ -91,14 +81,15 @@ export default function StreamScreen() {
   const flashHint = useCallback((message: string) => {
     setHint(message);
   }, []);
+  const visibleHint = hint ?? (gate.notice !== dismissedNotice ? gate.notice : null);
   useEffect(() => {
-    if (!hint) return;
-    const timer = setTimeout(() => setHint(null), 3000);
+    if (!visibleHint) return;
+    const timer = setTimeout(() => {
+      setHint(null);
+      setDismissedNotice(gate.notice);
+    }, 3000);
     return () => clearTimeout(timer);
-  }, [hint]);
-  useEffect(() => {
-    if (gate.notice) flashHint(gate.notice);
-  }, [flashHint, gate.notice]);
+  }, [gate.notice, visibleHint]);
 
   const gameRuntimeAction = useCallback(async (
     action: 'pause' | 'resume',
@@ -134,8 +125,7 @@ export default function StreamScreen() {
     // Giữ khung hình TRƯỚC khi menu che mất để còn chụp ảnh được.
     setHasFrame(false);
     void grabFrame().then(setHasFrame);
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setGuideStatus('Đang pause game...');
+    setGuideStatus(null);
     setGuideOpen(true);
     void gameRuntimeAction('pause')
       .then((paused) => {
@@ -143,11 +133,11 @@ export default function StreamScreen() {
           if (resumeAfterPendingPauseRef.current) void gameRuntimeAction('resume').catch(() => {});
           return;
         }
-        setGuideStatus(paused ? 'Game đã tự pause.' : 'Không có game đang chạy để pause.');
+        setGuideStatus(paused ? 'Game đã tự pause.' : null);
       })
       .catch((error) => {
         if (generation === guideGenerationRef.current) {
-          setGuideStatus((error as Error).message || 'Không tự pause được game.');
+          setGuideStatus((error as Error).message || null);
         }
       });
   }, [gameRuntimeAction, live]);
@@ -194,82 +184,21 @@ export default function StreamScreen() {
     onGuide: () => { if (guideOpen) closeGuide(); else openGuide(); },
     onShortcut,
   });
-  rumbleRef.current = createRumbleHandler(bridge.nativeIdForSlot, inputSettingsRef);
+  useLayoutEffect(() => {
+    rumbleRef.current = createRumbleHandler(bridge.nativeIdForSlot, inputSettingsRef);
+    return () => { rumbleRef.current = null; };
+  }, [bridge.nativeIdForSlot, inputSettingsRef, rumbleRef]);
 
   // ---- cảm ứng -> chuột (kiểu touchpad tuyệt đối trên khung stream) ----
-  const phaseRef = useRef(phase);
-  phaseRef.current = phase;
-  const gestureRef = useRef<GestureState>({ startX: 0, startY: 0, lastX: 0, lastY: 0, moved: 0, twoFinger: false, scrolling: false, leftDown: false });
-  const normalized = (x: number, y: number) => pointOnStream(x, y, videoRef.current, stageRef.current);
-  const releaseLeft = () => {
-    if (!gestureRef.current.leftDown) return;
-    clientRef.current?.sendMouseButton(false, NativeMouseButton.LEFT);
-    gestureRef.current.leftDown = false;
-  };
-
-  const panResponder = useRef(PanResponder.create({
-    onStartShouldSetPanResponder: () => phaseRef.current === 'live',
-    onMoveShouldSetPanResponder: () => phaseRef.current === 'live',
-    onPanResponderGrant: (event, gesture) => {
-      const first = event.nativeEvent.touches[0];
-      const x = first?.locationX ?? event.nativeEvent.locationX;
-      const y = first?.locationY ?? event.nativeEvent.locationY;
-      gestureRef.current = { startX: x, startY: y, lastX: x, lastY: y, moved: 0, twoFinger: gesture.numberActiveTouches >= 2, scrolling: false, leftDown: false };
-    },
-    onPanResponderMove: (event, gesture) => {
-      const touches = event.nativeEvent.touches;
-      const state = gestureRef.current;
-      if (gesture.numberActiveTouches >= 2 && touches.length >= 2) {
-        if (state.leftDown) releaseLeft();
-        const x = ((touches[0].locationX ?? state.lastX) + (touches[1].locationX ?? state.lastX)) / 2;
-        const y = ((touches[0].locationY ?? state.lastY) + (touches[1].locationY ?? state.lastY)) / 2;
-        const dy = y - state.lastY;
-        state.twoFinger = true;
-        state.moved += Math.abs(x - state.lastX) + Math.abs(dy);
-        state.lastX = x;
-        state.lastY = y;
-        if (state.moved >= TAP_THRESHOLD) {
-          state.scrolling = true;
-          const settings = inputSettingsRef.current ?? DEFAULT_INPUT_SETTINGS;
-          const direction = settings.invertScroll ? 1 : -1;
-          clientRef.current?.sendScroll(0, dy * 3 * settings.scrollSensitivity * direction);
-        }
-        return;
-      }
-      const first = touches[0];
-      if (!first) return;
-      const x = first.locationX ?? state.lastX;
-      const y = first.locationY ?? state.lastY;
-      state.moved += Math.abs(x - state.lastX) + Math.abs(y - state.lastY);
-      state.lastX = x;
-      state.lastY = y;
-      if (state.moved < TAP_THRESHOLD) return;
-      if (!state.leftDown) {
-        const start = normalized(state.startX, state.startY);
-        clientRef.current?.sendMousePosition(start.x, start.y, true);
-        clientRef.current?.sendMouseButton(true, NativeMouseButton.LEFT);
-        state.leftDown = true;
-      }
-      const point = normalized(x, y);
-      clientRef.current?.sendMousePosition(point.x, point.y);
-    },
-    onPanResponderRelease: () => {
-      const state = gestureRef.current;
-      const point = normalized(state.lastX, state.lastY);
-      if (state.leftDown) {
-        clientRef.current?.sendMousePosition(point.x, point.y, true);
-        releaseLeft();
-        return;
-      }
-      if (state.scrolling) return;
-      clientRef.current?.sendMousePosition(point.x, point.y, true);
-      const button = state.twoFinger ? NativeMouseButton.RIGHT : NativeMouseButton.LEFT;
-      clientRef.current?.sendMouseButton(true, button);
-      clientRef.current?.sendMouseButton(false, button);
-    },
-    onPanResponderTerminate: releaseLeft,
-    onPanResponderTerminationRequest: () => true,
-  })).current;
+  const [touchpad] = useState(() => new StreamTouchpad());
+  useLayoutEffect(() => {
+    touchpad.update({
+      live, videoSize, stage,
+      getClient: () => clientRef.current,
+      getSettings: () => inputSettingsRef.current,
+    });
+  }, [clientRef, inputSettingsRef, live, stage, touchpad, videoSize]);
+  useEffect(() => () => touchpad.release(), [touchpad]);
 
   const stretch = useMemo(() => streamStretchStyle(videoSize, stage), [stage, videoSize]);
   const controller = useMemo(
@@ -299,9 +228,10 @@ export default function StreamScreen() {
         />
       ) : <View style={styles.black} />}
 
-      {live ? <View collapsable={false} style={styles.touch} {...panResponder.panHandlers} /> : null}
+      {live ? <View collapsable={false} style={styles.touch} {...touchpad.panHandlers} /> : null}
 
       <StreamLoading
+        key={attempt}
         visible={!live || covering}
         phase={live ? 'connecting' : phase}
         status={covering ? gate.label : status}
@@ -315,7 +245,8 @@ export default function StreamScreen() {
         onReveal={covering && gate.skippable ? gate.skip : undefined}
       />
 
-      <StreamHud client={client} enabled={live && !covering && Boolean(streamSettings?.hud_enabled)} top={s(8) + Math.min(insets.top, 8)} left={insets.left + s(12)} />
+      <StreamTelemetry client={client} enabled={live} />
+      <StreamHud enabled={live && !covering && Boolean(streamSettings?.hud_enabled)} top={s(8) + Math.min(insets.top, 8)} left={insets.left + s(12)} />
 
       <GuideMenu
         open={live && guideOpen}
@@ -323,6 +254,9 @@ export default function StreamScreen() {
         hasFrame={hasFrame}
         status={guideStatus}
         watchParty={watchParty}
+        launch={launch}
+        videoSize={videoSize}
+        streamSettings={streamSettings}
         onClose={() => closeGuide(true)}
         onHome={() => { closeGuide(false); exit(); }}
         onReload={reload}
@@ -330,10 +264,10 @@ export default function StreamScreen() {
         onExitGame={() => { closeGuide(false); exit(); }}
       />
 
-      {hint && live ? (
+      {visibleHint && live ? (
         <View pointerEvents="none" style={[styles.hint, { bottom: s(24) + insets.bottom, paddingHorizontal: s(16), paddingVertical: s(8), borderRadius: s(18) }]}>
           <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
-          <T size={11.8} weight="medium" color="rgba(255,255,255,0.85)">{hint}</T>
+          <T size={11.8} weight="medium" color="rgba(255,255,255,0.85)">{visibleHint}</T>
         </View>
       ) : null}
 

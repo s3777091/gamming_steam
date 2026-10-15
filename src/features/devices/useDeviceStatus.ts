@@ -31,21 +31,19 @@ export type DeviceStatus = {
 };
 
 export function useDeviceStatus(resourceKey: string = HOME_PC_RESOURCE): DeviceStatus {
-  const [row, setRow] = useState<{ online: boolean; stage: DevicePowerStage; at: number } | null>(null);
-  const [fresh, setFresh] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [row, setRow] = useState<{ online: boolean; stage: DevicePowerStage; at: number; fresh: boolean } | null>(null);
+  const [ready, setReady] = useState(() => !createClient());
 
   useEffect(() => {
     const supabase = createClient();
-    if (!supabase) { setReady(true); return; }
+    if (!supabase) return;
     let active = true;
     const apply = (next: Row | null) => {
       if (!active || !next) return;
       const at = next.updated_at ? Date.parse(next.updated_at) : NaN;
       const online = Boolean(next.online);
       const stamp = Number.isFinite(at) ? at : Date.now();
-      setRow({ online, stage: normalizeStage(next.detail, online), at: stamp });
-      setFresh(Date.now() - stamp < FRESH_MS);
+      setRow({ online, stage: normalizeStage(next.detail, online), at: stamp, fresh: Date.now() - stamp < FRESH_MS });
     };
     const channel = supabase
       .channel(realtimeChannelInstance(realtimeChannels.devicePresence(resourceKey)))
@@ -71,14 +69,14 @@ export function useDeviceStatus(resourceKey: string = HOME_PC_RESOURCE): DeviceS
 
   // Một timeout đúng lúc tin hết hạn, không phải đồng hồ chạy mỗi vài giây.
   useEffect(() => {
-    if (!row) return;
+    if (!row?.fresh) return;
     const remaining = FRESH_MS - (Date.now() - row.at);
-    if (remaining <= 0) { setFresh(false); return; }
-    setFresh(true);
-    const timer = setTimeout(() => setFresh(false), remaining);
+    const timer = setTimeout(() => {
+      setRow((current) => current?.at === row.at ? { ...current, fresh: false } : current);
+    }, Math.max(0, remaining));
     return () => clearTimeout(timer);
   }, [row]);
 
-  if (!row || !fresh) return { online: null, stage: 'unknown', ready };
+  if (!row?.fresh) return { online: null, stage: 'unknown', ready };
   return { online: row.online, stage: row.stage, ready };
 }

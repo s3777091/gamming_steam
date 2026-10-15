@@ -4,6 +4,7 @@
 // components/StoreGameDetail.tsx + components/store-detail/*.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useMotion } from '@/ui/motion';
 import { Animated, Easing, Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, ScrollView } from 'react-native';
 import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -846,7 +847,8 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyA
   const [coverFailed, setCoverFailed] = useState(false);
   const scroller = useRef<ScrollView>(null);
   const reviewsY = useRef(0);
-  const enter = useRef(new Animated.Value(0)).current;
+  const [enter] = useState(() => new Animated.Value(0));
+  const { reduceMotion } = useMotion();
 
   const isFree = detail?.isFree || priceLabel.toLowerCase().includes('miễn phí') || priceLabel.toLowerCase().includes('free');
   const effectiveBuyAction: StoreBuyAction = buyAction ?? {
@@ -857,8 +859,10 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyA
 
   useBack(() => { if (sheet) setSheet(null); else onClose(); });
   useEffect(() => {
-    Animated.timing(enter, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  }, [enter]);
+    const animation = Animated.timing(enter, { toValue: 1, duration: reduceMotion ? 0 : 260, easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false });
+    animation.start();
+    return () => animation.stop();
+  }, [enter, reduceMotion]);
 
   const name = detail?.name || item.name;
   const storeUrl = detail?.storeUrl || item.storeUrl;

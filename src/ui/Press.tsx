@@ -6,6 +6,7 @@ import {
 import { useFocusable } from '@/features/gamepad/focus';
 import { playUiSound, type UiSound } from '@/features/sound/UiSoundProvider';
 import { FocusRing } from './FocusRing';
+import { useMotion } from './motion';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -17,6 +18,8 @@ type Props = Omit<PressableProps, 'style' | 'children'> & {
   focusable?: boolean;
   /** Ô được chọn đầu tiên khi tay cầm bắt đầu điều hướng trong màn/lớp này. */
   autoFocus?: boolean;
+  /** Yêu cầu chiếm tiêu điểm ngay khi giá trị chuyển sang true (dùng khi đổi tab bằng LB/RB). */
+  requestFocus?: boolean;
   /** Bo góc của viền tiêu điểm khi bo góc nằm ở phần tử con chứ không ở `style`. */
   focusRadius?: number;
   /** Dùng mép kính mảnh cho thẻ ảnh thay vì vòng focus trắng đục mặc định. */
@@ -32,8 +35,8 @@ type Props = Omit<PressableProps, 'style' | 'children'> & {
   children?: ReactNode;
 };
 
-/** Phần tử lớn lên chừng này dp khi được chọn: thẻ nhỏ phóng nhiều, hàng dài gần như đứng yên. */
-const FOCUS_GROW_DP = 14;
+/** Phần tử lớn lên chừng này dp khi được chọn: thẻ nhỏ phóng vừa phải, hàng dài gần như đứng yên. */
+const FOCUS_GROW_DP = 8;
 const PRESS_FLASH_MS = 110;
 
 /**
@@ -45,9 +48,10 @@ const PRESS_FLASH_MS = 110;
  * viền trắng + phóng nhẹ cho biết ô đang chọn, A kích hoạt `onPress`.
  */
 export function Press({
-  style, pressScale = 0.96, onPressIn, onPressOut, onPress, onLayout, focusable = true, autoFocus = false, focusRadius, focusVariant = 'auto', focusTint = 'accent', onAdjust, onFocused, sound = 'select', children, ...rest
+  style, pressScale = 0.96, onPressIn, onPressOut, onPress, onLayout, focusable = true, autoFocus = false, requestFocus = false, focusRadius, focusVariant = 'auto', focusTint = 'accent', onAdjust, onFocused, sound = 'select', children, ...rest
 }: Props) {
   const hostRef = useRef<View>(null);
+  const { reduceMotion } = useMotion();
   const [box, setBox] = useState({ w: 120, h: 60 });
   const [ringShown, setRingShown] = useState(false);
   const hideRing = useCallback(() => setRingShown(false), []);
@@ -56,9 +60,12 @@ export function Press({
   const combinedScale = useMemo(() => Animated.multiply(scale, focusScale), [focusScale, scale]);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const wasFocused = useRef(false);
-  const animate = (to: number) => Animated.spring(scale, {
-    toValue: to, stiffness: 420, damping: 28, mass: 0.6, useNativeDriver: true,
-  }).start();
+  const animate = useCallback((to: number) => {
+    if (reduceMotion) { scale.setValue(1); return; }
+    Animated.spring(scale, {
+      toValue: to, stiffness: 420, damping: 28, mass: 0.6, useNativeDriver: true, isInteraction: false,
+    }).start();
+  }, [reduceMotion, scale]);
   const activate = useCallback((event: GestureResponderEvent) => {
     if (sound) playUiSound(sound);
     onPress?.(event);
@@ -69,6 +76,7 @@ export function Press({
     enabled: focusable && Boolean(onPress),
     disabled: Boolean(rest.disabled),
     autoFocus,
+    requestFocus,
     adjust: onAdjust,
     onPress: () => {
       if (pressScale !== 1) {
@@ -80,13 +88,28 @@ export function Press({
     },
   });
 
-  const row = box.w / Math.max(1, box.h) >= 3 && box.h <= 76;
-  const focusGrow = row ? 1 : Math.min(1.07, Math.max(1.012, 1 + FOCUS_GROW_DP / Math.max(1, box.w)));
+  const isAutoRow = box.w >= 160 && box.w / Math.max(1, box.h) >= 2.6 && box.h <= 76;
+  const isRow = focusVariant === 'row' || (focusVariant === 'auto' && isAutoRow);
+  const focusGrow = isRow ? 1 : Math.min(1.045, Math.max(1.01, 1 + FOCUS_GROW_DP / Math.max(1, box.w)));
   useEffect(() => {
-    Animated.spring(focusScale, {
-      toValue: focused ? focusGrow : 1, stiffness: 320, damping: 26, mass: 0.7, useNativeDriver: true,
-    }).start();
-  }, [focusGrow, focusScale, focused]);
+    if (reduceMotion) {
+      focusScale.setValue(1);
+      return;
+    }
+    // Most buttons never receive gamepad focus; avoid starting an idle spring
+    // for every button on mount and for every initial layout measurement.
+    if (!focused && !wasFocused.current) return;
+    const animation = Animated.spring(focusScale, {
+      toValue: focused ? focusGrow : 1,
+      stiffness: 240,
+      damping: 24,
+      mass: 0.8,
+      useNativeDriver: true,
+      isInteraction: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [focusGrow, focusScale, focused, reduceMotion]);
   useEffect(() => {
     const entered = focused && !wasFocused.current;
     wasFocused.current = focused;
@@ -96,14 +119,28 @@ export function Press({
       onFocused?.();
     }
   }, [focused, onFocused]);
-  useEffect(() => () => clearTimeout(flashTimer.current), []);
+  useEffect(() => () => {
+    clearTimeout(flashTimer.current);
+    scale.stopAnimation();
+    focusScale.stopAnimation();
+  }, [focusScale, scale]);
 
-  const radius = focusRadius ?? Number(StyleSheet.flatten(style)?.borderRadius ?? 12);
-  const ringVariant = focusVariant === 'auto' ? (row ? 'row' : 'card') : focusVariant;
+  const ringVariant = focusVariant === 'auto' ? (isRow ? 'row' : 'card') : focusVariant;
+  const flatStyle = StyleSheet.flatten(style);
+  const radius =
+    focusRadius ??
+    (flatStyle?.borderRadius !== undefined
+      ? Number(flatStyle.borderRadius)
+      : isRow
+        ? 0
+        : 12);
+  const isCompact = (box.w > 0 && box.w <= 54 && box.h <= 54) || radius <= 18;
   return (
     <AnimatedPressable
       {...rest}
       ref={hostRef}
+      accessibilityRole={rest.accessibilityRole ?? (onPress ? 'button' : undefined)}
+      accessibilityState={{ ...rest.accessibilityState, disabled: Boolean(rest.disabled) }}
       onPress={activate}
       onLayout={(event) => {
         const { width, height } = event.nativeEvent.layout;
@@ -115,7 +152,16 @@ export function Press({
       onPressOut={(event) => { if (pressScale !== 1) animate(1); onPressOut?.(event); }}
     >
       {children}
-      {focused || ringShown ? <FocusRing radius={radius} variant={ringVariant} tint={focusTint} visible={focused} onHidden={hideRing} /> : null}
+      {focused || ringShown ? (
+        <FocusRing
+          radius={radius}
+          variant={ringVariant}
+          tint={focusTint}
+          isSmall={isCompact}
+          visible={focused}
+          onHidden={hideRing}
+        />
+      ) : null}
     </AnimatedPressable>
   );
 }

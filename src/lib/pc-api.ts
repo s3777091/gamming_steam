@@ -9,7 +9,7 @@
 
 import Constants from 'expo-constants';
 
-import { apiFetch } from '@/lib/api';
+import { apiFetch, apiRequest } from '@/lib/api';
 import { getBackendBaseUrl } from '@/lib/config';
 import { UI_DEMO, demoResponse } from '@/lib/demo';
 
@@ -74,12 +74,13 @@ export async function pcFetchJson<T extends PcJson>(
       return sample;
     }
   }
-  const response = await pcFetch(path, { cache: 'no-store', signal });
-  const data = await response.json().catch(() => null) as T | null;
-  if (!response.ok || !data?.ok || !isValid(data)) {
-    throw new Error(data?.error || fallbackError);
-  }
-  return data;
+  return apiRequest(pcApiUrl(path), { cache: 'no-store', signal }, async (response) => {
+    const data = await response.json().catch(() => null) as T | null;
+    if (!response.ok || !data?.ok || !isValid(data)) {
+      throw new Error(data?.error || fallbackError);
+    }
+    return data;
+  });
 }
 
 export async function pcPostJson<T extends PcJson>(
@@ -88,13 +89,14 @@ export async function pcPostJson<T extends PcJson>(
   fallbackError: string,
   signal?: AbortSignal,
 ): Promise<T> {
-  const response = await pcFetch(path, {
+  return apiRequest(pcApiUrl(path), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal,
+  }, async (response) => {
+    const data = await response.json().catch(() => null) as T | null;
+    if (!response.ok || !data?.ok) throw new Error(data?.error || fallbackError);
+    return data;
   });
-  const data = await response.json().catch(() => null) as T | null;
-  if (!response.ok || !data?.ok) throw new Error(data?.error || fallbackError);
-  return data;
 }

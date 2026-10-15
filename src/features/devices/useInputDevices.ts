@@ -27,7 +27,7 @@ export type LocalDevice = {
   rumble: boolean;
 };
 
-function toLocal(device: NativeInputDevice): LocalDevice {
+export function toLocal(device: NativeInputDevice): LocalDevice {
   return {
     id: device.id,
     nativeId: device.nativeId,
@@ -51,8 +51,6 @@ export function useInputDevices() {
   const [bluetooth, setBluetooth] = useState<NativeBluetoothInfo>(() => getBluetooth());
 
   useEffect(() => {
-    setDevices(getDevices().map(toLocal));
-    setBluetooth(getBluetooth());
     const offDevices = addListener('onDevicesChanged', ({ devices: next }) => setDevices(next.map(toLocal)));
     const offBluetooth = addListener('onBluetoothChanged', (next) => setBluetooth(next));
     return () => {

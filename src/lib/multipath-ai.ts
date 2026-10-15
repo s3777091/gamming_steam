@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { PermissionsAndroid, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useStreamStats } from '@/features/stream/useStreamTelemetry';
+import { streamQuality } from './stream-stats';
 
 import {
   addMultipathListener,
@@ -10,13 +13,20 @@ import {
   getAvailableWifiNetworks,
   getCurrentMultipathStatus,
   getNetworkCapabilities,
+  openCaptivePortalPage,
   type AvailableWifi,
-  type MultipathMode,
   type MultipathStatus,
   type NetworkCapabilities,
 } from 'jetsona-multipath';
 
+import {
+  computeAiDecision,
+  type AiDecision,
+} from './multipath-algorithm';
+
 export type { AvailableWifi };
+export { computeAiDecision };
+export type { AiDecision };
 
 const STORAGE_KEYS = {
   SECONDARY_SSID: '@jetsona/secondary_wifi_ssid',
@@ -24,14 +34,6 @@ const STORAGE_KEYS = {
   AUTO_CELLULAR: '@jetsona/multipath_auto_cellular',
   AI_ENABLED: '@jetsona/multipath_ai_enabled',
 };
-
-import {
-  computeAiDecision,
-  type AiDecision,
-} from './multipath-algorithm';
-
-export { computeAiDecision };
-export type { AiDecision };
 
 export type MultipathAiState = {
   capabilities: NetworkCapabilities;
@@ -41,7 +43,7 @@ export type MultipathAiState = {
   aiEnabled: boolean;
   autoCellular: boolean;
   savedSecondarySsid: string | null;
-  decision: AiDecision;
+  decision: ReturnType<typeof streamQuality>;
 };
 
 export function useMultipathAi() {
@@ -52,22 +54,16 @@ export function useMultipathAi() {
   const [aiEnabled, setAiEnabled] = useState(true);
   const [autoCellular, setAutoCellular] = useState(true);
   const [savedSecondarySsid, setSavedSecondarySsid] = useState<string | null>(null);
+  const [captivePortalSsid, setCaptivePortalSsid] = useState<string | null>(null);
 
-  // Giả lập/đo lường metrics RTT và loss hiện tại để cấp cho AI Actor
-  const [metrics, setMetrics] = useState({
-    link1Rtt: 12,
-    link1Loss: 0,
-    link2Rtt: 15,
-    link2Loss: 0,
-    bufferSec: 4.2,
-  });
-
-  const [decision, setDecision] = useState<AiDecision>(() =>
-    computeAiDecision(status, 12, 0, 15, 0, 4.2, status.secondary.type === 'cellular')
-  );
+  const { stats: metrics, live: metricsLive } = useStreamStats();
+  const decision = useMemo(() => aiEnabled ? streamQuality(metrics) : null, [aiEnabled, metrics]);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   const statusRef = useRef(status);
-  statusRef.current = status;
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   // Đọc cài đặt đã lưu trong AsyncStorage
   useEffect(() => {
@@ -104,46 +100,72 @@ export function useMultipathAi() {
       setStatus(newStatus);
     });
 
+    const unsubscribeCaptive = addMultipathListener('onCaptivePortalDetected', (ev) => {
+      setCaptivePortalSsid(ev.ssid);
+    });
+
     return () => {
       active = false;
       unsubscribeStatus();
+      unsubscribeCaptive();
     };
   }, []);
 
-  // Vòng lặp suy luận AI (Inference Interval: 1 giây / lần)
-  useEffect(() => {
-    if (!aiEnabled) return;
-
-    const interval = setInterval(() => {
-      const currentStatus = statusRef.current;
-      const isCellular = currentStatus.secondary.type === 'cellular';
-
-      // Tạo một chút dao động thực tế để mô phỏng môi trường mạng
-      setMetrics((prev) => {
-        const nextLink1Rtt = Math.max(8, prev.link1Rtt + (Math.random() * 6 - 3));
-        const nextDecision = computeAiDecision(
-          currentStatus,
-          nextLink1Rtt,
-          prev.link1Loss,
-          prev.link2Rtt,
-          prev.link2Loss,
-          prev.bufferSec,
-          isCellular
+  // Yêu cầu quyền quét Wi-Fi trên Android (kiểm tra trước, tránh bật Activity màn trắng của OS)
+  const ensureScanPermissions = async () => {
+    if (Platform.OS !== 'android') return true;
+    try {
+      const apiLevel = Number(Platform.Version);
+      const perms: Parameters<typeof PermissionsAndroid.check>[0][] = [];
+      if (apiLevel >= 33) {
+        perms.push(
+          'android.permission.NEARBY_WIFI_DEVICES',
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
         );
-        setDecision(nextDecision);
-        return { ...prev, link1Rtt: nextLink1Rtt };
-      });
-    }, 1000);
+      } else {
+        perms.push(
+          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          PermissionsAndroid.PERMISSIONS.ACCESS_COARSE_LOCATION
+        );
+      }
 
-    return () => clearInterval(interval);
-  }, [aiEnabled]);
+      // Kiểm tra trước: nếu đã được cấp thì KHÔNG gọi requestMultiple để tránh màn hình trắng của hệ thống
+      const checks = await Promise.all(
+        perms.map((p) => PermissionsAndroid.check(p).catch(() => false))
+      );
+      if (checks.every(Boolean)) {
+        return true;
+      }
+
+      const res = await PermissionsAndroid.requestMultiple(perms);
+      return Object.values(res).every((val) => val === PermissionsAndroid.RESULTS.GRANTED);
+    } catch {
+      return false;
+    }
+  };
 
   // Quét danh sách Wi-Fi xung quanh
   const scanWifi = useCallback(async () => {
     setScanning(true);
+    setScanError(null);
     try {
+      if (!await ensureScanPermissions()) {
+        setScanError('Cần cấp quyền Wi-Fi và vị trí để tìm mạng xung quanh.');
+        setAvailableWifi([]);
+        return;
+      }
       const networks = getAvailableWifiNetworks();
-      setAvailableWifi(networks);
+
+      // Loại bỏ hoàn toàn mạng chính (primary SSID) khỏi danh sách chọn mạng phụ
+      const primarySsid = (statusRef.current.primary.ssid ?? '').trim().toLowerCase();
+      const filtered = (networks || []).filter((item) => {
+        const s = (item.ssid ?? '').trim().toLowerCase();
+        return s.length > 0 && s !== primarySsid;
+      });
+
+      setAvailableWifi(filtered);
+    } catch {
+      setScanError('Không quét được Wi-Fi. Hãy thử lại.');
     } finally {
       setScanning(false);
     }
@@ -164,9 +186,15 @@ export function useMultipathAi() {
   // Ngắt Wi-Fi thứ 2
   const disconnectSecondary = useCallback(async () => {
     setSavedSecondarySsid(null);
+    setCaptivePortalSsid(null);
     await AsyncStorage.removeItem(STORAGE_KEYS.SECONDARY_SSID);
     await AsyncStorage.removeItem(STORAGE_KEYS.SECONDARY_PASS);
     nativeDisconnectSecondaryWifi();
+  }, []);
+
+  // Mở trang đăng nhập Web / Captive Portal
+  const openCaptivePortal = useCallback(() => {
+    openCaptivePortalPage();
   }, []);
 
   // Bật/tắt dự phòng 4G/5G
@@ -194,12 +222,16 @@ export function useMultipathAi() {
     aiEnabled,
     autoCellular,
     savedSecondarySsid,
+    captivePortalSsid,
     decision,
     metrics,
+    metricsLive,
+    scanError,
     scanWifi,
     connectSecondary,
     disconnectSecondary,
     toggleCellular,
     toggleAi,
+    openCaptivePortal,
   };
 }

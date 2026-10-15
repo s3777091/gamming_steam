@@ -1,17 +1,29 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { memo, useLayoutEffect, useState, type ReactNode } from 'react';
+import { Animated, type StyleProp, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { FocusSuspend } from '@/features/gamepad/focus';
 import { STORE_TAB_ORDER, type StoreTab } from '@/features/library/types';
 import { useUi } from '@/ui/scale';
+import { useMotion } from '@/ui/motion';
 import { TAB_MOTION_EASING, TAB_MOTION_MS } from './tabMotion';
+
+const TabContent = memo(function TabContent({ active, tab, renderTab }: {
+  active: boolean;
+  tab: StoreTab;
+  renderTab: (tab: StoreTab) => ReactNode;
+}) {
+  return <FocusSuspend suspended={!active}>{renderTab(tab)}</FocusSuspend>;
+}, (previous, next) => previous.active === next.active && previous.tab === next.tab
+  && (!next.active || previous.renderTab === next.renderTab));
 
 /**
  * Hiệu ứng chuyển cảnh giữa các tab Games, Store và PC:
  * - Giữ các tab đã mở (mount) trong cây View để tránh giật lag, mất vị trí cuộn
  *   hoặc tải lại hình ảnh khi chuyển qua lại giữa các tab.
- * - Trượt nhẹ (slide) kết hợp mờ dần (crossfade) đồng bộ giữa tab cũ và tab mới.
- * - Tab không hoạt động được ẩn mờ và treo tiêu điểm (FocusSuspend).
+ * - Tab mới lướt nhẹ vào và mượt mà phủ lên tab cũ mà không bị khựng, không chớp đen.
+ * - Tab không hoạt động ĐƯỢC ẨN BẰNG display: 'none' (View.GONE trên Android) để
+ *   đảm bảo không bị đè hình ảnh, không xung đột tiêu điểm và không tiêu tốn GPU/RenderNode.
+ * - Tab không hoạt động được treo tiêu điểm (FocusSuspend).
  */
 export function ConsoleTabTransition({
   activeTab,
@@ -21,58 +33,61 @@ export function ConsoleTabTransition({
   renderTab: (tab: StoreTab) => ReactNode;
 }) {
   const { s } = useUi();
+  const { active, reduceMotion } = useMotion();
   const [visitedTabs, setVisitedTabs] = useState<Set<StoreTab>>(() => new Set([activeTab]));
-  const currentTabRef = useRef(activeTab);
-  const [displayTab, setDisplayTab] = useState(activeTab);
-  const [exitingTab, setExitingTab] = useState<StoreTab | null>(null);
-  const [direction, setDirection] = useState<'left' | 'right'>('right');
+  const [activeState, setActiveState] = useState({
+    currentTab: activeTab,
+    outgoingTab: null as StoreTab | null,
+    direction: 'right' as 'left' | 'right',
+  });
   const [progress] = useState(() => new Animated.Value(1));
-  const animRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  useEffect(() => {
-    if (activeTab === currentTabRef.current) return;
-
-    const prev = currentTabRef.current;
-    currentTabRef.current = activeTab;
-
-    setVisitedTabs((current) => {
-      if (current.has(activeTab)) return current;
-      const next = new Set(current);
-      next.add(activeTab);
-      return next;
+  // Đồng bộ trạng thái khi activeTab thay đổi
+  if (activeTab !== activeState.currentTab) {
+    const isRight = STORE_TAB_ORDER.indexOf(activeTab) > STORE_TAB_ORDER.indexOf(activeState.currentTab);
+    setActiveState({
+      currentTab: activeTab,
+      outgoingTab: activeState.currentTab,
+      direction: isRight ? 'right' : 'left',
     });
+    if (!visitedTabs.has(activeTab)) {
+      setVisitedTabs((prev) => new Set(prev).add(activeTab));
+    }
+  }
 
-    const isRight = STORE_TAB_ORDER.indexOf(activeTab) > STORE_TAB_ORDER.indexOf(prev);
-    setDirection(isRight ? 'right' : 'left');
-    setExitingTab(prev);
-    setDisplayTab(activeTab);
+  const { outgoingTab, direction, currentTab } = activeState;
 
-    animRef.current?.stop();
+  useLayoutEffect(() => {
+    if (!outgoingTab) return;
+
+    // Reset after commit, before paint. Interrupted animations must never clear
+    // the outgoing tab or overwrite progress belonging to the next transition.
+    let cancelled = false;
     progress.setValue(0);
-
     const animation = Animated.timing(progress, {
       toValue: 1,
-      duration: TAB_MOTION_MS,
+      duration: active && !reduceMotion ? TAB_MOTION_MS : 0,
       easing: TAB_MOTION_EASING,
       useNativeDriver: true,
+      isInteraction: false,
     });
-    animRef.current = animation;
 
     animation.start(({ finished }) => {
-      if (finished) {
-        setExitingTab(null);
-      }
+      if (!finished || cancelled) return;
+      setActiveState((prev) => prev.currentTab === currentTab && prev.outgoingTab === outgoingTab
+        ? { ...prev, outgoingTab: null } : prev);
     });
 
     return () => {
+      cancelled = true;
       animation.stop();
     };
-  }, [activeTab, progress]);
+  }, [active, currentTab, outgoingTab, progress, reduceMotion]);
 
   const slideOffset = s(16);
   const isMovingRight = direction === 'right';
   const enterStart = isMovingRight ? slideOffset : -slideOffset;
-  const exitEnd = isMovingRight ? -slideOffset : slideOffset;
+  const exitEnd = isMovingRight ? -slideOffset * 0.4 : slideOffset * 0.4;
 
   return (
     <View style={styles.container}>
@@ -82,16 +97,44 @@ export function ConsoleTabTransition({
           return null;
         }
 
-        const isCurrent = tab === displayTab;
-        const isExiting = tab === exitingTab;
-        const isVisible = isCurrent || isExiting;
+        const isCurrent = tab === currentTab;
+        const isOutgoing = tab === outgoingTab;
+        const isVisible = isCurrent || isOutgoing;
 
-        let animStyle = undefined;
-        if (isExiting) {
+        let animStyle: StyleProp<Animated.WithAnimatedValue<ViewStyle>> = styles.hidden;
+        let pointerEvents: 'auto' | 'none' = 'none';
+
+        if (isCurrent) {
+          pointerEvents = 'auto';
+          if (outgoingTab) {
+            animStyle = {
+              zIndex: 2,
+              opacity: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0, 1],
+              }),
+              transform: [
+                {
+                  translateX: progress.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [enterStart, 0],
+                  }),
+                },
+              ],
+            };
+          } else {
+            animStyle = {
+              zIndex: 2,
+              opacity: 1,
+            };
+          }
+        } else if (isOutgoing) {
+          pointerEvents = 'none';
           animStyle = {
+            zIndex: 1,
             opacity: progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [1, 0],
+              inputRange: [0, 0.65, 1],
+              outputRange: [1, 0.35, 0],
             }),
             transform: [
               {
@@ -102,40 +145,21 @@ export function ConsoleTabTransition({
               },
             ],
           };
-        } else if (isCurrent && exitingTab !== null) {
-          animStyle = {
-            opacity: progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, 1],
-            }),
-            transform: [
-              {
-                translateX: progress.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [enterStart, 0],
-                }),
-              },
-            ],
-          };
-        } else if (isCurrent) {
-          animStyle = {
-            opacity: 1,
-            transform: [{ translateX: 0 }],
-          };
         }
 
         return (
           <Animated.View
             key={tab}
-            pointerEvents={isCurrent ? 'auto' : 'none'}
+            pointerEvents={pointerEvents}
             accessibilityElementsHidden={!isCurrent}
             importantForAccessibility={isCurrent ? 'auto' : 'no-hide-descendants'}
             style={[
               StyleSheet.absoluteFill,
-              !isVisible ? styles.hidden : animStyle,
+              { display: isVisible ? 'flex' : 'none' },
+              animStyle,
             ]}
           >
-            <FocusSuspend suspended={!isCurrent}>{renderTab(tab)}</FocusSuspend>
+            <TabContent active={isCurrent} tab={tab} renderTab={renderTab} />
           </Animated.View>
         );
       })}
@@ -149,9 +173,11 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
-  // opacity 0 thay vì display: 'none': tab ẩn vẫn gắn trong cây nên hiện lại không phải layout/vẽ lại từ đầu.
   hidden: {
     opacity: 0,
-    zIndex: -1,
+    zIndex: 0,
+    display: 'none',
+    position: 'absolute',
+    left: -9999,
   },
 });

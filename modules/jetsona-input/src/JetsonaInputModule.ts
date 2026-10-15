@@ -23,6 +23,7 @@ declare class JetsonaInputNative extends NativeModule<JetsonaInputModuleEvents> 
   stopSpeakerRoute(): void;
   describeDevice(deviceId: number): NativeDeviceDescription | null;
   getDisplayInfo(): NativeDisplayInfo;
+  setStreamFrameRate?(fps: number): void;
   grabFrame(): Promise<boolean>;
   exportFrame(maxWidth: number): Promise<string | null>;
   releaseFrame(): void;

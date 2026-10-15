@@ -3,6 +3,7 @@ import { useCallback, useRef, useState, type MutableRefObject } from 'react';
 import { isSteamAppId } from './format';
 import type { AchievementResponse, PcGame, ProfileAchievement, SteamProfileResponse, SteamUserDetails } from './types';
 import { PC_ROUTES, pcFetchJson } from '@/lib/pc-api';
+import type { TimedCache } from '@/lib/timed-cache';
 import { fetchAchievements } from './usePcLibrary';
 
 const lastPlayedTime = (game: PcGame) => Date.parse(game.lastPlayed || '') || 0;
@@ -24,7 +25,7 @@ function activityCandidates(games: PcGame[], profile: SteamUserDetails): PcGame[
 }
 
 /** Steam account details plus the newest achievements unlocked across installed games. */
-export function useSteamProfile(games: PcGame[], achievementCache: MutableRefObject<Map<number, AchievementResponse>>) {
+export function useSteamProfile(games: PcGame[], achievementCache: MutableRefObject<TimedCache<number, AchievementResponse>>) {
   const [details, setDetails] = useState<SteamUserDetails | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

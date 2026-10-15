@@ -15,6 +15,7 @@ declare class JetsonaMultipathNative extends NativeModule<JetsonaMultipathModule
   connectSecondaryWifi(ssid: string, password?: string): boolean;
   disconnectSecondaryWifi(): void;
   getCurrentMultipathStatus(): MultipathStatus;
+  openCaptivePortalPage(): boolean;
 }
 
 /** null trên iOS/web hoặc khi chưa chạy dev build native. */

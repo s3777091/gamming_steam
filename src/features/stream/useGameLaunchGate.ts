@@ -83,8 +83,8 @@ export function useGameLaunchGate(launch: PendingGameLaunch | null, streamLive: 
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [degraded, setDegraded] = useState(false);
-  const [skippable, setSkippable] = useState(false);
+  const [degraded] = useState(() => !createClient());
+  const [skipState, setSkipState] = useState({ covering: false, ready: false });
   const [now, setNow] = useState(() => Date.now());
   const startSent = useRef(false);
   const startedAt = useRef<number | null>(null);
@@ -153,9 +153,7 @@ export function useGameLaunchGate(launch: PendingGameLaunch | null, streamLive: 
     const supabase = createClient();
     let channel: RealtimeChannel | null = null;
 
-    if (!supabase) {
-      setDegraded(true);
-    } else {
+    if (supabase) {
       const handleRow = (row: Row | null | undefined) => {
         if (disposed || !row || row.id !== sessionId) return;
         apply(rowToStatus(row));
@@ -251,29 +249,22 @@ export function useGameLaunchGate(launch: PendingGameLaunch | null, streamLive: 
     return () => clearTimeout(timer);
   }, [done, degraded, snapshot]);
 
-  // Tan màn loading khi stream đã sống mà không còn lý do che.
-  useEffect(() => {
-    if (revealed || !launch || !streamLive || stage.covering) return;
+  // Latch the derived reveal before rendering, without an extra effect render.
+  if (!revealed && launch && streamLive && !stage.covering) {
     setRevealed(true);
     if (status?.phase === 'failed') setNotice(gameLaunchErrorMessage(status.error));
     else if (status?.timedOut || status?.phase === 'launching' || status?.phase === 'starting') {
       setNotice('Trò chơi chưa hiện lên — kiểm tra màn hình máy tính.');
     }
-  }, [launch, revealed, stage.covering, status, streamLive]);
-
-  // Phiên kết thúc/huỷ/hỏng trước khi stream lên: không còn gì để chờ.
-  useEffect(() => {
-    if (revealed || !status) return;
-    if (isTerminalGamePhase(status.phase)) {
-      if (status.phase === 'failed') setNotice(gameLaunchErrorMessage(status.error));
-      if (streamLive) setRevealed(true);
-    }
-  }, [revealed, status, streamLive]);
+  }
 
   const coveringNow = Boolean(launch) && !revealed && stage.covering && streamLive;
+  if (skipState.covering !== coveringNow) {
+    setSkipState({ covering: coveringNow, ready: false });
+  }
   useEffect(() => {
-    if (!coveringNow) { setSkippable(false); return; }
-    const timer = setTimeout(() => setSkippable(true), COVER_SKIP_AFTER_MS);
+    if (!coveringNow) return;
+    const timer = setTimeout(() => setSkipState({ covering: true, ready: true }), COVER_SKIP_AFTER_MS);
     return () => clearTimeout(timer);
   }, [coveringNow]);
 
@@ -284,12 +275,12 @@ export function useGameLaunchGate(launch: PendingGameLaunch | null, streamLive: 
 
   return {
     skip,
-    skippable,
+    skippable: coveringNow && skipState.ready,
     covering: Boolean(launch) && !revealed && stage.covering,
     label: stage.label,
     progress: stage.progress,
     highlights: boostHighlights(status?.boost ?? null),
-    notice,
+    notice: notice ?? (!revealed && status?.phase === 'failed' ? gameLaunchErrorMessage(status.error) : null),
     degraded,
   };
 }

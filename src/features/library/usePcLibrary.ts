@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { PC_ROUTES, pcFetchJson, pcPostJson } from '@/lib/pc-api';
+import { TimedCache } from '@/lib/timed-cache';
 
 import { isSteamAppId } from './format';
 import type { AchievementResponse, GameResponse, PcGame, SteamProfile } from './types';
@@ -62,56 +63,95 @@ export function usePcLibrary() {
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [uninstallingId, setUninstallingId] = useState<string | null>(null);
   const [installOpenedId, setInstallOpenedId] = useState<string | null>(null);
-  const achievementCache = useRef(new Map<number, AchievementResponse>());
+  const [achievementsCache] = useState(() => new TimedCache<number, AchievementResponse>(64, 60_000));
+  const achievementCache = useRef(achievementsCache);
   const mounted = useRef(true);
 
-  useEffect(() => () => { mounted.current = false; }, []);
+  const inflight = useRef<{ promise: Promise<void>; controller: AbortController } | null>(null);
+  const snapshotSignature = useRef<string | null>(null);
+  const receivedNetworkSnapshot = useRef(false);
+  const reloadQueued = useRef(false);
 
-  const loadGames = useCallback(async (manual = false) => {
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      inflight.current?.controller.abort();
+      inflight.current = null;
+      reloadQueued.current = false;
+    };
+  }, []);
+
+  const loadGames = useCallback(async function loadGames(manual = false): Promise<void> {
+    if (!mounted.current) return;
     if (manual) setRefreshing(true);
-    setError(null);
-    try {
-      const data = await pcFetchJson<GameResponse>(
-        PC_ROUTES.games,
-        'Không đọc được thư viện trò chơi trên máy tính.',
-        (body) => Array.isArray(body.games),
-      );
-      if (!mounted.current) return;
-      const nextGames = data.games!;
-      setGames(nextGames);
-      setSteamProfile(data.steamProfile || null);
-      setLibraryWarning(data.steamWarning || null);
-      setSelectedId((current) => (
-        current && nextGames.some((game) => game.id === current) ? current : nextGames[0]?.id ?? null
-      ));
-      setReachable(true);
-      void AsyncStorage.setItem(CACHE_KEY, JSON.stringify({
-        games: nextGames,
-        steamProfile: data.steamProfile || null,
-      })).catch(() => {});
-    } catch (loadError) {
-      if (!mounted.current) return;
-      setReachable(false);
-      setError(loadError instanceof Error ? loadError.message : 'Không kết nối được máy tính.');
-    } finally {
-      if (mounted.current) {
-        setLoading(false);
-        setRefreshing(false);
-      }
+    if (inflight.current) {
+      // A completed install may invalidate a request that started before it.
+      // Coalesce repeated refreshes, then fetch one fresh snapshot afterward.
+      if (manual) reloadQueued.current = true;
+      return inflight.current.promise;
     }
+    const controller = new AbortController();
+    const promise = (async () => {
+      setError(null);
+      try {
+        const data = await pcFetchJson<GameResponse>(
+          PC_ROUTES.games,
+          'Không đọc được thư viện trò chơi trên máy tính.',
+          (body) => Array.isArray(body.games),
+          controller.signal,
+        );
+        if (!mounted.current || controller.signal.aborted) return;
+        const nextGames = data.games!;
+        receivedNetworkSnapshot.current = true;
+        const signature = JSON.stringify({ games: nextGames, steamProfile: data.steamProfile || null });
+        if (signature !== snapshotSignature.current) {
+          snapshotSignature.current = signature;
+          setGames(nextGames);
+          setSteamProfile(data.steamProfile || null);
+          void AsyncStorage.setItem(CACHE_KEY, signature).catch(() => {});
+        }
+        setLibraryWarning(data.steamWarning || null);
+        setSelectedId((current) => (
+          current && nextGames.some((game) => game.id === current) ? current : nextGames[0]?.id ?? null
+        ));
+        setReachable(true);
+      } catch (loadError) {
+        if (!mounted.current || controller.signal.aborted) return;
+        setReachable(false);
+        setError(loadError instanceof Error ? loadError.message : 'Không kết nối được máy tính.');
+      } finally {
+        if (inflight.current?.controller === controller) inflight.current = null;
+        if (mounted.current && !controller.signal.aborted) {
+          setLoading(false);
+          if (reloadQueued.current) {
+            reloadQueued.current = false;
+            await loadGames(true);
+          } else {
+            setRefreshing(false);
+          }
+        }
+      }
+    })();
+    inflight.current = { promise, controller };
+    return promise;
   }, []);
 
   useEffect(() => {
     let active = true;
     void readCachedLibrary().then((cached) => {
       if (!active) return;
-      if (cached.games.length) {
-        setGames((current) => (current.length ? current : cached.games));
-        setSelectedId((current) => current ?? cached.games[0].id);
+      if (!receivedNetworkSnapshot.current) {
+        snapshotSignature.current = JSON.stringify(cached);
+        if (cached.games.length) {
+          setGames((current) => (current.length ? current : cached.games));
+          setSelectedId((current) => current ?? cached.games[0].id);
+        }
+        if (cached.steamProfile) setSteamProfile((current) => current ?? cached.steamProfile);
       }
-      if (cached.steamProfile) setSteamProfile((current) => current ?? cached.steamProfile);
+      // Hydrate local artwork first so the network refresh preserves the shelf.
+      void loadGames();
     });
-    void loadGames();
     return () => { active = false; };
   }, [loadGames]);
 
@@ -208,7 +248,7 @@ export function usePcLibrary() {
     [selected, uninstallGame],
   );
 
-  return {
+  return useMemo(() => ({
     games,
     selected,
     selectGame: setSelectedId,
@@ -230,7 +270,9 @@ export function usePcLibrary() {
     uninstallGame,
     achievements,
     achievementCache,
-  };
+  }), [games, selected, loading, refreshing, reachable, error, libraryWarning, steamProfile,
+    loadGames, launchingId, installingId, uninstallingId, installOpenedId, launchSelected,
+    installSelected, installGame, uninstallSelected, uninstallGame, achievements]);
 }
 
 export type PcLibrary = ReturnType<typeof usePcLibrary>;

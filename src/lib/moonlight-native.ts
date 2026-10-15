@@ -37,6 +37,8 @@ type NativeStreamCallbacks = {
   onInputReady: () => void;
   onAudioReady: () => void;
   onError: (message: string) => void;
+  /** The host intentionally ended the session (including physical PC takeover). */
+  onTerminated: () => void;
   /** PC báo rung cho một tay cầm (slot do app đặt khi add). Giá trị 0..1. */
   onRumble?: (rumble: { slot: number; low: number; high: number; triggerLeft?: number; triggerRight?: number }) => void;
 };
@@ -70,7 +72,7 @@ export type CoControlPointerInput = {
 };
 
 type ControlMessage = {
-  Setup?: { ice_servers?: Array<{ urls?: string | string[]; username?: string; credential?: string }> };
+  Setup?: { ice_servers?: { urls?: string | string[]; username?: string; credential?: string }[] };
   WebRtc?: WebRtcSignal;
   DebugLog?: { message?: string; ty?: string };
   ConnectionComplete?: {
@@ -113,6 +115,7 @@ const INPUT_CHANNELS = [
   // CONTROLLER0..15. Data channels can open in any order, so treating input as
   // ready before this channel opens can make the host drop the gamepad entirely.
   CHANNEL.CONTROLLERS,
+  controllerChannel(0),
 ] as const;
 
 function prefixFor(targetId: DeviceId): '/pc' | '/vm' {
@@ -245,14 +248,14 @@ export async function fetchMoonlightTarget(targetId: DeviceId): Promise<Moonligh
     .split(/\r?\n/)
     .find((line) => line.trim().length > 0);
   const host = firstLine
-    ? (JSON.parse(firstLine) as { hosts?: Array<{ host_id?: number }> }).hosts?.[0]
+    ? (JSON.parse(firstLine) as { hosts?: { host_id?: number }[] }).hosts?.[0]
     : null;
   if (!host?.host_id) throw new Error('Không tìm thấy host Moonlight đã ghép đôi.');
 
   const appsResponse = await apiFetch(`${prefix}/api/apps?host_id=${host.host_id}`);
   if (!appsResponse.ok) throw new Error(`Không đọc được ứng dụng stream (${appsResponse.status}).`);
   const apps = ((await appsResponse.json()) as {
-    apps?: Array<{ app_id: number; title: string }>;
+    apps?: { app_id: number; title: string }[];
   }).apps ?? [];
   const wanted = appFor(targetId);
   const app = apps.find((item) => item.title === wanted.title) ?? (wanted.strict ? undefined : apps[0]);
@@ -273,8 +276,8 @@ export class NativeMoonlightClient {
   private readonly settings: MoonlightSettings;
   private readonly iceMode: IceMode;
   private readonly codecPlan: CodecPlan;
-  private readonly audioMuted: boolean;
-  private readonly audioVolume: number;
+  private audioMuted: boolean;
+  private audioVolume: number;
   private readonly callbacks: NativeStreamCallbacks;
 
   private ws: WebSocket | null = null;
@@ -408,6 +411,20 @@ export class NativeMoonlightClient {
     return this.inputReady;
   }
 
+  setAudio(audio: { muted?: boolean; volume?: number }): void {
+    if (typeof audio.muted === 'boolean') {
+      this.audioMuted = audio.muted;
+      if (this.remoteAudioTrack) {
+        this.remoteAudioTrack.enabled = !audio.muted;
+      }
+    }
+    if (typeof audio.volume === 'number') {
+      this.audioVolume = audio.volume;
+      const gain = Math.min(1, Math.max(0, audio.volume / 100));
+      (this.remoteAudioTrack as { _setVolume?: (vol: number) => void } | null)?._setVolume?.(gain);
+    }
+  }
+
   /**
    * Toast một lệnh pointer co-control từ viewer vào kênh input của host. Host giữ
    * quyền điều khiển; viewer được approve thì input của nó đi qua đây. Tọa độ (x,y)
@@ -498,7 +515,7 @@ export class NativeMoonlightClient {
    * ước Gamepad API (lên là âm) — Y được đảo dấu ở đây đúng như client web.
    */
   sendControllerState(slot: number, state: ControllerState): void {
-    this.sendChannel(controllerChannel(slot), encodeControllerState(state), 1);
+    this.sendChannel(controllerChannel(slot), encodeControllerState(state), 4);
   }
 
   /** Số liệu WebRTC cho HUD (RTT, jitter, bitrate, khung rớt, loại đường). */
@@ -535,6 +552,7 @@ export class NativeMoonlightClient {
   }
 
   private async handleControl(message: ControlMessage): Promise<void> {
+    if (this.stopped) return;
     if (message.DebugLog?.message) {
       const detail = message.DebugLog.message;
       if (/permission/i.test(detail)) this.callbacks.onStatus('Đã xác nhận quyền truy cập…');
@@ -571,12 +589,18 @@ export class NativeMoonlightClient {
     }
 
     if (message.ConnectionTerminated) {
+      const code = message.ConnectionTerminated.error_code;
+      if (code === 0 || code === '0') {
+        this.stop();
+        this.callbacks.onTerminated();
+        return;
+      }
       this.fail(`Sunshine đã kết thúc phiên (${message.ConnectionTerminated.error_code ?? 'không rõ mã'}).`);
     }
   }
 
   private async startPeer(
-    iceServers: Array<{ urls?: string | string[]; username?: string; credential?: string }>,
+    iceServers: { urls?: string | string[]; username?: string; credential?: string }[],
   ): Promise<void> {
     if (this.pc || this.stopped) return;
     this.sendControl({ SetTransport: 'WebRTC' });

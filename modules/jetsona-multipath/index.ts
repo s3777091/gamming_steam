@@ -96,6 +96,10 @@ export function getCurrentMultipathStatus(): MultipathStatus {
   return Native?.getCurrentMultipathStatus() ?? DEFAULT_STATUS;
 }
 
+export function openCaptivePortalPage(): boolean {
+  return Native?.openCaptivePortalPage() ?? false;
+}
+
 export function addMultipathListener<K extends keyof JetsonaMultipathModuleEvents>(
   event: K,
   listener: JetsonaMultipathModuleEvents[K],

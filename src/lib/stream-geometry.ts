@@ -1,12 +1,20 @@
 import { Dimensions, PixelRatio } from 'react-native';
+import { getDisplayInfo } from 'jetsona-input';
 
 /** Physical pixels of the surface a session is played on. */
 export type DisplayGeometry = { width: number; height: number };
 
+/**
+ * Một mode Windows chịu đặt. `refreshRates` là các tần số quét (Hz) của đúng
+ * độ phân giải ấy; agent cũ không gửi trường này, nên thiếu nghĩa là "không
+ * biết", không phải "không có".
+ */
+export type HostDisplayMode = DisplayGeometry & { refreshRates?: number[] };
+
 /** What the agent on the Windows machine reports about the captured desktop. */
 export type HostDisplay = DisplayGeometry & {
   canSwitchResolution?: boolean;
-  modes?: DisplayGeometry[];
+  modes?: HostDisplayMode[];
   /** Sunshine still points at a display identifier that no longer exists. */
   captureTargetStale?: boolean;
   /** Number of Windows displays seen by the capture-session agent. */
@@ -46,6 +54,10 @@ export function displayGeometryForCssPixels(
  */
 export function clientDisplayGeometry(): DisplayGeometry {
   try {
+    const native = getDisplayInfo();
+    if (native && native.widthPx > 0 && native.heightPx > 0) {
+      return displayGeometryForCssPixels(native.widthPx, native.heightPx);
+    }
     const screen = Dimensions.get('screen');
     return displayGeometryForCssPixels(screen.width, screen.height, PixelRatio.get());
   } catch {
@@ -146,6 +158,34 @@ function hostModeNearestViewer(
 }
 
 /**
+ * Bao nhiêu chi tiết thật một mode mang được tới màn người xem.
+ *
+ * Mode được vẽ kiểu contain vào màn xem; mỗi trục chỉ tính tới số pixel mà
+ * khung contain ấy hiển thị được 1:1. Mode nhỏ hơn màn thì bị phóng to, nên chỉ
+ * mang đúng số pixel của chính nó; mode lớn hơn khung thì phần dư bị thu nhỏ
+ * mất. Viền đen của mode lệch tỉ lệ đã nằm sẵn trong phép tính: khung contain
+ * thấp hơn màn thì trục dọc bị cắt theo đó.
+ */
+function deliveredPixels(mode: DisplayGeometry, viewer: DisplayGeometry): number {
+  const scale = Math.min(viewer.width / mode.width, viewer.height / mode.height);
+  return Math.min(mode.width, mode.width * scale) * Math.min(mode.height, mode.height * scale);
+}
+
+/**
+ * Lệch tỉ lệ được chấp nhận khi mode ấy mang tới nhiều chi tiết hơn ít nhất ngần
+ * này lần.
+ *
+ * Khớp tỉ lệ vẫn là mặc định, nhưng không được phép thắng bằng mọi giá. Màn
+ * Samsung ở nhà chỉ có một mode 16:10 là 1680x1050; tablet 2800x1752 nhận mode
+ * ấy thì phải tự phóng to 1,67 lần mỗi trục, mờ thấy rõ. Khi DSR mở ra 2560x1440
+ * hay 2880x1620, một khung 16:9 có viền mỏng (phần lớn được `stream-fit` giãn
+ * lấp) mang gấp đôi chi tiết. 1.3 đủ cao để 1920x1080 (chỉ hơn 1680x1050 khoảng
+ * 18% trên tablet này) và 1920x1080 so với 1600x1200 cho iPad 4:3 (~8%) không
+ * đổi lấy viền đen.
+ */
+const SHARPER_MODE_GAIN = 1.3;
+
+/**
  * Pick the literal frame Sunshine should request for one horizontal quality
  * tier. A mode reported by Windows is returned verbatim; rounding 1680x1050 to
  * 1680x1052 is enough to make Windows reject the switch.
@@ -162,8 +202,12 @@ export function streamGeometryForTier(
     const floor = floorWidthsFor(host);
     const cap = Math.max(tierWidth, floor.hard);
     const matching = hostModeMatchingViewer(host, display, cap, floor.aspect);
-    if (matching) return matching;
     const nearest = hostModeNearestViewer(host, display, cap, floor.hard);
+    if (matching && nearest
+      && deliveredPixels(nearest, display) >= deliveredPixels(matching, display) * SHARPER_MODE_GAIN) {
+      return nearest;
+    }
+    if (matching) return matching;
     if (nearest) return nearest;
     // A non-switchable/single-mode Hyper-V display must be reported honestly.
     return { width: host.width, height: host.height };
@@ -178,6 +222,30 @@ export function streamGeometryForTier(
     width = snapToBlock(height * aspect);
   }
   return { width, height };
+}
+
+/** Dưới mức này là số rác (0/1 Hz là "mặc định phần cứng"), không phải tần số thật. */
+const MIN_HOST_REFRESH_HZ = 24;
+
+/**
+ * Tần số quét cao nhất máy chủ chạy được ở đúng khung hình sẽ xin — `null` khi
+ * không biết (agent cũ, không có mode trùng, hoặc mode không kèm tần số).
+ *
+ * Sunshine bắt hình theo nhịp desktop. Màn Samsung ở nhà chỉ lên tới 100 Hz ở
+ * mọi mode, nên xin 120 fps thì nó vẫn bắt 100 khung/giây rồi mã hoá thành 120:
+ * cứ năm khung lại lặp một, nhịp trình lệch đều đặn và tốn bit cho khung thừa.
+ * Chỉ tra mode TRÙNG KHÍT khung hình, vì tần số của 1920x1080 không nói gì về
+ * 1680x1050 — Windows kê tần số theo từng độ phân giải.
+ */
+export function hostRefreshCeiling(
+  host: HostDisplay | null | undefined,
+  frame: DisplayGeometry,
+): number | null {
+  const mode = host?.modes?.find((candidate) => displayGeometriesMatch(candidate, frame));
+  const rates = (mode?.refreshRates ?? []).filter(
+    (rate) => Number.isFinite(rate) && rate >= MIN_HOST_REFRESH_HZ,
+  );
+  return rates.length ? Math.max(...rates) : null;
 }
 
 /** True when the host can produce the viewer's shape without letterboxing. */

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View, ScrollView } from 'react-native';
 import { FocusScroll } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,7 +8,10 @@ import Svg, { Path } from 'react-native-svg';
 import { formatStorePrice } from '@/features/library/format';
 import type { SteamPromotion, SteamStoreItem, StoreResponse } from '@/features/library/types';
 import { colors } from '@/theme';
+import { nearbyBackdropUrls } from '@/lib/backdrop-preloader';
 import { Img } from '@/ui/Img';
+import { useBackdropPreload } from '@/ui/useBackdropPreload';
+import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -63,14 +66,17 @@ function DiscountBadge({ percent, size = 9 }: { percent: number; size?: number }
   );
 }
 
-function StorePreview({ item }: { item: SteamStoreItem }) {
+const StorePreview = memo(function StorePreview({ item }: { item: SteamStoreItem }) {
   const { s, width } = useUi();
+  const { reduceMotion } = useMotion();
   const [failedLogo, setFailedLogo] = useState<string | null>(null);
   const logo = item.logo && item.logo.url !== failedLogo ? item.logo : null;
   const [enter] = useState(() => new Animated.Value(0));
   useEffect(() => {
-    Animated.timing(enter, { toValue: 1, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  }, [enter]);
+    const animation = Animated.timing(enter, { toValue: 1, duration: reduceMotion ? 0 : 420, easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false });
+    animation.start();
+    return () => animation.stop();
+  }, [enter, reduceMotion]);
 
   const maxHeight = s(76);
   const ratio = logo ? logo.width / logo.height : 2.4;
@@ -106,31 +112,40 @@ function StorePreview({ item }: { item: SteamStoreItem }) {
       </T>
     </Animated.View>
   );
-}
+});
 
-function ShelfCard({ item, previewing, onPreview, onOpen }: {
+const ShelfCard = memo(function ShelfCard({ item, previewing, onPreview, onOpen }: {
   item: SteamStoreItem;
   previewing: boolean;
-  onPreview: () => void;
-  onOpen: () => void;
+  onPreview: (item: SteamStoreItem) => void;
+  onOpen: (item: SteamStoreItem) => void;
 }) {
   const { s } = useUi();
+  const preview = useCallback(() => onPreview(item), [item, onPreview]);
+  const open = useCallback(() => onOpen(item), [item, onOpen]);
+  const { reduceMotion } = useMotion();
+  const previousPreview = useRef(previewing);
   const [selection] = useState(() => new Animated.Value(previewing ? 1 : 0));
   useEffect(() => {
+    const changed = previousPreview.current !== previewing;
+    previousPreview.current = previewing;
+    if (reduceMotion) { selection.setValue(previewing ? 1 : 0); return; }
+    if (!changed) return;
     const animation = Animated.spring(selection, {
       toValue: previewing ? 1 : 0,
       stiffness: 260,
       damping: 26,
       mass: 0.72,
       useNativeDriver: true,
+      isInteraction: false,
     });
     animation.start();
     return () => animation.stop();
-  }, [previewing, selection]);
+  }, [previewing, reduceMotion, selection]);
 
   return (
     <View>
-      <Press onPress={onPreview} onFocused={onPreview} autoFocus={previewing} focusRadius={s(previewing ? 20 : 12)} pressScale={0.98} accessibilityLabel={`Chọn ${item.name}`}>
+      <Press onPress={preview} onFocused={preview} autoFocus={previewing} focusRadius={s(previewing ? 20 : 12)} pressScale={0.98} accessibilityLabel={`Chọn ${item.name}`}>
         <Animated.View
           style={[
             styles.card,
@@ -192,7 +207,7 @@ function ShelfCard({ item, previewing, onPreview, onOpen }: {
       </Press>
       {previewing ? (
         <Press
-          onPress={onOpen}
+          onPress={open}
           accessibilityLabel={`Xem chi tiết ${item.name}`}
           focusRadius={s(SHELF_DISC / 2)}
           style={[styles.openButton, { width: s(SHELF_DISC), height: s(SHELF_DISC), borderRadius: s(SHELF_DISC / 2) }]}
@@ -202,9 +217,9 @@ function ShelfCard({ item, previewing, onPreview, onOpen }: {
       ) : null}
     </View>
   );
-}
+});
 
-function PromotionTile({ promotion, onOpen }: { promotion: SteamPromotion; onOpen: () => void }) {
+const PromotionTile = memo(function PromotionTile({ promotion, onOpen }: { promotion: SteamPromotion; onOpen: () => void }) {
   const { s } = useUi();
   return (
     <Press onPress={onOpen} pressScale={0.99} accessibilityLabel={`Xem khuyến mãi ${promotion.name}`} style={[styles.tile, { flex: 1.25, borderRadius: s(12) }]}>
@@ -219,14 +234,15 @@ function PromotionTile({ promotion, onOpen }: { promotion: SteamPromotion; onOpe
       </View>
     </Press>
   );
-}
+});
 
-function QuickDealTile({ item, previewing, onPreview }: { item: SteamStoreItem; previewing: boolean; onPreview: () => void }) {
+const QuickDealTile = memo(function QuickDealTile({ item, previewing, onPreview }: { item: SteamStoreItem; previewing: boolean; onPreview: (item: SteamStoreItem) => void }) {
   const { s } = useUi();
+  const preview = useCallback(() => onPreview(item), [item, onPreview]);
   return (
     <Press
-      onPress={onPreview}
-      onFocused={onPreview}
+      onPress={preview}
+      onFocused={preview}
       pressScale={0.99}
       accessibilityLabel={`Chọn ${item.name}`}
       style={[styles.tile, { flex: 1, borderRadius: s(12), borderColor: previewing ? '#9ac5ff' : 'rgba(255,255,255,0.12)' }]}
@@ -241,10 +257,10 @@ function QuickDealTile({ item, previewing, onPreview }: { item: SteamStoreItem; 
       </View>
     </Press>
   );
-}
+});
 
 /** Trang chủ tab Store: game nổi bật, kệ bán chạy và hàng ưu đãi. */
-export function StoreHome({ data, featured, preview, onPreview, onOpenGame, onOpenPromotion }: {
+export const StoreHome = memo(function StoreHome({ data, featured, preview, onPreview, onOpenGame, onOpenPromotion }: {
   data: StoreResponse;
   featured: SteamStoreItem;
   preview: SteamStoreItem;
@@ -255,27 +271,31 @@ export function StoreHome({ data, featured, preview, onPreview, onOpenGame, onOp
   const { s } = useUi();
   const rail = useRef<ScrollView>(null);
   const railWidth = useRef(0);
-  const shelfItems = Array.from(
+  const shelfItems = useMemo(() => Array.from(
     new Map([featured, ...(data.topSellers || []), ...(data.newReleases || [])].map((item) => [item.appId, item])).values(),
-  ).slice(0, 7);
-  const quickItems = (data.specials || []).filter((item) => item.appId !== featured.appId).slice(0, 3);
+  ).slice(0, 7), [data.topSellers, data.newReleases, featured]);
+  const quickItems = useMemo(() => (data.specials || []).filter((item) => item.appId !== featured.appId).slice(0, 3), [data.specials, featured.appId]);
   const promotion = data.promotions?.[0];
   const previewIndex = Math.max(0, shelfItems.findIndex((item) => item.appId === preview.appId));
+  const preloadUrls = useMemo(() => nearbyBackdropUrls(
+    shelfItems.map((item) => item.backgroundImage || `https://shared.steamstatic.com/store_item_assets/steam/apps/${item.appId}/library_hero.jpg`),
+    previewIndex,
+  ), [shelfItems, previewIndex]);
+  useBackdropPreload(preloadUrls);
 
-  const center = (animated: boolean) => {
+  const center = useCallback((animated: boolean) => {
     const left = previewIndex * (s(IDLE.w) + s(GAP));
     rail.current?.scrollTo({ x: Math.max(0, left - (railWidth.current - s(PREVIEW.w)) / 2), animated });
-  };
+  }, [previewIndex, s]);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => center(true));
     return () => cancelAnimationFrame(frame);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preview.appId]);
+  }, [center]);
 
   return (
     <View style={{ flex: 1, justifyContent: 'flex-end', overflow: 'hidden', paddingBottom: s(2), paddingTop: s(4) }}>
-      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: s(10) }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: s(6) }}>
         <StorePreview item={preview} />
       </View>
 
@@ -284,8 +304,8 @@ export function StoreHome({ data, featured, preview, onPreview, onOpenGame, onOp
         horizontal
         showsHorizontalScrollIndicator={false}
         onLayout={(event) => { railWidth.current = event.nativeEvent.layout.width; center(false); }}
-        style={{ flexGrow: 0, height: s(PREVIEW.h + 18) }}
-        contentContainerStyle={{ alignItems: 'flex-end', gap: s(GAP), paddingHorizontal: s(10), paddingTop: s(10), paddingBottom: s(12) }}
+        style={{ flexGrow: 0, height: s(PREVIEW.h + 40) }}
+        contentContainerStyle={{ alignItems: 'flex-end', gap: s(GAP), paddingHorizontal: s(10), paddingTop: s(22), paddingBottom: s(12) }}
         decelerationRate="fast"
       >
         {shelfItems.map((item) => (
@@ -293,8 +313,8 @@ export function StoreHome({ data, featured, preview, onPreview, onOpenGame, onOp
             key={item.appId}
             item={item}
             previewing={preview.appId === item.appId}
-            onPreview={() => onPreview(item)}
-            onOpen={() => onOpenGame(item)}
+            onPreview={onPreview}
+            onOpen={onOpenGame}
           />
         ))}
         <View style={{ width: s(PREVIEW.w) }} />
@@ -303,12 +323,12 @@ export function StoreHome({ data, featured, preview, onPreview, onOpenGame, onOp
       <View style={{ marginTop: s(8), height: s(70), flexDirection: 'row', gap: s(10) }}>
         {promotion ? <PromotionTile promotion={promotion} onOpen={() => onOpenPromotion(promotion)} /> : null}
         {quickItems.map((item) => (
-          <QuickDealTile key={item.appId} item={item} previewing={preview.appId === item.appId} onPreview={() => onPreview(item)} />
+          <QuickDealTile key={item.appId} item={item} previewing={preview.appId === item.appId} onPreview={onPreview} />
         ))}
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

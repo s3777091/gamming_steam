@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import { Clock3, Gamepad2, LockKeyhole, Play, Trophy, Users, X, ArrowUpRight } from 'lucide-react-native';
@@ -6,6 +6,7 @@ import { Clock3, Gamepad2, LockKeyhole, Play, Trophy, Users, X, ArrowUpRight } f
 import { openExternal } from '@/lib/open-external';
 import { colors } from '@/theme';
 import { Img } from '@/ui/Img';
+import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
 import { PanelMessage, SidePanel, SteamLink } from '@/ui/SidePanel';
 import { Skeleton } from '@/ui/Skeleton';
@@ -263,11 +264,14 @@ export function PromotionPanel({ promotion, specials, onOpenGame, onClose }: {
 }) {
   const { s, width, height, insets } = useUi();
   useBack(() => { onClose(); });
-  const enter = useRef(new Animated.Value(0)).current;
+  const [enter] = useState(() => new Animated.Value(0));
+  const { reduceMotion } = useMotion();
 
   useEffect(() => {
-    Animated.timing(enter, { toValue: 1, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  }, [enter]);
+    const animation = Animated.timing(enter, { toValue: 1, duration: reduceMotion ? 0 : 260, easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false });
+    animation.start();
+    return () => animation.stop();
+  }, [enter, reduceMotion]);
 
   const panelWidth = Math.min(s(560), width * 0.78);
   const items = specials.slice(0, 8);

@@ -57,4 +57,5 @@ export type JetsonaMultipathModuleEvents = {
   onCellularStatusChanged: (event: CellularStatusEvent) => void;
   onSecondaryWifiStatusChanged: (event: SecondaryWifiStatusEvent) => void;
   onWifiScanCompleted: (networks: AvailableWifi[]) => void;
+  onCaptivePortalDetected: (event: { ssid: string }) => void;
 };

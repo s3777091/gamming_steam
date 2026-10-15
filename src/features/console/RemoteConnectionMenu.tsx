@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
-import { Moon, Play, Power, RotateCw, X } from 'lucide-react-native';
+import { Moon, Play, Power, RotateCw } from 'lucide-react-native';
 
 import { FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
@@ -179,6 +179,7 @@ export function RemoteConnectionMenu({
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => closeWithAnimation()}
+            focusable={false}
             accessibilityLabel="Đóng menu kết nối"
           />
         </Animated.View>
@@ -240,16 +241,6 @@ export function RemoteConnectionMenu({
                 </T>
               </View>
             )}
-
-            <Press
-              onPress={() => closeWithAnimation()}
-              sound="back"
-              focusable={false}
-              accessibilityLabel="Đóng menu"
-              style={[styles.closeBtn, { width: s(18), height: s(18), borderRadius: s(9) }]}
-            >
-              <X size={s(10)} color={colors.text3} />
-            </Press>
           </View>
 
           {/* Dãy 3 icon chức năng chuẩn phong cách glass, đồng bộ giao diện */}

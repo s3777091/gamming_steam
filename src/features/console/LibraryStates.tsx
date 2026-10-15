@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Gamepad2, Monitor, RefreshCw, WifiOff } from 'lucide-react-native';
 
 import { colors } from '@/theme';
+import { failBackdrop, finishBackdrop, requestBackdrop } from '@/lib/backdrop-state';
 import { Img } from '@/ui/Img';
+import { useMotion } from '@/ui/motion';
 import { LiquidAmbientAurora } from '@/ui/LiquidGlass';
 import { Press } from '@/ui/Press';
 import { Skeleton } from '@/ui/Skeleton';
@@ -12,69 +14,155 @@ import { useUi } from '@/ui/scale';
 import { TAB_MOTION_EASING, TAB_MOTION_MS } from './tabMotion';
 import { T } from '@/ui/Text';
 
-type BackdropLayer = { key: number; url: string; opacity: number; fade: Animated.Value };
+type BackdropProps = {
+  url: string | null | undefined;
+  fallbackUrl?: string | null;
+  store: boolean;
+};
 
-/**
- * Ảnh nền đổi giữa game ↔ store ↔ game khác: ảnh cũ giữ nguyên cho tới khi ảnh mới đã vẽ xong rồi
- * mới crossfade lên trên. Trước đây dùng `key={url}` nên ảnh cũ biến mất ngay, ảnh mới hiện từ
- * trong suốt → thấy nền Aurora chớp giữa hai ảnh.
- */
-function BackdropImage({ url, store }: { url: string | null | undefined; store: boolean }) {
-  const [layers, setLayers] = useState<BackdropLayer[]>([]);
+const BACKDROP_FADE_MS = 180;
 
-  // Đổi url: thêm lớp mới (độ mờ 0) lên trên cùng; url rỗng thì giữ nguyên ảnh đang có.
-  const top = layers[layers.length - 1];
-  if (url && top?.url !== url) {
-    const layer: BackdropLayer = { key: (top?.key ?? 0) + 1, url, opacity: store ? 0.95 : 0.88, fade: new Animated.Value(layers.length ? 0 : 1) };
-    setLayers([...layers, layer]);
+/** Show the selected game's cached card while the full background downloads. */
+function BackdropLayer({ url, opacity, preview, layerOpacity, retryDirect, onLoaded, onReady, onError, onDispose }: {
+  url: string;
+  opacity: number;
+  preview: boolean;
+  layerOpacity: Animated.Value;
+  retryDirect: boolean;
+  onLoaded: (url: string) => void;
+  onReady: (url: string) => void;
+  onError: (url: string) => void;
+  onDispose: (url: string) => void;
+}) {
+  const { reduceMotion } = useMotion();
+  const [fade] = useState(() => new Animated.Value(0));
+  const started = useRef(false);
+  const animation = useRef<Animated.CompositeAnimation | null>(null);
+  useLayoutEffect(() => () => {
+    animation.current?.stop();
+    onDispose(url);
+  }, [onDispose, url]);
+  const reveal = () => {
+    onLoaded(url);
+    if (!preview || started.current) return;
+    started.current = true;
+    animation.current = Animated.timing(fade, {
+      toValue: opacity, duration: reduceMotion ? 0 : 120,
+      easing: TAB_MOTION_EASING, useNativeDriver: true, isInteraction: false,
+    });
+    animation.current.start(({ finished }) => { if (finished) onReady(url); });
+  };
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: preview ? fade : layerOpacity }]}>
+      <Img source={url} style={StyleSheet.absoluteFill} contentFit="cover" transition={0}
+        priority="high" retryDirect={retryDirect} onLoad={reveal} onDisplay={reveal} onError={() => onError(url)} />
+    </Animated.View>
+  );
+}
+
+/** Keep the displayed native image mounted until its replacement has loaded. */
+function BackdropImage({ url, fallbackUrl, store }: BackdropProps) {
+  const requested = url || null;
+  const fallback = fallbackUrl || null;
+  const targetOpacity = store ? 0.95 : 0.88;
+  const { reduceMotion } = useMotion();
+  const [images, setImages] = useState(() => requestBackdrop(null, requested, fallback));
+  const [incoming] = useState(() => new Animated.Value(0));
+  const [currentFade] = useState(() => new Animated.Value(0));
+  const revealRef = useRef<{ url: string; start: () => void } | null>(null);
+  const loadedUrlsRef = useRef(new Set<string>());
+
+  if (requested !== images.requested || fallback !== images.fallback) {
+    setImages(requestBackdrop(images, requested, fallback));
   }
 
-  const reveal = (layer: BackdropLayer) => {
-    Animated.timing(layer.fade, {
-      toValue: 1,
-      duration: TAB_MOTION_MS * 2,
+  const { current, pending } = images;
+  useLayoutEffect(() => {
+    let cancelled = false;
+    let started = false;
+    let animation: Animated.CompositeAnimation | null = null;
+    const timing = (value: Animated.Value, toValue: number) => Animated.timing(value, {
+      toValue,
+      duration: reduceMotion ? 0 : BACKDROP_FADE_MS,
       easing: TAB_MOTION_EASING,
       useNativeDriver: true,
-    }).start(({ finished }) => {
-      // Ảnh mới đã phủ kín: bỏ mọi lớp bên dưới nó.
-      if (finished) setLayers((current) => current.slice(current.findIndex((entry) => entry.key === layer.key)));
+      isInteraction: false,
     });
-  };
+
+    if (!requested) {
+      animation = timing(currentFade, 0);
+      animation.start(({ finished }) => {
+        if (!finished || cancelled) return;
+        setImages((value) => value.requested === null ? { ...value, current: null } : value);
+      });
+    } else if (pending) {
+      incoming.setValue(0);
+      const start = () => {
+        if (cancelled || started) return;
+        started = true;
+        animation = timing(incoming, targetOpacity);
+        animation.start(({ finished }) => {
+          if (!finished || cancelled) return;
+          currentFade.setValue(targetOpacity);
+          setImages((value) => finishBackdrop(value, pending));
+        });
+      };
+      revealRef.current = { url: pending, start };
+      if (loadedUrlsRef.current.has(pending)) start();
+    } else {
+      currentFade.setValue(targetOpacity);
+    }
+
+    return () => {
+      cancelled = true;
+      revealRef.current = null;
+      animation?.stop();
+    };
+  }, [currentFade, incoming, pending, reduceMotion, requested, targetOpacity]);
+
+  const reveal = useCallback((loadedUrl: string) => {
+    loadedUrlsRef.current.add(loadedUrl);
+    if (revealRef.current?.url === loadedUrl) revealRef.current.start();
+  }, []);
+  const forget = useCallback((disposedUrl: string) => {
+    loadedUrlsRef.current.delete(disposedUrl);
+  }, []);
+  const failed = useCallback((failedUrl: string) => {
+    setImages((value) => failBackdrop(value, failedUrl));
+  }, []);
+  const coverReady = useCallback((coverUrl: string) => {
+    currentFade.setValue(targetOpacity);
+    setImages((value) => finishBackdrop(value, coverUrl));
+  }, [currentFade, targetOpacity]);
+  const preview = pending === requested && fallback !== current && fallback !== pending && !images.fallbackFailed ? fallback : null;
 
   return (
     <>
-      {layers.map((layer) => (
-        <Animated.View
-          key={layer.key}
-          pointerEvents="none"
-          style={[StyleSheet.absoluteFill, { opacity: Animated.multiply(layer.fade, layer.opacity) }]}
-        >
-          <Img
-            source={{ uri: layer.url }}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            transition={0}
-            onDisplay={() => reveal(layer)}
-            onLoad={() => reveal(layer)}
-          />
-        </Animated.View>
-      ))}
+      {[current, preview, pending].map((imageUrl, index) => imageUrl ? (
+        <BackdropLayer key={imageUrl} url={imageUrl} opacity={targetOpacity} preview={index === 1}
+          layerOpacity={index === 2 ? incoming : currentFade} retryDirect={imageUrl === fallback || !fallback}
+          onLoaded={reveal} onReady={coverReady} onError={failed} onDispose={forget} />
+      ) : null)}
     </>
   );
 }
 
 /** Ảnh nền toàn màn hình theo tab đang mở, kết hợp Aurora chất lỏng phát quang và lớp làm tối dịu mắt. */
-export function LibraryBackdrop({ url, store }: { url: string | null | undefined; store: boolean }) {
+export const LibraryBackdrop = memo(function LibraryBackdrop({ url, fallbackUrl, store }: BackdropProps) {
+  const { reduceMotion } = useMotion();
   const [storeAnim] = useState(() => new Animated.Value(store ? 1 : 0));
 
   useEffect(() => {
-    Animated.timing(storeAnim, {
+    const animation = Animated.timing(storeAnim, {
       toValue: store ? 1 : 0,
-      duration: TAB_MOTION_MS,
+      duration: reduceMotion ? 0 : TAB_MOTION_MS,
       easing: TAB_MOTION_EASING,
       useNativeDriver: true,
-    }).start();
-  }, [store, storeAnim]);
+      isInteraction: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [reduceMotion, store, storeAnim]);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -82,7 +170,7 @@ export function LibraryBackdrop({ url, store }: { url: string | null | undefined
       <LiquidAmbientAurora active opacity={0.85} />
 
       {/* 2. Ảnh nền game / store nếu có */}
-      <BackdropImage url={url} store={store} />
+      <BackdropImage url={url} fallbackUrl={fallbackUrl} store={store} />
 
       <Animated.View
         pointerEvents="none"
@@ -131,24 +219,28 @@ export function LibraryBackdrop({ url, store }: { url: string | null | undefined
       </Animated.View>
     </View>
   );
-}
+});
 
 /**
  * Nền tab PC: hình hoa xanh kiểu desktop Windows 11, vẽ bằng gradient nên không cần ảnh.
  * Phủ kín trên ảnh game và mờ dần vào/ra khi đổi tab.
  */
-export function PcWallpaper({ visible }: { visible: boolean }) {
+export const PcWallpaper = memo(function PcWallpaper({ visible }: { visible: boolean }) {
   const { width, height } = useUi();
+  const { reduceMotion } = useMotion();
   const [anim] = useState(() => new Animated.Value(visible ? 1 : 0));
 
   useEffect(() => {
-    Animated.timing(anim, {
+    const animation = Animated.timing(anim, {
       toValue: visible ? 1 : 0,
-      duration: TAB_MOTION_MS,
+      duration: reduceMotion ? 0 : TAB_MOTION_MS,
       easing: TAB_MOTION_EASING,
       useNativeDriver: true,
-    }).start();
-  }, [visible, anim]);
+      isInteraction: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [visible, anim, reduceMotion]);
 
   const petal = (
     size: number, left: number, top: number, rotate: string, colors: [string, string],
@@ -194,7 +286,7 @@ export function PcWallpaper({ visible }: { visible: boolean }) {
       />
     </Animated.View>
   );
-}
+});
 
 export function StoreLoading() {
   const { s } = useUi();

@@ -9,10 +9,12 @@
 // VM hay Supabase, và không có hỏi thăm định kỳ.
 
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { RTCPeerConnection, RTCSessionDescription } from 'react-native-webrtc';
 
 import { PC_ROUTES, pcFetchJson, pcPostJson } from '@/lib/pc-api';
+import { startAsyncPoll } from '@/lib/async-poll';
 import { realtimeChannelInstance } from '@/lib/realtime-channels';
 import {
   type AppCommand,
@@ -20,6 +22,8 @@ import {
   STEAM_DOWNLOADS_CHANNEL,
   STEAM_DOWNLOADS_PRESENCE,
   parseAgentMessage,
+  hasPendingDownloads,
+  reuseDownloadSnapshot,
 } from '@/lib/steam-downloads';
 import { createClient } from '@/lib/supabase';
 
@@ -167,6 +171,15 @@ export function useSteamDownloads(
   const [expectedAppId, setExpectedAppId] = useState<number | null>(null);
   const [expectedUninstallAppId, setExpectedUninstallAppId] = useState<number | null>(null);
   const [reconnectNonce, setReconnectNonce] = useState(0);
+  const [foreground, setForeground] = useState(() => AppState.currentState !== 'background' && AppState.currentState !== 'inactive');
+  const pollingDelay = useRef(8_000);
+  useLayoutEffect(() => {
+    pollingDelay.current = expectedAppId || expectedUninstallAppId || hasPendingDownloads(state) ? 2_500 : 8_000;
+  }, [expectedAppId, expectedUninstallAppId, state]);
+  useEffect(() => {
+    const listener = AppState.addEventListener('change', (next) => setForeground(next === 'active'));
+    return () => listener.remove();
+  }, []);
   const linkRef = useRef<Link | null>(null);
   const installedRef = useRef(new Set<number>());
   const uninstalledRef = useRef(new Set<number>());
@@ -191,7 +204,7 @@ export function useSteamDownloads(
   }, []);
 
   const applyState = useCallback((next: DownloadsState) => {
-    setState(next);
+    setState((previous) => reuseDownloadSnapshot(previous, next));
     for (const flow of next.installs) {
       if (flow.phase !== 'installed' || installedRef.current.has(flow.appid)) continue;
       installedRef.current.add(flow.appid);
@@ -229,41 +242,17 @@ export function useSteamDownloads(
 
   // HTTP polling fallback khi WebRTC DataChannel chưa mở hoặc bị rớt
   useEffect(() => {
-    let disposed = false;
-    let pollTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const poll = async () => {
-      if (disposed) return;
-      if (!connected) {
-        try {
-          const resp = await pcFetchJson<{ ok?: boolean; state?: DownloadsState | null }>(
-            PC_ROUTES.gameDownloads,
-            'Không đọc được tiến trình tải',
-          );
-          if (!disposed && resp.ok && resp.state) {
-            applyState(resp.state);
-          }
-        } catch {
-          // PC agent chưa phản hồi
-        }
-      }
-
-      if (disposed) return;
-      const hasActive = Boolean(
-        expectedAppId
-        || expectedUninstallAppId
-        || (state && (state.active || state.queue.length > 0 || state.installs.length > 0))
+    if (connected || !foreground) return;
+    return startAsyncPoll(async (signal) => {
+      const resp = await pcFetchJson<{ ok?: boolean; state?: DownloadsState | null }>(
+        PC_ROUTES.gameDownloads,
+        'Không đọc được tiến trình tải',
+        undefined,
+        signal,
       );
-      const nextDelay = connected ? 15_000 : hasActive ? 2_500 : 8_000;
-      pollTimer = setTimeout(() => void poll(), nextDelay);
-    };
-
-    void poll();
-    return () => {
-      disposed = true;
-      if (pollTimer) clearTimeout(pollTimer);
-    };
-  }, [connected, expectedAppId, expectedUninstallAppId, state, applyState]);
+      if (!signal.aborted && resp.ok && resp.state) applyState(resp.state);
+    }, () => pollingDelay.current);
+  }, [connected, foreground, expectedAppId, expectedUninstallAppId, applyState]);
 
   // Nối thẳng tới agent khi nó có mặt; rớt thì nối lại vài lần.
   useEffect(() => {
@@ -365,7 +354,14 @@ export function useSteamDownloads(
     setReconnectNonce((n) => n + 1);
   }, []);
 
-  return {
+  const actions = useMemo(() => ({
+    answerEula: (appid: number, accept: boolean) => send({ type: 'eula', appid, accept }),
+    answerConfig: (appid: number, answer: ConfigAnswer) => send({ type: 'config', appid, ...answer }),
+    pause: (appid: number) => send({ type: 'pause', appid }),
+    resume: (appid: number) => send({ type: 'resume', appid }),
+  }), [send]);
+
+  return useMemo(() => ({
     state,
     agentOnline,
     connected,
@@ -375,9 +371,6 @@ export function useSteamDownloads(
     expectedAppId,
     expectUninstall,
     expectedUninstallAppId,
-    answerEula: (appid, accept) => send({ type: 'eula', appid, accept }),
-    answerConfig: (appid, answer) => send({ type: 'config', appid, ...answer }),
-    pause: (appid) => send({ type: 'pause', appid }),
-    resume: (appid) => send({ type: 'resume', appid }),
-  };
+    ...actions,
+  }), [state, agentOnline, connected, userId, notice, expect, expectedAppId, expectUninstall, expectedUninstallAppId, actions]);
 }

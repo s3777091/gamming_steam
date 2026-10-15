@@ -333,7 +333,7 @@ export function PurchaseSheet({
       offer.imageUrl,
       offer.fallbackImageUrl,
       `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${offer.appId}/header.jpg`,
-      `https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/${offer.appId}/header.jpg`,
+      `https://shared.steamstatic.com/store_item_assets/steam/apps/${offer.appId}/header.jpg`,
       `https://cdn.cloudflare.steamstatic.com/steam/apps/${offer.appId}/header.jpg`,
     ].filter((u): u is string => Boolean(u && typeof u === 'string'));
     return Array.from(new Set(list));

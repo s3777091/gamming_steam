@@ -8,7 +8,6 @@
     "scheme": "jetsona",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#080c12",
-    "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "cloud.protexa.jetsona.console",
       "supportsTablet": true,
@@ -31,6 +30,11 @@
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.CHANGE_NETWORK_STATE",
+        "android.permission.CHANGE_WIFI_STATE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.NEARBY_WIFI_DEVICES",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.VIBRATE",
         "android.permission.WAKE_LOCK",
@@ -85,7 +89,12 @@
     },
     "extra": {
       "backendBaseUrl": "https://vn.protexa.cloud",
-      "supabaseAnonKey": "sb_publishable_-QsnqGoqBAspgJOSGXM1rX_N1hlwRkN"
-    }
+      "supabaseAnonKey": "sb_publishable_-QsnqGoqBAspgJOSGXM1rX_N1hlwRkN",
+      "router": {},
+      "eas": {
+        "projectId": "95c0822b-af7c-4b00-a3d5-1ca1b7023246"
+      }
+    },
+    "owner": "dathuynh_coolest"
   }
 }

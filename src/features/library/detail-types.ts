@@ -36,10 +36,10 @@ export type SteamStoreGameDetail = {
   platforms: { windows: boolean; mac: boolean; linux: boolean };
   controllerSupport: 'full' | 'partial' | null;
   requiredAge: number | null;
-  languages: Array<{ name: string; fullAudio: boolean }>;
+  languages: { name: string; fullAudio: boolean }[];
   requirements: {
-    minimum: Array<{ label: string | null; value: string }>;
-    recommended: Array<{ label: string | null; value: string }>;
+    minimum: { label: string | null; value: string }[];
+    recommended: { label: string | null; value: string }[];
   };
   storageSize: string | null;
   achievementCount: number | null;
@@ -47,11 +47,11 @@ export type SteamStoreGameDetail = {
   recommendations: number | null;
   metacriticScore: number | null;
   metacriticUrl: string | null;
-  screenshots: Array<{ id: number; thumbnail: string; full: string }>;
+  screenshots: { id: number; thumbnail: string; full: string }[];
   contentNotice: string | null;
   reviewSummary: { label: string | null; positive: number; negative: number; total: number } | null;
   reviews: StoreReview[];
-  news: Array<{
+  news: {
     id: string;
     title: string;
     url: string | null;
@@ -59,7 +59,7 @@ export type SteamStoreGameDetail = {
     summary: string | null;
     feedLabel: string | null;
     publishedAt: string | null;
-  }>;
+  }[];
   storeUrl: string;
 };
 

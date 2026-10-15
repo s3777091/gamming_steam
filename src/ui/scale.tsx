@@ -15,7 +15,7 @@ type Ui = {
   tablet: boolean;
 };
 
-const UiContext = createContext<Ui | null>(null);
+export const UiContext = createContext<Ui | null>(null);
 
 /**
  * App được vẽ ở khung 932x430 (iPhone 14 Pro Max nằm ngang). Galaxy Tab S9

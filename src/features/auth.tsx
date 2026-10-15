@@ -18,13 +18,12 @@ type AuthState =
 const AuthContext = createContext<AuthState>({ status: 'loading' });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({ status: 'loading' });
+  const [state, setState] = useState<AuthState>(() => UI_DEMO
+    ? { status: 'signed-in', userId: 'demo-user', email: 'demo@jetsona.local' }
+    : { status: 'loading' });
 
   useEffect(() => {
-    if (UI_DEMO) {
-      setState({ status: 'signed-in', userId: 'demo-user', email: 'demo@jetsona.local' });
-      return;
-    }
+    if (UI_DEMO) return;
     let active = true;
     let unsubscribe: (() => void) | null = null;
     // Chốt host vn/cn TRƯỚC khi tạo Supabase client, để client dùng đúng edge ngay từ đầu.

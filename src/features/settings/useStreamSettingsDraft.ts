@@ -3,7 +3,7 @@
 // công tắc là đã đổi. Các chỉnh sửa được gom lại một nhịp để kéo thanh bitrate
 // chỉ ghi một hàng thay vì bốn mươi, và phần còn chờ được ghi khi màn hình đóng.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { detectRegion } from '@/lib/detect-region';
 import { createClient } from '@/lib/supabase';
@@ -42,12 +42,10 @@ export function useStreamSettingsDraft(notify: Notify) {
   // Ghi lần lượt từng lượt một để hàng cũ không bao giờ đè lên hàng mới.
   const chain = useRef<Promise<void>>(Promise.resolve());
   const notifyRef = useRef(notify);
-  notifyRef.current = notify;
+  useLayoutEffect(() => { notifyRef.current = notify; }, [notify]);
 
-  const load = useCallback(async () => {
-    if (!snapshot) setLoading(true);
-    setLoadError(null);
-    try {
+  const load = useCallback(() => {
+    const read = async () => {
       const supabase = createClient();
       if (!supabase) throw new Error('Supabase chưa được cấu hình.');
       const { data: auth } = await supabase.auth.getUser();
@@ -57,19 +55,22 @@ export function useStreamSettingsDraft(notify: Notify) {
         fetchStreamSettingsDefaults(supabase, deviceClass),
       ]);
       if (settingsResult.error) throw settingsResult.error;
+      return { userId: auth.user.id, stored: settingsResult.data as Partial<StreamSettings> | null, streamDefaults };
+    };
+    return read().then(({ userId, stored, streamDefaults }) => {
       // Thay đổi xảy ra giữa chừng thắng hàng vừa đọc về.
       if (pending.current) return;
-      const next = completeSettings(auth.user.id, settingsResult.data as Partial<StreamSettings> | null, streamDefaults);
+      const next = completeSettings(userId, stored, streamDefaults);
       snapshot = { settings: next, defaults: streamDefaults };
       settingsRef.current = next;
       defaultsRef.current = streamDefaults;
       setSettings(next);
       setDefaults(streamDefaults);
-    } catch (error) {
+    }).catch((error) => {
       if (!snapshot) setLoadError(friendlyError(error, 'Không đọc được cài đặt. Vui lòng thử lại sau ít phút.'));
-    } finally {
+    }).finally(() => {
       setLoading(false);
-    }
+    });
   }, [deviceClass]);
 
   useEffect(() => {
@@ -146,9 +147,14 @@ export function useStreamSettingsDraft(notify: Notify) {
     ));
   }, [change]);
 
-  const hasDrift = Boolean(settings && defaults && streamSettingsDifferFromDefaults(settings, defaults));
+  const hasDrift = Boolean(settings && streamSettingsDifferFromDefaults(settings, defaults));
+  const reload = useCallback(() => {
+    if (!snapshot) setLoading(true);
+    setLoadError(null);
+    return load();
+  }, [load]);
 
-  return { deviceClass, settings, loading, loadError, saveState, hasDrift, reload: load, update, selectProfile, restoreDefaults };
+  return { deviceClass, settings, loading, loadError, saveState, hasDrift, reload, update, selectProfile, restoreDefaults };
 }
 
 export type StreamSettingsDraft = ReturnType<typeof useStreamSettingsDraft>;

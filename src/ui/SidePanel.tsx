@@ -11,6 +11,7 @@ import { colors, glass } from '@/theme';
 import { GlassBackdrop } from './GlassMaterial';
 import { Press } from './Press';
 import { useUi } from './scale';
+import { useMotion } from './motion';
 import { T } from './Text';
 
 /**
@@ -32,6 +33,7 @@ export function SidePanel({
   children: ReactNode;
 }) {
   const { s, width: screenWidth, insets } = useUi();
+  const { reduceMotion } = useMotion();
   const [enter] = useState(() => new Animated.Value(0));
   const closingRef = useRef(false);
 
@@ -41,9 +43,10 @@ export function SidePanel({
     enter.stopAnimation();
     Animated.timing(enter, {
       toValue: 0,
-      duration: 170,
+      duration: reduceMotion ? 0 : 170,
       easing: Easing.bezier(0.4, 0, 1, 1),
       useNativeDriver: true,
+      isInteraction: false,
     }).start(({ finished }) => {
       if (!finished) {
         closingRef.current = false;
@@ -51,7 +54,7 @@ export function SidePanel({
       }
       onClose();
     });
-  }, [enter, onClose]);
+  }, [enter, onClose, reduceMotion]);
 
   useBack(closeWithAnimation);
 
@@ -60,13 +63,14 @@ export function SidePanel({
     enter.setValue(0);
     const animation = Animated.timing(enter, {
       toValue: 1,
-      duration: 250,
+      duration: reduceMotion ? 0 : 250,
       easing: Easing.bezier(0.16, 1, 0.3, 1),
       useNativeDriver: true,
+      isInteraction: false,
     });
     animation.start();
     return () => animation.stop();
-  }, [enter]);
+  }, [enter, reduceMotion]);
 
   const panelWidth = Math.min(s(width), screenWidth * 0.68);
 

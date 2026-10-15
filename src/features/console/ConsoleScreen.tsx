@@ -10,8 +10,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, TextInput, View } from 'react-native';
 
 import { useSignedInUser } from '@/features/auth';
+import { resetFocusToTab } from '@/features/gamepad/focus';
 import { useBack, useGamepadTabs } from '@/features/gamepad/hooks';
 import { useCaptureMode } from '@/features/gamepad/captureMode';
+import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { formatStorePrice, isSteamAppId } from '@/features/library/format';
 import type { DownloadItem } from '@/features/library/DownloadNotificationCard';
 import { GameDetailPanel } from '@/features/library/GamePanels';
@@ -229,7 +231,7 @@ export default function ConsoleScreen() {
   const eulaDownload = promptDownload?.status === 'eula' ? promptDownload : null;
   const openPrompt = useCallback(() => { setPromptClosed(null); }, []);
   const profile = useSteamProfile(library.games, library.achievementCache);
-  const store = useSteamStore(activeTab === 'store');
+  const store = useSteamStore(activeTab === 'store' || storeSearchOpen);
   const storeSearch = useStoreSearch(storeQuery, storeSearchOpen);
   const storeDetail = useStoreGameDetail(selectedStoreItem);
   // Mua game: Steam client trên PC lo thanh toán, app chờ game vào thư viện rồi mời Tải.
@@ -238,8 +240,9 @@ export default function ConsoleScreen() {
   const [purchaseNotice, setPurchaseNotice] = useState<string | null>(null);
 
   // Mọi lượt tải để hiện ở tab Tải xuống của thông báo (kèm ảnh game trong thư viện).
+  const gamesByAppId = useMemo(() => new Map(library.games.map((game) => [game.steamAppId, game])), [library.games]);
   const downloadItems = useMemo<DownloadItem[]>(() => {
-    const gameFor = (appid: number) => library.games.find((game) => game.steamAppId === String(appid));
+    const gameFor = (appid: number) => gamesByAppId.get(String(appid));
     const list: GameDownload[] = allDownloads(downloads.state);
     const expected = downloads.expectedAppId;
     if (expected && !list.some((entry) => entry.appid === expected)) {
@@ -255,27 +258,23 @@ export default function ConsoleScreen() {
         imageUrl: game?.artworkUrl || game?.heroUrl || `https://cdn.cloudflare.steamstatic.com/steam/apps/${download.appid}/header.jpg`,
       };
     });
-  }, [downloads.expectedAppId, downloads.state, library.games]);
-  const activeDownloads = downloadItems.filter((item) => isDownloadActive(item.download));
+  }, [downloads.expectedAppId, downloads.state, gamesByAppId]);
+  const activeDownloads = useMemo(() => downloadItems.filter((item) => isDownloadActive(item.download)), [downloadItems]);
   const ringPercent = activeDownloads.find((item) => item.download.status === 'downloading' || item.download.status === 'working')?.download.percent ?? null;
 
   const storeFeatured = store.data?.featured || null;
   const storePreview = storePreviewItem || storeFeatured;
-  const lastActiveBackdrop = useRef<string | null | undefined>(selected?.heroUrl);
-
-  const backdropUrl = useMemo(() => {
-    if (activeTab === 'store') {
-      const url = storePreview?.backgroundImage || storePreview?.headerImage;
-      if (url) lastActiveBackdrop.current = url;
-      return url || lastActiveBackdrop.current;
-    }
-    if (activeTab === 'games') {
-      const url = selected?.heroUrl;
-      if (url) lastActiveBackdrop.current = url;
-      return url || lastActiveBackdrop.current;
-    }
-    return lastActiveBackdrop.current;
-  }, [activeTab, selected?.heroUrl, storePreview?.backgroundImage, storePreview?.headerImage]);
+  const storeHero = storePreview?.backgroundImage
+    || (storePreview?.appId ? `https://shared.steamstatic.com/store_item_assets/steam/apps/${storePreview.appId}/library_hero.jpg` : null);
+  // Reuse the exact shelf image, already decoded/cached when the card is visible.
+  const storeBackdropFallback = storePreview?.largeImage || storePreview?.headerImage || storePreview?.smallImage || null;
+  const gameHero = selected?.heroUrl
+    || (selected?.steamAppId ? `https://shared.steamstatic.com/store_item_assets/steam/apps/${selected.steamAppId}/library_hero.jpg` : null);
+  const backdropUrl = activeTab === 'store'
+    ? (storeHero || null)
+    : activeTab === 'games'
+      ? (gameHero || null)
+      : null;
   const uninstallAppId = isSteamAppId(uninstallTarget?.steamAppId) ? Number(uninstallTarget.steamAppId) : null;
   const uninstallOperation = uninstallForApp(downloads.state, uninstallAppId) ?? (
     uninstallAppId && downloads.expectedUninstallAppId === uninstallAppId ? {
@@ -294,14 +293,18 @@ export default function ConsoleScreen() {
     return () => clearTimeout(timer);
   }, [storeSearchOpen]);
 
-  const openStoreGame = (item: SteamStoreItem) => {
+  const openStoreGame = useCallback((item: SteamStoreItem) => {
     searchInputRef.current?.blur();
     setSelectedPromotion(null);
     setSelectedStoreItem(item);
-  };
+  }, []);
   const closeStoreDetail = () => { setSelectedStoreItem(null); setSelectedPromotion(null); };
 
   const switchTab = useCallback((tab: StoreTab) => {
+    if (tab !== activeTab) {
+      playUiSound('transition');
+      resetFocusToTab();
+    }
     setActiveTab(tab);
     setStoreSearchOpen(false);
     setMenuOpen(false);
@@ -310,7 +313,7 @@ export default function ConsoleScreen() {
     setSelectedPromotion(null);
     setRemoteMenuOpen(false);
     setDeviceMenuOpen(false);
-  }, []);
+  }, [activeTab]);
 
   const anyOverlay = Boolean(settingsCategory || selectedStoreItem || selectedPromotion || panel || menuOpen || storeSearchOpen || powerOpen || remoteMenuOpen || deviceMenuOpen || uninstallTarget || purchase.visible);
 
@@ -331,11 +334,12 @@ export default function ConsoleScreen() {
     if (next) switchTab(next);
   });
 
+  const { selectGame: setSelectedGame } = library;
   const selectGame = useCallback((id: string) => {
-    library.selectGame(id);
+    setSelectedGame(id);
     setMenuOpen(false);
     setPanel(null);
-  }, [library]);
+  }, [setSelectedGame]);
 
   const openProfile = () => {
     setMenuOpen(false);
@@ -531,11 +535,11 @@ export default function ConsoleScreen() {
     }
   };
 
-  const pressStoreKey = (key: string) => {
+  const pressStoreKey = useCallback((key: string) => {
     setStoreQuery((current) => `${current}${key.toLocaleLowerCase('vi')}`.slice(0, 80));
-  };
-  const eraseStoreKey = () => setStoreQuery((current) => Array.from(current).slice(0, -1).join(''));
-  const submitStoreSearch = useCallback(() => { if (storeSearch.results[0]) openStoreGame(storeSearch.results[0]); }, [storeSearch.results]);
+  }, []);
+  const eraseStoreKey = useCallback(() => setStoreQuery((current) => Array.from(current).slice(0, -1).join('')), []);
+  const submitStoreSearch = useCallback(() => { if (storeSearch.results[0]) openStoreGame(storeSearch.results[0]); }, [openStoreGame, storeSearch.results]);
 
   const storeContent = useMemo(() => (
     storeSearchOpen ? (
@@ -553,12 +557,14 @@ export default function ConsoleScreen() {
         onOpenGame={openStoreGame}
         onOpenPromotion={(promotion) => { setSelectedStoreItem(null); setSelectedPromotion(promotion); }}
       />
+    ) : !store.data && !store.error ? (
+      <StoreLoading />
     ) : (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <T size={12} color="rgba(255,255,255,0.48)">Steam Store chưa có nội dung để hiển thị.</T>
       </View>
     )
-  ), [storeSearchOpen, storeQuery, storeSearch, store, storeFeatured, storePreview, submitStoreSearch]);
+  ), [storeSearchOpen, storeQuery, storeSearch, store, storeFeatured, storePreview, openStoreGame, pressStoreKey, eraseStoreKey, submitStoreSearch]);
 
   const gamesContent = useMemo(() => (
     library.loading && !library.games.length ? (
@@ -610,22 +616,25 @@ export default function ConsoleScreen() {
     <GlassBlurProvider targetRef={blurTargetRef}>
       <View ref={rootRef} collapsable={false} style={styles.root}>
         <BlurTargetView ref={blurTargetRef} style={StyleSheet.absoluteFill}>
-          <LibraryBackdrop url={backdropUrl} store={activeTab === 'store'} />
+          <LibraryBackdrop url={backdropUrl} fallbackUrl={activeTab === 'store' ? storeBackdropFallback : activeTab === 'games' ? selected?.artworkUrl : null} store={activeTab === 'store'} />
           <PcWallpaper visible={activeTab === 'pc'} />
-          <View style={[styles.contentFrame, {
+        </BlurTargetView>
+
+        <View
+          style={[styles.contentFrame, {
             paddingLeft: s(22) + insets.left,
             paddingRight: s(22) + insets.right,
             paddingTop: s(10) + insets.top,
             paddingBottom: s(12) + insets.bottom,
           }]}
-          >
-            <View style={{ height: s(48) }} />
-            <ConsoleTabTransition
-              activeTab={activeTab}
-              renderTab={renderTab}
-            />
-          </View>
-        </BlurTargetView>
+          pointerEvents="box-none"
+        >
+          <View style={{ height: s(48) }} />
+          <ConsoleTabTransition
+            activeTab={activeTab}
+            renderTab={renderTab}
+          />
+        </View>
 
         <View
           pointerEvents="box-none"

@@ -1,4 +1,8 @@
-import { useEffect, useState, type MutableRefObject } from 'react';
+import { useCallback, useMemo, useState, type MutableRefObject } from 'react';
+import { useFocusEffect } from 'expo-router';
+
+import type { TimedCache } from '@/lib/timed-cache';
+import { useMotion } from '@/ui/motion';
 
 type Result<T> = { key: number; data: T | null; error: string | null };
 
@@ -9,40 +13,44 @@ type Result<T> = { key: number; data: T | null; error: string | null };
  */
 export function useCachedResource<T>(
   key: number | null,
-  cache: MutableRefObject<Map<number, T>>,
+  cache: MutableRefObject<TimedCache<number, T>>,
   load: (key: number, signal: AbortSignal) => Promise<T>,
   fallbackError: string,
 ) {
   const [result, setResult] = useState<Result<T> | null>(null);
+  const { active } = useMotion();
 
-  useEffect(() => {
-    if (key === null) return;
-    const cached = cache.current.get(key);
-    if (cached) {
-      setResult({ key, data: cached, error: null });
-      return;
-    }
-
+  useFocusEffect(useCallback(() => {
+    if (key === null || !active) return;
     const controller = new AbortController();
-    void load(key, controller.signal)
-      .then((data) => {
-        cache.current.set(key, data);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = async () => {
+      if (controller.signal.aborted) return;
+      try {
+        const cached = cache.current.get(key);
+        const data = cached ?? await load(key, controller.signal);
+        if (controller.signal.aborted) return;
+        if (cached === undefined) cache.current.set(key, data);
         setResult({ key, data, error: null });
-      })
-      .catch((loadError: unknown) => {
+        timer = setTimeout(() => void refresh(), cache.current.remainingMs(key));
+      } catch (loadError: unknown) {
         if (controller.signal.aborted) return;
         setResult({ key, data: null, error: loadError instanceof Error ? loadError.message : fallbackError });
-      });
+        timer = setTimeout(() => void refresh(), 30_000);
+      }
+    };
+    // Keep cache hits asynchronous as well, avoiding a synchronous effect update.
+    void Promise.resolve().then(refresh);
 
-    return () => controller.abort();
-  }, [cache, fallbackError, key, load]);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [active, cache, fallbackError, key, load]));
 
+  const cached = key === null ? undefined : cache.current.get(key);
   const current = key !== null && result?.key === key ? result : null;
-  return {
-    data: current?.data ?? null,
-    error: current?.error ?? null,
-    loading: key !== null && !current,
-  };
+  const data = cached ?? null;
+  const error = cached !== undefined ? null : current?.error ?? null;
+  const loading = key !== null && cached === undefined && !error;
+  return useMemo(() => ({ data, error, loading }), [data, error, loading]);
 }
 
 export { pcFetchJson as fetchJson } from '@/lib/pc-api';

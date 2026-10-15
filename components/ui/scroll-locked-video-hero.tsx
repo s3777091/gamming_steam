@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { Asset } from "expo-asset"
 
 // ─────────────────────────────────────────────────────────────
 // THE CITY OPENS — locked scroll-scrub video hero
@@ -26,7 +27,9 @@ export interface MetroHeroProps {
   style?: React.CSSProperties
 }
 
-const DEFAULT_VIDEO = "https://cdn.21st.dev/assets/mirror/21/21a77eac28eacbb7e142016eefeaa0b4a766619e51113629a3bc6df6af066c0f.mp4"
+const DEFAULT_VIDEO = Asset.fromModule(
+  require("../../assets/video/train_doors_closed_loop_6s.mp4"),
+).uri
 const DEFAULT_SIGNATURE = { name: "guglielmogiannattasio.exe", url: "https://www.guglielmogiannattasio.it" }
 const SANS = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
 

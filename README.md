@@ -92,6 +92,12 @@ chụp khi mở kênh, và một dây an toàn đọc **một lần** nếu PC c
   `extra.imageProxyUrl`, để rỗng để tắt) và tự thử lại URL gốc nếu proxy lỗi.
 - Danh sách thiết bị, Bluetooth, tai nghe cập nhật bằng **sự kiện** (InputDeviceListener,
   AudioDeviceCallback, broadcast Bluetooth).
+- Android có thể gộp các giao diện HID thành một thiết bị như `Gamepad Controller Keyboard`
+  (đã kiểm tra trên Galaxy Tab S9+, VID/PID `0f0d:0213`). Khi có nguồn `GAMEPAD` hoặc
+  `JOYSTICK`, thiết bị phải được nhận là tay cầm kể cả khi có kiểu `ALPHABETIC` và
+  đầy đủ phím chữ. Định tuyến từng sự kiện để nút/cần vẫn vào tay cầm, còn chữ và
+  chuyển động chuột vẫn đi đúng đường bàn phím/chuột. Không dùng khả năng gõ chữ
+  để chặn sự kiện joystick; bàn phím Book Cover có D-pad vẫn là bàn phím.
 - *Cài đặt › Tay cầm* có bộ kiểm tra tín hiệu trực tiếp (nút, cần, cò) để thử từng tay cầm
   (ví dụ Rapoo V610M) và nút **Thử rung**.
 
@@ -102,5 +108,14 @@ tay cầm.
 ## Kiểm tra
 
 ```bash
+npm test
+npx expo lint
 npx tsc --noEmit
+cd android
+./gradlew :jetsona-input:testReleaseUnitTest
 ```
+
+Profile EAS `preview` chạy kiểm tra hồi quy native của tay cầm trước khi xuất APK;
+build sẽ thất bại nếu kiểm tra này không đạt. Trên Windows nếu JVM báo lỗi đường
+dẫn thư viện có dấu cách, thêm `-Djava.library.path=C:/Windows/System32` vào lệnh
+Gradle kiểm tra (các kiểm tra phân loại này không dùng thư viện JNI).

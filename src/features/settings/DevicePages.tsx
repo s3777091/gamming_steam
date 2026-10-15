@@ -13,7 +13,6 @@ import {
   Gamepad2,
   Headphones,
   Plus,
-  RotateCcw,
   Vibrate,
 } from 'lucide-react-native';
 import {
@@ -53,6 +52,7 @@ import {
 } from './controls';
 import { useSuspendCursor } from '@/features/gamepad/hooks';
 import { webCodeForKeyCode } from './keycodes';
+import { useSettingsRestore } from './SettingsRestore';
 import { HOST_SHORTCUT_OPTIONS, type InputSettingsState } from './useInputSettings';
 import type { Notify } from './useStreamSettingsDraft';
 import {
@@ -119,7 +119,7 @@ function DeviceRow({ device }: { device: LocalDevice }) {
             right: -s(1),
             bottom: -s(1),
             borderWidth: 1.5,
-            borderColor: '#111821',
+            borderColor: 'rgba(16, 23, 34, 0.95)',
             backgroundColor: appleColors.green,
           }}
         />
@@ -242,9 +242,11 @@ function Bar({ label, value, signed }: { label: string; value: number; signed?: 
       </View>
       <View
         style={{
-          height: s(5),
-          borderRadius: s(2.5),
-          backgroundColor: 'rgba(255, 255, 255, 0.10)',
+          height: s(6),
+          borderRadius: s(3),
+          backgroundColor: 'rgba(255, 255, 255, 0.08)',
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: 'rgba(255, 255, 255, 0.12)',
           overflow: 'hidden',
         }}
       >
@@ -253,6 +255,7 @@ function Bar({ label, value, signed }: { label: string; value: number; signed?: 
             width: `${Math.max(0, Math.min(1, ratio)) * 100}%`,
             height: '100%',
             backgroundColor: appleColors.blue,
+            borderRadius: s(3),
           }}
         />
       </View>
@@ -338,10 +341,12 @@ function ControllerInspector({
                     minWidth: s(34),
                     height: s(24),
                     paddingHorizontal: s(6),
-                    borderRadius: s(5),
+                    borderRadius: s(6),
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: on ? appleColors.blue : 'rgba(255, 255, 255, 0.08)',
+                    backgroundColor: on ? 'rgba(31, 111, 235, 0.28)' : 'rgba(255, 255, 255, 0.08)',
+                    borderWidth: 1,
+                    borderColor: on ? 'rgba(102, 168, 255, 0.45)' : 'rgba(255, 255, 255, 0.12)',
                   }}
                 >
                   <T size={10} weight="semibold" color={on ? '#FFFFFF' : 'rgba(255, 255, 255, 0.75)'}>
@@ -360,10 +365,12 @@ function ControllerInspector({
                   minWidth: s(34),
                   height: s(24),
                   paddingHorizontal: s(6),
-                  borderRadius: s(5),
+                  borderRadius: s(6),
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: on ? appleColors.blue : 'rgba(255, 255, 255, 0.08)',
+                  backgroundColor: on ? 'rgba(31, 111, 235, 0.28)' : 'rgba(255, 255, 255, 0.08)',
+                  borderWidth: 1,
+                  borderColor: on ? 'rgba(102, 168, 255, 0.45)' : 'rgba(255, 255, 255, 0.12)',
                 }}
               >
                 <T size={10} weight="semibold" color={on ? '#FFFFFF' : 'rgba(255, 255, 255, 0.75)'}>
@@ -404,6 +411,15 @@ export function ControllerPage({ input }: { input: InputSettingsState }) {
     testing.current = target.nativeId;
     rumble(target.nativeId, settings.vibrationStrength / 100, settings.vibrationStrength / 100, 400);
   }, [pads, settings.vibrationStrength]);
+
+  useSettingsRestore(() => {
+    update('controllerLayout', DEFAULT_INPUT_SETTINGS.controllerLayout);
+    update('vibrationEnabled', DEFAULT_INPUT_SETTINGS.vibrationEnabled);
+    update('vibrationStrength', DEFAULT_INPUT_SETTINGS.vibrationStrength);
+    update('leftDeadzone', DEFAULT_INPUT_SETTINGS.leftDeadzone);
+    update('rightDeadzone', DEFAULT_INPUT_SETTINGS.rightDeadzone);
+    update('triggerDeadzone', DEFAULT_INPUT_SETTINGS.triggerDeadzone);
+  });
 
   return (
     <>
@@ -499,22 +515,6 @@ export function ControllerPage({ input }: { input: InputSettingsState }) {
           onChange={(value) => update('triggerDeadzone', value)}
         />
       </SettingsGroup>
-
-      <SettingsGroup>
-        <ActionRow
-          icon={RotateCcw}
-          iconBg={appleColors.orange}
-          label="Khôi phục mặc định"
-          onPress={() => {
-            update('controllerLayout', DEFAULT_INPUT_SETTINGS.controllerLayout);
-            update('vibrationEnabled', DEFAULT_INPUT_SETTINGS.vibrationEnabled);
-            update('vibrationStrength', DEFAULT_INPUT_SETTINGS.vibrationStrength);
-            update('leftDeadzone', DEFAULT_INPUT_SETTINGS.leftDeadzone);
-            update('rightDeadzone', DEFAULT_INPUT_SETTINGS.rightDeadzone);
-            update('triggerDeadzone', DEFAULT_INPUT_SETTINGS.triggerDeadzone);
-          }}
-        />
-      </SettingsGroup>
     </>
   );
 }
@@ -530,6 +530,12 @@ export function MousePage({ input }: { input: InputSettingsState }) {
     settings.mouseSensitivity === DEFAULT_INPUT_SETTINGS.mouseSensitivity &&
     settings.scrollSensitivity === DEFAULT_INPUT_SETTINGS.scrollSensitivity &&
     settings.invertScroll === DEFAULT_INPUT_SETTINGS.invertScroll;
+
+  useSettingsRestore(() => {
+    update('mouseSensitivity', DEFAULT_INPUT_SETTINGS.mouseSensitivity);
+    update('scrollSensitivity', DEFAULT_INPUT_SETTINGS.scrollSensitivity);
+    update('invertScroll', DEFAULT_INPUT_SETTINGS.invertScroll);
+  }, { disabled: isDefault });
 
   return (
     <>
@@ -577,21 +583,6 @@ export function MousePage({ input }: { input: InputSettingsState }) {
           onChange={(value) => update('invertScroll', value)}
         />
       </SettingsGroup>
-
-      <SettingsGroup>
-        <ActionRow
-          icon={RotateCcw}
-          iconBg={appleColors.orange}
-          label="Khôi phục mặc định"
-          detail="Tốc độ 1.00×, không đảo chiều"
-          disabled={isDefault}
-          onPress={() => {
-            update('mouseSensitivity', DEFAULT_INPUT_SETTINGS.mouseSensitivity);
-            update('scrollSensitivity', DEFAULT_INPUT_SETTINGS.scrollSensitivity);
-            update('invertScroll', DEFAULT_INPUT_SETTINGS.invertScroll);
-          }}
-        />
-      </SettingsGroup>
     </>
   );
 }
@@ -629,22 +620,24 @@ function KeyCapture({
   return (
     <Press
       onPress={() => setListening((current) => !current)}
+      pressScale={0.97}
       style={{
         height: s(28),
         minWidth: s(84),
         paddingHorizontal: s(10),
-        borderRadius: s(6),
+        borderRadius: s(7),
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: listening ? appleColors.blue : 'rgba(255, 255, 255, 0.18)',
-        backgroundColor: listening ? 'rgba(31, 111, 235, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+        borderColor: listening ? 'rgba(102, 168, 255, 0.45)' : 'rgba(255, 255, 255, 0.18)',
+        backgroundColor: listening ? 'rgba(31, 111, 235, 0.22)' : 'rgba(255, 255, 255, 0.08)',
+        overflow: 'hidden',
       }}
     >
       <T
         size={10.4}
         weight="semibold"
-        color={listening ? appleColors.blue : value ? appleColors.text : appleColors.textTertiary}
+        color={listening ? '#8bbcff' : value ? appleColors.text : appleColors.textTertiary}
       >
         {listening ? 'Nhấn một phím…' : value ? keyCodeLabel(value) : placeholder}
       </T>
@@ -679,8 +672,10 @@ function ActionPicker({
               justifyContent: 'center',
               paddingHorizontal: s(10),
               paddingVertical: s(6),
-              borderRadius: s(6),
-              backgroundColor: active ? appleColors.blue : 'rgba(255, 255, 255, 0.08)',
+              borderRadius: s(8),
+              backgroundColor: active ? 'rgba(31, 111, 235, 0.28)' : 'rgba(255, 255, 255, 0.07)',
+              borderWidth: 1,
+              borderColor: active ? 'rgba(102, 168, 255, 0.45)' : 'rgba(255, 255, 255, 0.12)',
             }}
           >
             <T
@@ -738,6 +733,13 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
     setOpenCode(code);
   };
 
+  useSettingsRestore(() => {
+    update('hostKey', DEFAULT_INPUT_SETTINGS.hostKey);
+    update('hostShortcuts', DEFAULT_INPUT_SETTINGS.hostShortcuts);
+    update('keyboardRemaps', {});
+    setOpenCode(null);
+  });
+
   return (
     <>
       <SettingsGroup title="Kiểm tra tín hiệu bàn phím">
@@ -752,10 +754,10 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
             marginHorizontal: s(14),
             marginBottom: s(8),
             padding: s(12),
-            borderRadius: s(10),
-            backgroundColor: '#0c121a',
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: appleColors.cardBorder,
+            borderRadius: s(12),
+            backgroundColor: 'rgba(16, 23, 34, 0.65)',
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.12)',
           }}
         >
           <T size={10.8} color={appleColors.textSecondary} leading={1.4}>
@@ -774,7 +776,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
                 pressScale={0.995}
                 style={rowStyle(s, {
                   minHeight: s(48),
-                  backgroundColor: open ? '#0c121a' : appleColors.card,
+                  backgroundColor: open ? 'rgba(9, 14, 22, 0.82)' : 'transparent',
                 })}
               >
                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(5) }}>
@@ -795,7 +797,9 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
                     paddingBottom: s(12),
                     paddingTop: s(4),
                     gap: s(8),
-                    backgroundColor: '#0c121a',
+                    backgroundColor: 'rgba(9, 14, 22, 0.82)',
+                    borderTopWidth: StyleSheet.hairlineWidth,
+                    borderTopColor: 'rgba(255, 255, 255, 0.08)',
                   }}
                 >
                   <ActionPicker
@@ -838,7 +842,9 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
               paddingHorizontal: s(14),
               paddingVertical: s(12),
               gap: s(8),
-              backgroundColor: '#0c121a',
+              backgroundColor: 'rgba(9, 14, 22, 0.82)',
+              borderTopWidth: StyleSheet.hairlineWidth,
+              borderTopColor: 'rgba(255, 255, 255, 0.08)',
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(5) }}>
@@ -944,21 +950,6 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
           </PillButton>
         </View>
       </SettingsGroup>
-
-      <SettingsGroup>
-        <ActionRow
-          icon={RotateCcw}
-          iconBg={appleColors.orange}
-          label="Khôi phục phím mặc định"
-          detail="Đặt lại phím tắt và xóa toàn bộ ánh xạ phím đã đổi"
-          onPress={() => {
-            update('hostKey', DEFAULT_INPUT_SETTINGS.hostKey);
-            update('hostShortcuts', DEFAULT_INPUT_SETTINGS.hostShortcuts);
-            update('keyboardRemaps', {});
-            setOpenCode(null);
-          }}
-        />
-      </SettingsGroup>
     </>
   );
 }
@@ -971,6 +962,11 @@ export function AudioPage({ input }: { input: InputSettingsState }) {
   const { settings, update } = input;
   const { devices } = useInputDevices();
   const headsets = devices.filter((device) => device.kind === 'headset');
+
+  useSettingsRestore(() => {
+    update('audioVolume', 100);
+    update('audioMuted', false);
+  }, { disabled: settings.audioVolume === 100 && !settings.audioMuted });
 
   return (
     <>
@@ -1033,20 +1029,6 @@ export function AudioPage({ input }: { input: InputSettingsState }) {
           detail="Chỉ tắt âm thanh phát ra tại thiết bị này"
           checked={settings.audioMuted}
           onChange={(value) => update('audioMuted', value)}
-        />
-      </SettingsGroup>
-
-      <SettingsGroup>
-        <ActionRow
-          icon={RotateCcw}
-          iconBg={appleColors.orange}
-          label="Khôi phục mặc định"
-          detail="Âm lượng 100%, bật tiếng"
-          disabled={settings.audioVolume === 100 && !settings.audioMuted}
-          onPress={() => {
-            update('audioVolume', 100);
-            update('audioMuted', false);
-          }}
         />
       </SettingsGroup>
     </>

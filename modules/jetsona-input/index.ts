@@ -1,7 +1,6 @@
 import Native from './src/JetsonaInputModule';
 import type {
   CaptureMode,
-  GamepadButtonName,
   JetsonaInputModuleEvents,
   NativeBluetoothInfo,
   NativeDeviceDescription,
@@ -73,10 +72,13 @@ export function addListener<K extends keyof JetsonaInputModuleEvents>(
   return () => subscription.remove();
 }
 
-export type { GamepadButtonName };
-
 export function getDisplayInfo(): NativeDisplayInfo | null {
   return Native?.getDisplayInfo() ?? null;
+}
+
+/** Zero restores the window preference after the stream ends. */
+export function setStreamFrameRate(fps: number): void {
+  Native?.setStreamFrameRate?.(fps);
 }
 
 /** Giữ lại khung hình đang hiện trên màn (gồm video stream) ngay lúc này. */

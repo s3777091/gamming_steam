@@ -9,7 +9,7 @@
 
 import {
   createContext, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useRef, useSyncExternalStore,
-  type ReactNode, type RefObject,
+  useLayoutEffect, useState, type ReactNode, type RefObject,
 } from 'react';
 import {
   ScrollView, View, type NativeScrollEvent, type NativeSyntheticEvent, type ScrollViewProps,
@@ -49,7 +49,7 @@ const nodes = new Map<number, FocusNode>();
 const layers: number[] = [];
 const layerScrolls = new Map<number, ScrollTarget>();
 const lastFocusByLayer = new Map<number, number>();
-const listeners = new Set<() => void>();
+const listeners = new Map<number, Set<() => void>>();
 
 let nextId = 1;
 let focusedId: number | null = null;
@@ -59,6 +59,7 @@ let viewport = { width: 1280, height: 800 };
 let moving = false;
 let queuedDirection: Direction | null = null;
 let repickTimer: ReturnType<typeof setTimeout> | undefined;
+let focusEpoch = 0;
 
 const REVEAL_PADDING = 24;
 const SCROLL_STEP = 180;
@@ -66,13 +67,18 @@ const MEASURE_TIMEOUT_MS = 160;
 /** Chờ lớp phủ vừa mở xong animation trượt vào rồi mới đo và chọn ô đầu tiên. */
 const LAYER_SETTLE_MS = 340;
 
-function notify() {
-  listeners.forEach((listener) => listener());
+function notify(id: number | null) {
+  if (id !== null) listeners.get(id)?.forEach((listener) => listener());
 }
 
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => { listeners.delete(listener); };
+function subscribe(id: number, listener: () => void): () => void {
+  let group = listeners.get(id);
+  if (!group) { group = new Set(); listeners.set(id, group); }
+  group.add(listener);
+  return () => {
+    group.delete(listener);
+    if (!group.size) listeners.delete(id);
+  };
 }
 
 function currentLayer(): number {
@@ -80,15 +86,19 @@ function currentLayer(): number {
 }
 
 function setFocused(id: number | null, rect: Rect | null) {
+  const previous = focusedId;
   focusedId = id;
   focusedRect = rect;
-  notify();
+  if (previous !== id) {
+    notify(previous);
+    notify(id);
+  }
 }
 
 function setActive(active: boolean) {
   if (padActive === active) return;
   padActive = active;
-  notify();
+  notify(focusedId);
 }
 
 // ---------------------------------------------------------------- đo đạc
@@ -118,10 +128,10 @@ function intersectsViewport(rect: Rect): boolean {
   return rect.x < viewport.width && rect.y < viewport.height && rect.x + rect.w > 0 && rect.y + rect.h > 0;
 }
 
-async function measureLayer(layer: number): Promise<Array<Candidate<FocusNode>>> {
+async function measureLayer(layer: number): Promise<Candidate<FocusNode>[]> {
   const pool = Array.from(nodes.values()).filter((node) => node.layer === layer && !node.isDisabled());
   const rects = await Promise.all(pool.map(measureNode));
-  const result: Array<Candidate<FocusNode>> = [];
+  const result: Candidate<FocusNode>[] = [];
   pool.forEach((node, index) => {
     const rect = rects[index];
     // Phần tử nằm trong ScrollView được phép ở ngoài màn hình (sẽ cuộn tới).
@@ -187,12 +197,13 @@ export function scrollFocused(dx: number, dy: number): void {
 // ---------------------------------------------------------------- điều hướng
 
 function focusNode(node: FocusNode, rect: Rect) {
+  if (nodes.get(node.id) !== node || node.layer !== currentLayer() || node.isDisabled()) return;
   lastFocusByLayer.set(node.layer, node.id);
   setFocused(node.id, rect);
   void reveal(node, rect);
 }
 
-function pickDefault(items: Array<Candidate<FocusNode>>): FocusNode | null {
+function pickDefault(items: Candidate<FocusNode>[]): FocusNode | null {
   const layer = items[0]?.item.layer;
   const remembered = layer === undefined ? undefined : lastFocusByLayer.get(layer);
   const previous = remembered === undefined ? undefined : items.find((entry) => entry.item.id === remembered);
@@ -202,8 +213,9 @@ function pickDefault(items: Array<Candidate<FocusNode>>): FocusNode | null {
 }
 
 async function runMove(direction: Direction) {
+  const epoch = focusEpoch;
   const items = await measureLayer(currentLayer());
-  if (!items.length) return;
+  if (epoch !== focusEpoch || !items.length) return;
   const current = focusedId === null ? undefined : items.find((entry) => entry.item.id === focusedId);
 
   // Lần bấm đầu sau khi chạm màn hình hoặc mở lớp mới: hiện tiêu điểm, chưa di chuyển.
@@ -256,11 +268,17 @@ export function activateFocus(): boolean {
 
 /** Người dùng chạm màn hình: ẩn viền tiêu điểm cho tới lần bấm D-pad kế tiếp. */
 export function deactivateFocus(): void {
+  focusEpoch += 1;
+  queuedDirection = null;
   setActive(false);
 }
 
 export function isFocusActive(): boolean {
   return padActive;
+}
+
+export function ensureFocusActive(): void {
+  setActive(true);
 }
 
 export function setFocusViewport(width: number, height: number): void {
@@ -269,21 +287,25 @@ export function setFocusViewport(width: number, height: number): void {
 
 /** Chọn ô mặc định của lớp trên cùng (sau khi mở lớp phủ hoặc đóng lớp phủ). */
 async function focusLayerDefault() {
+  const epoch = focusEpoch;
   const items = await measureLayer(currentLayer());
+  if (epoch !== focusEpoch) return;
   if (!items.length) { setFocused(null, null); return; }
   const first = pickDefault(items);
   const rect = first ? items.find((entry) => entry.item === first)!.rect : null;
   if (first && rect) focusNode(first, rect);
 }
 
-/** Ô đang được chọn biến mất (đóng menu, đổi tab): nhảy sang ô gần nó nhất. */
+/** Ô đang được chọn biến mất (đóng menu): nhảy sang ô gần nó nhất. */
 function scheduleRepick() {
   clearTimeout(repickTimer);
   repickTimer = setTimeout(async () => {
+    const epoch = focusEpoch;
     if (focusedId !== null && nodes.has(focusedId)) return;
     const origin = focusedRect;
     if (!padActive) { setFocused(null, null); return; }
     const items = await measureLayer(currentLayer());
+    if (epoch !== focusEpoch) return;
     if (focusedId !== null && nodes.has(focusedId)) return;
     const next = origin
       ? pickNearest({ x: origin.x + origin.w / 2, y: origin.y + origin.h / 2 }, items)
@@ -291,6 +313,25 @@ function scheduleRepick() {
     const rect = next ? items.find((entry) => entry.item === next)!.rect : null;
     if (next && rect) focusNode(next, rect); else setFocused(null, null);
   }, 90);
+}
+
+/**
+ * Chuyển tab (Games, Store, PC): hủy repick dở dang của tab cũ,
+ * xóa tiêu điểm cũ và chọn phần tử mặc định (autoFocus) của tab mới.
+ */
+export function resetFocusToTab(): void {
+  focusEpoch += 1;
+  clearTimeout(repickTimer);
+  const previous = focusedId;
+  focusedId = null;
+  focusedRect = null;
+  queuedDirection = null;
+  lastFocusByLayer.delete(currentLayer());
+  notify(previous);
+  if (!padActive) return;
+  repickTimer = setTimeout(() => {
+    void focusLayerDefault();
+  }, 110);
 }
 
 // ---------------------------------------------------------------- React
@@ -303,11 +344,10 @@ const ScrollContext = createContext<ScrollTarget | null>(null);
  * dung của mọi lớp phủ chiếm cả màn hình (cài đặt, panel, hộp thoại).
  */
 export function FocusLayer({ children }: { children: ReactNode }) {
-  const idRef = useRef(0);
-  if (!idRef.current) idRef.current = nextId++;
-  const id = idRef.current;
+  const [id] = useState(() => nextId++);
 
   useEffect(() => {
+    focusEpoch += 1;
     layers.push(id);
     playUiSound('transition');
     let settle: ReturnType<typeof setTimeout> | undefined;
@@ -316,6 +356,7 @@ export function FocusLayer({ children }: { children: ReactNode }) {
       settle = setTimeout(() => void focusLayerDefault(), LAYER_SETTLE_MS);
     }
     return () => {
+      focusEpoch += 1;
       clearTimeout(settle);
       const index = layers.lastIndexOf(id);
       if (index >= 0) layers.splice(index, 1);
@@ -343,6 +384,10 @@ export function FocusLayer({ children }: { children: ReactNode }) {
 
 const SuspendContext = createContext(false);
 
+export function useSceneActive(): boolean {
+  return !useContext(SuspendContext);
+}
+
 /**
  * Tạm tắt điều hướng tay cầm cho phần nội dung vẫn đang mount nhưng không hiển thị
  * (tab ẩn giữ nguyên trong cây để ảnh không phải tải lại). Mọi `Press` bên trong thôi
@@ -358,20 +403,21 @@ type FocusableOptions = {
   disabled?: boolean;
   enabled?: boolean;
   autoFocus?: boolean;
+  requestFocus?: boolean;
   adjust?: (step: -1 | 1) => boolean;
 };
 
 /** Đăng ký một phần tử điều hướng được; trả về true khi nó đang là ô được chọn. */
-export function useFocusable({ ref, onPress, disabled = false, enabled = true, autoFocus = false, adjust }: FocusableOptions): boolean {
+export function useFocusable({ ref, onPress, disabled = false, enabled = true, autoFocus = false, requestFocus = false, adjust }: FocusableOptions): boolean {
   const layer = useContext(LayerContext);
   const scroll = useContext(ScrollContext);
   const suspended = useContext(SuspendContext);
-  const idRef = useRef(0);
-  if (!idRef.current) idRef.current = nextId++;
-  const id = idRef.current;
+  const [id] = useState(() => nextId++);
 
   const latest = useRef({ onPress, disabled, adjust });
-  latest.current = { onPress, disabled, adjust };
+  useLayoutEffect(() => {
+    latest.current = { onPress, disabled, adjust };
+  }, [onPress, disabled, adjust]);
 
   useEffect(() => {
     if (!enabled || suspended) return;
@@ -388,8 +434,29 @@ export function useFocusable({ ref, onPress, disabled = false, enabled = true, a
     };
   }, [autoFocus, enabled, id, layer, ref, scroll, suspended]);
 
+  useEffect(() => {
+    if (!requestFocus || !enabled || suspended || !padActive) return;
+    let cancelled = false;
+    const attempt = (retries = 2) => {
+      if (cancelled) return;
+      const node = nodes.get(id);
+      if (!node || node.isDisabled()) return;
+      void measureNode(node).then((rect) => {
+        if (cancelled) return;
+        if (rect) {
+          focusNode(node, rect);
+        } else if (retries > 0) {
+          requestAnimationFrame(() => attempt(retries - 1));
+        }
+      });
+    };
+    attempt();
+    return () => { cancelled = true; };
+  }, [requestFocus, enabled, suspended, id]);
+
+  const subscribeFocus = useCallback((listener: () => void) => subscribe(id, listener), [id]);
   return useSyncExternalStore(
-    subscribe,
+    subscribeFocus,
     () => padActive && focusedId === id,
     () => false,
   );

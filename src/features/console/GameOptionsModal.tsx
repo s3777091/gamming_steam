@@ -60,9 +60,9 @@ function ActionItem({
         marginHorizontal: s(10),
         marginVertical: s(2),
         borderRadius: s(12),
-        backgroundColor: danger ? 'rgba(111,31,31,0.50)' : glass.surfaceThin,
+        backgroundColor: glass.surfaceThin,
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: danger ? 'rgba(239,68,68,0.30)' : glass.borderSubtle,
+        borderColor: glass.borderSubtle,
         opacity: disabled ? 0.5 : 1,
         overflow: 'hidden',
       }}
@@ -75,7 +75,7 @@ function ActionItem({
           left: 0,
           right: 0,
           height: StyleSheet.hairlineWidth,
-          backgroundColor: danger ? 'rgba(248,113,113,0.28)' : 'rgba(255,255,255,0.12)',
+          backgroundColor: 'rgba(255,255,255,0.12)',
         }}
         pointerEvents="none"
       />
@@ -87,9 +87,9 @@ function ActionItem({
             borderRadius: s(8),
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: danger ? 'rgba(239,68,68,0.18)' : glass.surface,
+            backgroundColor: danger ? 'rgba(239,68,68,0.14)' : glass.surface,
             borderWidth: StyleSheet.hairlineWidth,
-            borderColor: danger ? 'rgba(239,68,68,0.34)' : glass.border,
+            borderColor: danger ? 'rgba(239,68,68,0.24)' : glass.border,
           }}
         >
           <Icon size={s(15)} color={tint} strokeWidth={2} />

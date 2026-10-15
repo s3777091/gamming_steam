@@ -22,7 +22,7 @@ export type NativeBluetoothInfo = {
   enabled: boolean;
   /** Đã có quyền BLUETOOTH_CONNECT (Android 12+). */
   permitted: boolean;
-  bonded: Array<{ name: string; type: number | null }>;
+  bonded: { name: string; type: number | null }[];
 };
 
 /** Cờ nút đúng như gói `controller` của moonlight-web. */
@@ -85,6 +85,9 @@ export type NativeDeviceDescription = {
 export type NativeDisplayInfo = {
   /** Hz thật của panel, ví dụ 120.0. */
   refreshRate: number;
+  /** Rates available at the current resolution; optional on older builds. */
+  supportedRefreshRates?: number[];
+  smallestScreenWidthDp?: number;
   widthPx: number;
   heightPx: number;
   /** Inset hộp thoại cắt (tai thỏ/camera) theo px, đã xoay theo hướng hiện tại. */

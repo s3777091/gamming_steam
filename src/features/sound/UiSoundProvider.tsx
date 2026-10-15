@@ -45,7 +45,7 @@ const MIN_INTERVAL_MS: Record<UiSound, number> = {
   transition: 120,
 };
 /** One physical action may update focus, open a layer, and change a route in the same frame. */
-const GLOBAL_MIN_INTERVAL_MS = 105;
+const GLOBAL_MIN_INTERVAL_MS = 35;
 
 const UiSoundContext = createContext<UiSoundContextValue | null>(null);
 
@@ -88,24 +88,40 @@ export function UiSoundProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let disposed = false;
-    void setAudioModeAsync({
-      interruptionMode: 'mixWithOthers',
-      playsInSilentMode: false,
-      shouldPlayInBackground: false,
-    }).then(() => {
+    const init = async () => {
+      try {
+        await setAudioModeAsync({
+          interruptionMode: 'mixWithOthers',
+          playsInSilentMode: true,
+          shouldPlayInBackground: false,
+        });
+      } catch {
+        // Bỏ qua lỗi audio mode trên các nền tảng đặc thù
+      }
       if (disposed) return;
       const next: Partial<Record<UiSound, AudioPlayer>> = {};
       (Object.keys(SOURCES) as UiSound[]).forEach((sound) => {
-        const player = createAudioPlayer(SOURCES[sound], { downloadFirst: true, keepAudioSessionActive: true });
-        player.volume = volumeRef.current * SOUND_GAIN[sound];
-        next[sound] = player;
+        try {
+          const player = createAudioPlayer(SOURCES[sound], { keepAudioSessionActive: true });
+          player.volume = volumeRef.current * SOUND_GAIN[sound];
+          next[sound] = player;
+        } catch {
+          // Bỏ qua nếu lỗi nạp player riêng lẻ
+        }
       });
       players.current = next;
       setPlayersReady(true);
-    }).catch(() => {});
+    };
+
+    void init();
+
     return () => {
       disposed = true;
-      Object.values(players.current).forEach((player) => player?.remove());
+      Object.values(players.current).forEach((player) => {
+        try {
+          player?.remove();
+        } catch {}
+      });
       players.current = {};
     };
   }, []);
@@ -130,11 +146,12 @@ export function UiSoundProvider({ children }: { children: ReactNode }) {
     if (!player) return;
     lastPlayedAny.current = now;
     lastPlayed.current[sound] = now;
-    player.volume = volumeRef.current * SOUND_GAIN[sound];
-    if (player.currentTime > 0.005 || player.playing) {
-      void player.seekTo(0).then(() => player.play()).catch(() => {});
-    } else {
-      try { player.play(); } catch { /* Audio feedback must never block the interaction. */ }
+    try {
+      player.volume = volumeRef.current * SOUND_GAIN[sound];
+      void player.seekTo(0);
+      player.play();
+    } catch {
+      // Audio feedback must never block the interaction.
     }
   }, []);
 

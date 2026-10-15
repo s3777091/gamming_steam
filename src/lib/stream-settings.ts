@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { autoFrameRate } from './display-refresh';
+import { DEVICE_STREAM_DEFAULTS, panelResolution } from './stream-display-policy';
 import {
   DEFAULT_LOADING_THEME_ID,
   isLoadingThemeId,
@@ -8,6 +9,7 @@ import {
 } from './loading-themes';
 import {
   clientDisplayGeometry,
+  hostRefreshCeiling,
   streamGeometryForTier,
   type DisplayGeometry,
   type HostDisplay,
@@ -21,7 +23,7 @@ export {
   displayGeometryForCssPixels,
   streamWillFillViewer,
 } from './stream-geometry';
-export type { DisplayGeometry, HostDisplay } from './stream-geometry';
+export type { DisplayGeometry, HostDisplay, HostDisplayMode } from './stream-geometry';
 
 export type StreamProfile =
   | 'auto' | 'competitive' | 'balanced' | 'quality' | 'data_saver' | 'long_haul';
@@ -30,8 +32,8 @@ export type StreamProfile =
  * luôn tới từ tỉ lệ màn hình người xem (xem `streamGeometryFor`).
  *
  * Dải nhắm vào TABLET → LAPTOP → MÀN HÌNH DESKTOP. Không có bậc nào dưới 720p
- * — chính bậc 960 px từng kéo màn hình ở nhà xuống 1176x664. Điện thoại dùng
- * phần dưới của cùng thang này, trần 1080p (xem `DEVICE_AUTO_CEILING`).
+ * — chính bậc 960 px từng kéo màn hình ở nhà xuống 1176x664. Auto dùng cùng
+ * thang theo pixel thật, kể cả trên điện thoại và tablet nhỏ.
  *
  * Sáu bậc thay vì bốn để lấp hai khoảng trống thật giữa chúng: tablet và laptop
  * 13–14" quanh 1600, laptop 3K / ultrawide quanh 3200. Với bốn bậc cũ, mọi màn
@@ -178,19 +180,6 @@ function regionCeiling(region: ViewerRegion) {
   }
   return ceiling;
 }
-
-/**
- * Trần của đường AUTO theo loại màn hình, chồng lên trần khu vực.
- *
- * Màn 6–7" cầm tay không hiện được gì hơn 1080p, nhưng vẫn phải giải mã từng
- * điểm ảnh: panel 2400x1080 mà để auto chọn theo số pixel thì ra 1440p — nóng
- * máy, tốn pin, rớt khung, không đẹp hơn. 120 fps vì panel điện thoại phổ biến
- * là 90/120 Hz; `affordableFrameRate` vẫn hạ lại khi mạng không nuôi nổi.
- */
-const DEVICE_AUTO_CEILING: Record<StreamDeviceClass, { resolution: Exclude<Resolution, 'auto'>; fps: number }> = {
-  large: { resolution: '4k', fps: 144 },
-  phone: { resolution: '1080p', fps: 120 },
-};
 
 /** Bậc cao nhất người dùng tự chọn được trên từng loại màn — khớp CHECK của bảng. */
 export const DEVICE_RESOLUTION_LIMIT: Record<StreamDeviceClass, Exclude<Resolution, 'auto'>> = {
@@ -345,7 +334,7 @@ export const RESOLUTION_META: Record<Resolution, {
     label: 'Tự động',
     width: 'Theo màn hình',
     device: 'Khớp màn hình đang xem và chất lượng mạng',
-    guidance: 'Máy bạn sẽ chọn bậc gần nhất với số pixel thật của màn hình này; khi mạng yếu chỉ giảm bitrate nén, không thu nhỏ desktop.',
+    guidance: 'Auto dùng ngân sách đủ cho số pixel thật của màn hình; khi mạng yếu giảm bitrate nén, không thu nhỏ desktop.',
   },
   '720p': {
     label: '720p',
@@ -400,18 +389,11 @@ function capTier(
 /**
  * Bậc khớp với số pixel thật của màn hình đang xem.
  *
- * Ngưỡng đặt ở khoảng GIỮA hai bề ngang liền nhau, nên mỗi màn rơi về bậc gần
- * nó nhất thay vì luôn bị làm tròn xuống: màn 2560 lấy 1440p, màn 2400 cũng
- * lấy 1440p (gần 2560 hơn 1920), còn màn 2160 lấy 1080p.
+ * Chọn ngân sách đủ chứa pixel thật; geometry giới hạn ở độ rộng panel.
+ * Màn 2732 px cần ngân sách 1800p, tránh bị thu xuống 2560 rồi phóng lên lại.
  */
 function autoResolution(display: DisplayGeometry): Exclude<Resolution, 'auto'> {
-  const pixels = display.width;
-  if (pixels >= 3520) return '4k';
-  if (pixels >= 2880) return '1800p';
-  if (pixels >= 2240) return '1440p';
-  if (pixels >= 1760) return '1080p';
-  if (pixels >= 1440) return '900p';
-  return '720p';
+  return panelResolution(display.width);
 }
 
 /**
@@ -587,7 +569,9 @@ function affordableFrameRate(
 ): number {
   if (typeof measuredMbps !== 'number') return target;
   const usable = measuredMbps * 0.8;
-  const tiers = [144, 120, 90, 60].filter((tier) => tier <= target);
+  // `target` có thể nằm lệch bậc (100 fps theo màn 100 Hz của máy chủ): thử
+  // chính nó trước, rồi mới tới các bậc thấp hơn.
+  const tiers = [target, ...[144, 120, 90, 60].filter((tier) => tier < target)];
   for (const tier of tiers) {
     if (usable >= DEFAULT_BITRATE[resolution] * pixelScale * fpsBitrateScale(tier)) return tier;
   }
@@ -668,17 +652,13 @@ export function resolveMoonlightSettings(
   hostDisplay?: HostDisplay | null,
   displayRefreshHz?: number | null,
   viewerDisplay?: DisplayGeometry | null,
-  deviceClass: StreamDeviceClass = 'large',
+  _deviceClass: StreamDeviceClass = 'large',
 ): MoonlightSettings {
   // StreamTakeover passes the measured iframe container here. The fallback is
   // for callers without a rendered surface (settings previews and SSR/tests).
   const display = viewerDisplay ?? clientDisplayGeometry();
   const region = regionCeiling(settings.region);
-  const device = DEVICE_AUTO_CEILING[deviceClass];
-  const ceiling = {
-    resolution: capTier(region.resolution, device.resolution),
-    fps: Math.min(region.fps, device.fps),
-  };
+  const ceiling = region;
   // Trần khu vực chỉ chặn đường auto; bậc người dùng tự chọn đi qua nguyên vẹn.
   const geometryResolution: Exclude<Resolution, 'auto'> =
     settings.resolution === 'auto'
@@ -737,9 +717,16 @@ export function resolveMoonlightSettings(
   // Trần khu vực áp lên `autoFrameRate` chứ không áp lên `settings.frame_rate`:
   // 120 fps qua đường Trung Quốc là một lựa chọn tồi để MÁY tự đưa ra, nhưng
   // vẫn là lựa chọn của người dùng nếu họ tự bấm.
+  //
+  // Trần thứ ba là tần số quét của chính mode máy chủ sẽ chạy (xem
+  // `hostRefreshCeiling`): tablet 120 Hz xem máy 100 Hz thì xin đúng 100 fps,
+  // không xin 120 rồi nhận khung lặp. Con số lệch bậc như 100 là hợp lệ —
+  // Moonlight/Sunshine nhận fps tuỳ ý. Cũng chỉ chặn auto: người dùng tự chọn
+  // 120 fps thì vẫn đi qua nguyên vẹn.
+  const hostRefresh = hostRefreshCeiling(hostDisplay, { width, height });
   const fps = settings.frame_rate
     ?? affordableFrameRate(
-      Math.min(autoFrameRate(displayRefreshHz ?? null), ceiling.fps),
+      Math.min(autoFrameRate(displayRefreshHz ?? null), ceiling.fps, hostRefresh ?? Number.POSITIVE_INFINITY),
       qualityResolution,
       pixelScale,
       measured,
@@ -805,7 +792,7 @@ export const SHARED_STREAM_SETTING_KEYS: (keyof Omit<StreamSettings, 'user_id'>)
   'client_vsync', 'latency_mode', 'loading_theme',
 ];
 
-/** Read the canonical "best" settings row every user inherits on this kind of screen. */
+/** Inherit cloud tuning, with automatic pixels/Hz/bitrate for this native device. */
 export async function fetchStreamSettingsDefaults(
   supabase: SupabaseClient,
   deviceClass: StreamDeviceClass,
@@ -815,15 +802,15 @@ export async function fetchStreamSettingsDefaults(
     .select('*')
     .eq('id', true)
     .maybeSingle();
-  if (error || !data) return null;
+  if (error || !data) return { ...DEVICE_STREAM_DEFAULTS };
   const row = data as Record<string, unknown>;
   const picked: Partial<StreamSettings> = {};
   for (const key of SHARED_STREAM_SETTING_KEYS) {
     // Nullable columns (frame_rate, bitrate_mbps) carry meaning when null
     // ("auto"), so copy the value through as-is.
-    (picked as Record<string, unknown>)[key] = row[key];
+    if (row[key] !== undefined) (picked as Record<string, unknown>)[key] = row[key];
   }
-  return picked;
+  return { ...picked, ...DEVICE_STREAM_DEFAULTS };
 }
 
 /** True when the user has changed any shared setting away from the canonical. */

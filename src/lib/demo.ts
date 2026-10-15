@@ -6,7 +6,7 @@ export const UI_DEMO = process.env.EXPO_PUBLIC_UI_DEMO === '1';
 
 const CDN = 'https://cdn.cloudflare.steamstatic.com/steam/apps';
 const art = (id: number) => ({
-  artworkUrl: `${CDN}/${id}/library_hero.jpg`,
+  artworkUrl: `${CDN}/${id}/header.jpg`,
   heroUrl: `${CDN}/${id}/library_hero.jpg`,
 });
 
@@ -36,7 +36,7 @@ const GAMES = [
   art: { logoUrl: `${CDN}/${game.appId}/logo.png`, logoWidth: 640, logoHeight: 360 },
 }));
 
-const storeItem = (appId: number, name: string, price: number, discount = 0) => ({
+const storeItem = (appId: number, name: string, price: number, discount = 0, bg?: string) => ({
   appId,
   name,
   discounted: discount > 0,
@@ -50,7 +50,7 @@ const storeItem = (appId: number, name: string, price: number, discount = 0) => 
   portraitImage: `${CDN}/${appId}/library_600x900.jpg`,
   controllerSupport: 'full' as const,
   storeUrl: `https://store.steampowered.com/app/${appId}/`,
-  backgroundImage: `${CDN}/${appId}/library_hero.jpg`,
+  backgroundImage: bg || `${CDN}/${appId}/library_hero.jpg`,
   shortDescription: 'ARC Raiders là cuộc phiêu lưu khai thác nhiều người chơi, đặt trong một tương lai chết chóc nơi Trái Đất bị tàn phá bởi mối đe dọa cơ giới.',
   genres: ['Hành động', 'Bắn súng'],
   logo: { url: `${CDN}/${appId}/logo.png`, width: 640, height: 360 },
@@ -69,7 +69,7 @@ const STORE = {
     storeItem(1086940, 'Steam Machine', 0),
     storeItem(1172470, 'STAR WARS: Galactic Racer', 52000000),
     storeItem(1245620, 'WARDOGS', 31000000),
-    storeItem(2358720, 'Steam Deck', 0),
+    storeItem(1675200, 'Steam Deck', 0, 0, 'https://store.akamai.steamstatic.com/images/storepagebackground/app/1675200'),
   ],
   newReleases: [],
   promotions: [{ name: 'ƯU ĐÃI CUỐI TUẦN', image: `${CDN}/1174180/library_hero.jpg`, storeUrl: 'https://store.steampowered.com/' }],

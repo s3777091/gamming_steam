@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 import { addListener, type NativeGamepadButton } from 'jetsona-input';
 
 import { useUi } from '@/ui/scale';
-import { activateFocus, moveFocus, scrollFocused, setFocusViewport, type Direction } from './focus';
+import { activateFocus, ensureFocusActive, moveFocus, scrollFocused, setFocusViewport, type Direction } from './focus';
 import { listenGuideCombo } from './guideCombo';
 import { navDirection, REPEAT_DELAY_MS, REPEAT_INTERVAL_MS, scrollVector } from './navigation';
 import { dispatchBack, dispatchGuide, dispatchTab, isCursorSuspended } from './registry';
@@ -80,8 +80,14 @@ export default function GamepadNavigator({ enabled }: { enabled: boolean }) {
       if (event.button === 'b') dispatchBack();
       else if (isCursorSuspended()) return;
       else if (event.button === 'a') activateFocus();
-      else if (event.button === 'lb') dispatchTab(-1);
-      else if (event.button === 'rb') dispatchTab(1);
+      else if (event.button === 'lb') {
+        ensureFocusActive();
+        dispatchTab(-1);
+      }
+      else if (event.button === 'rb') {
+        ensureFocusActive();
+        dispatchTab(1);
+      }
     });
 
     const offGuideKey = addListener('onGuideKey', (event) => {

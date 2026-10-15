@@ -22,18 +22,17 @@ export function useUserProfile(userId: string, email: string | null) {
     role: null,
     email,
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(createClient()));
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const load = useCallback(() => {
     const supabase = createClient();
     if (!supabase) return;
-    setLoading(true);
-    const { data, error: queryError } = await supabase
+    return supabase
       .from('profiles')
       .select('id,username,display_name,avatar_url,role')
       .eq('id', userId)
-      .maybeSingle();
+      .maybeSingle().then(({ data, error: queryError }) => {
     if (queryError) {
       setError(queryError.message);
     } else if (data) {
@@ -50,8 +49,14 @@ export function useUserProfile(userId: string, email: string | null) {
       });
     }
     setLoading(false);
+    });
   }, [email, fallbackName, userId]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { void load(); }, [load]);
+  const refresh = useCallback(() => {
+    if (!createClient()) return Promise.resolve();
+    setLoading(true);
+    return load();
+  }, [load]);
   return { profile, loading, error, refresh };
 }

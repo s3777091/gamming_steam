@@ -45,7 +45,7 @@ export function directionScore(from: Rect, target: Rect, direction: Direction): 
 }
 
 /** Ô gần nhất theo hướng, hoặc null khi đã ở rìa. */
-export function pickNeighbor<T>(from: Rect, candidates: Array<Candidate<T>>, direction: Direction): T | null {
+export function pickNeighbor<T>(from: Rect, candidates: Candidate<T>[], direction: Direction): T | null {
   let best: T | null = null;
   let bestScore = Infinity;
   for (const candidate of candidates) {
@@ -59,7 +59,7 @@ export function pickNeighbor<T>(from: Rect, candidates: Array<Candidate<T>>, dir
 }
 
 /** Ô gần nhất với một điểm (dùng khi ô đang được chọn biến mất). */
-export function pickNearest<T>(point: { x: number; y: number }, candidates: Array<Candidate<T>>): T | null {
+export function pickNearest<T>(point: { x: number; y: number }, candidates: Candidate<T>[]): T | null {
   let best: T | null = null;
   let bestDistance = Infinity;
   for (const { item, rect } of candidates) {
@@ -75,7 +75,7 @@ export function pickNearest<T>(point: { x: number; y: number }, candidates: Arra
 }
 
 /** Ô mặc định khi chưa có tiêu điểm: trên cùng, rồi trái nhất. */
-export function pickFirst<T>(candidates: Array<Candidate<T>>): T | null {
+export function pickFirst<T>(candidates: Candidate<T>[]): T | null {
   let best: T | null = null;
   let bestKey = Infinity;
   for (const { item, rect } of candidates) {

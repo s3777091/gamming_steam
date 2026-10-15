@@ -1,4 +1,4 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
+import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   MediaStream,
@@ -135,7 +135,9 @@ export function useWatchPartyHost({
   userId: string;
   name: string;
 }): WatchPartyState {
-  const [live, setLive] = useState(false);
+  const [room, setRoom] = useState<{ sessionId: string; client: NativeMoonlightClient; supabase: SupabaseClient } | null>(null);
+  const live = Boolean(room && room.sessionId === sessionId && room.client === client);
+  if (room && !live) setRoom(null);
   const [busy, setBusy] = useState(false);
   const [viewers, setViewers] = useState<Viewer[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -143,7 +145,6 @@ export function useWatchPartyHost({
   const channelRef = useRef<RealtimeChannel | null>(null);
   const peersRef = useRef(new Map<string, PeerState>());
   const creationsRef = useRef(new Map<string, Promise<PeerState>>());
-  const liveSessionRef = useRef<string | null>(null);
 
   const closePeer = useCallback((viewerId: string) => {
     const state = peersRef.current.get(viewerId);
@@ -171,8 +172,7 @@ export function useWatchPartyHost({
         p_voice_enabled: false,
       });
       if (error) throw error;
-      liveSessionRef.current = sessionId;
-      setLive(true);
+      setRoom({ sessionId, client, supabase });
       setMessage('Đã bật streaming cho người xem.');
     } catch (error) {
       setMessage((error as Error).message || 'Chưa bật được streaming.');
@@ -183,22 +183,13 @@ export function useWatchPartyHost({
 
   const stop = useCallback(() => {
     if (!live) return;
-    setLive(false);
+    setRoom(null);
     setMessage('Đã dừng streaming cho người xem.');
   }, [live]);
 
   useEffect(() => {
-    if (!live || !sessionId || !client) return;
-    if (liveSessionRef.current !== sessionId) {
-      setLive(false);
-      return;
-    }
-    const supabase = createClient();
-    if (!supabase) {
-      setLive(false);
-      setMessage('Mất kết nối tới dịch vụ phòng xem.');
-      return;
-    }
+    if (!live || !sessionId || !client || !room) return;
+    const supabase = room.supabase;
     let disposed = false;
     let announceTimer: ReturnType<typeof setTimeout> | null = null;
     let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -369,14 +360,8 @@ export function useWatchPartyHost({
       setViewers([]);
       setRelayAvailable(null);
       void supabase.rpc('close_watch_room', { p_session_id: sessionId });
-      if (liveSessionRef.current === sessionId) liveSessionRef.current = null;
     };
-  }, [client, closePeer, live, name, sessionId, userId]);
-
-  useEffect(() => {
-    if (sessionId && client && (!live || liveSessionRef.current === sessionId)) return;
-    setLive(false);
-  }, [client, live, sessionId]);
+  }, [client, closePeer, live, name, room, sessionId, userId]);
 
   return { live, busy, viewers, message, relayAvailable, start, stop };
 }

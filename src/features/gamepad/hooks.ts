@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { BackHandler } from 'react-native';
 
 import { dispatchBack, onGuide, onTabSwitch, pushBack, suspendCursor } from './registry';
@@ -9,7 +9,7 @@ import { dispatchBack, onGuide, onTabSwitch, pushBack, suspendCursor } from './r
  */
 export function useBack(handler: () => boolean | void, enabled = true): void {
   const ref = useRef(handler);
-  ref.current = handler;
+  useLayoutEffect(() => { ref.current = handler; }, [handler]);
   useEffect(() => {
     if (!enabled) return;
     return pushBack(() => ref.current());
@@ -26,7 +26,7 @@ export function useHardwareBack(): void {
 
 export function useGamepadTabs(handler: (direction: -1 | 1) => boolean | void, enabled = true): void {
   const ref = useRef(handler);
-  ref.current = handler;
+  useLayoutEffect(() => { ref.current = handler; }, [handler]);
   useEffect(() => {
     if (!enabled) return;
     return onTabSwitch((direction) => ref.current(direction));
@@ -35,7 +35,7 @@ export function useGamepadTabs(handler: (direction: -1 | 1) => boolean | void, e
 
 export function useGuide(handler: () => void, enabled = true): void {
   const ref = useRef(handler);
-  ref.current = handler;
+  useLayoutEffect(() => { ref.current = handler; }, [handler]);
   useEffect(() => {
     if (!enabled) return;
     return onGuide(() => ref.current());

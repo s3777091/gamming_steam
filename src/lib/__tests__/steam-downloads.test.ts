@@ -9,9 +9,11 @@ import {
   formatBytes,
   formatEta,
   formatSpeed,
+  hasPendingDownloads,
   isDownloadActive,
   parseAgentMessage,
   primaryDownload,
+  reuseDownloadSnapshot,
   uninstallForApp,
 } from '../steam-downloads.ts';
 
@@ -32,6 +34,51 @@ function state(overrides: Partial<DownloadsState> = {}): DownloadsState {
 
 const flow = (phase: DownloadsState['installs'][number]['phase'], extra = {}) => ({
   appid: 570, name: 'Dota 2', phase, eulas: null, error: null, updatedAt: 1, ...extra,
+});
+
+test('timestamp-only agent messages reuse the previous UI snapshot', () => {
+  const previous = state({ installs: [flow('installed')] });
+  const heartbeat = state({ at: 2, installs: [flow('installed', { updatedAt: 2 })] });
+  assert.equal(reuseDownloadSnapshot(previous, heartbeat), previous);
+  assert.equal(reuseDownloadSnapshot(null, heartbeat), heartbeat);
+});
+
+test('progress, permissions, errors and install prompts always invalidate the snapshot', () => {
+  const previous = state({ installs: [flow('starting')] });
+  for (const next of [
+    state({ installs: [flow('eula', { eulas: [{ id: 'terms', version: 1, url: 'https://example.com' }] })] }),
+    state({ installs: [flow('failed', { error: 'disk full' })] }),
+    state({ installs: [flow('starting')], controllers: ['another-user'] }),
+    state({ installs: [flow('starting')], steam: { status: 'error', error: 'offline' } }),
+    state({ installs: [flow('starting')], queue: [{ appid: 570, name: 'Dota 2', active: true,
+      paused: false, completed: false, queueIndex: 0, downloaded: 10, total: 100, percent: 10,
+      error: null, completedAt: null }] }),
+  ]) {
+    assert.equal(reuseDownloadSnapshot(previous, next), next);
+  }
+  const queued = state({ queue: [{ appid: 570, name: 'Dota 2', active: true, paused: false,
+    completed: false, queueIndex: 0, downloaded: 10, total: 100, percent: 10, error: null, completedAt: null }] });
+  const progress = structuredClone(queued);
+  progress.queue[0].downloaded = 20;
+  progress.queue[0].percent = 20;
+  assert.equal(reuseDownloadSnapshot(queued, progress), progress);
+});
+
+test('completed download history does not keep fast polling active', () => {
+  assert.equal(hasPendingDownloads(null), false);
+  assert.equal(hasPendingDownloads(state()), false);
+  for (const phase of ['installed', 'failed', 'cancelled', 'manual'] as const) {
+    assert.equal(hasPendingDownloads(state({ installs: [flow(phase)] })), false);
+  }
+  for (const phase of ['starting', 'wizard', 'config', 'eula', 'queued'] as const) {
+    assert.equal(hasPendingDownloads(state({ installs: [flow(phase)] })), true);
+  }
+  assert.equal(hasPendingDownloads(state({
+    uninstalls: [{ appid: 570, name: 'Dota 2', phase: 'uninstalling', error: null, updatedAt: 1 }],
+  })), true);
+  assert.equal(hasPendingDownloads(state({
+    uninstalls: [{ appid: 570, name: 'Dota 2', phase: 'uninstalled', error: null, updatedAt: 1 }],
+  })), false);
 });
 
 test('parseAgentMessage nhận state, bye, notice và bỏ tin lạ', () => {

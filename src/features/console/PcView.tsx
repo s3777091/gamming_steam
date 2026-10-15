@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Monitor, Play } from 'lucide-react-native';
@@ -17,7 +17,7 @@ const CARD = { w: 288, h: 112 };
  * (tiêu đề + nút tròn phía trên, kệ thẻ phía dưới) nhưng không có nút (…) vì không có
  * thông tin/thành tựu/cập nhật để xem. Cấu hình stream dùng chung với Games.
  */
-export function PcView({ reachable, refreshing, error, onConnect }: {
+export const PcView = memo(function PcView({ reachable, refreshing, error, onConnect }: {
   reachable: boolean;
   refreshing: boolean;
   error: string | null;
@@ -110,7 +110,7 @@ export function PcView({ reachable, refreshing, error, onConnect }: {
       </FocusScroll>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   play: {

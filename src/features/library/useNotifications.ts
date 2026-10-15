@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { PC_ROUTES, pcFetchJson } from '@/lib/pc-api';
 import { isSteamAppId } from './format';
+import { fetchStoreOnce } from './useSteamStore';
 import type {
   AppNotification,
   GameDiscountNotification,
@@ -23,7 +24,7 @@ type ClearedState = {
   clearedAt?: number;
 };
 
-export function useNotifications(games: PcGame[]) {
+export function useNotifications(games: PcGame[] = []) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,11 +75,7 @@ export function useNotifications(games: PcGame[]) {
       // 1. Tải danh sách giảm giá Steam Store
       let storeData: StoreResponse | null = null;
       try {
-        storeData = await pcFetchJson<StoreResponse>(
-          PC_ROUTES.store,
-          'Không tải được ưu đãi Steam.',
-          (body) => Boolean(body.featured || body.specials),
-        );
+        storeData = await fetchStoreOnce();
       } catch {
         // Nếu không tải được store (offline), bỏ qua
       }
@@ -220,8 +217,8 @@ export function useNotifications(games: PcGame[]) {
   }, [games]);
 
   useEffect(() => {
-    // Chỉ tự động tải lần đầu hoặc khi danh sách game thay đổi
-    if (games.length > 0 && !loadedOnce.current) {
+    // Tự động tải lần đầu hoặc khi danh sách game thay đổi
+    if (!loadedOnce.current || games.length > 0) {
       loadedOnce.current = true;
       void loadNotifications();
     }

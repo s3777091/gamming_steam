@@ -1,5 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
+import { useSceneActive } from '@/features/gamepad/focus';
+import { useMotion } from './motion';
 
 /** Khối xám nhấp nháy khi dữ liệu đang tải. */
 export function Skeleton({ width, height, radius = 8, style, tone = 0.09 }: {
@@ -9,15 +11,21 @@ export function Skeleton({ width, height, radius = 8, style, tone = 0.09 }: {
   style?: StyleProp<ViewStyle>;
   tone?: number;
 }) {
-  const pulse = useRef(new Animated.Value(0)).current;
+  const [pulse] = useState(() => new Animated.Value(0));
+  const { active, reduceMotion } = useMotion();
+  const sceneActive = useSceneActive();
   useEffect(() => {
+    if (!active || reduceMotion || !sceneActive) {
+      pulse.setValue(1);
+      return;
+    }
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1, duration: 800, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 0, duration: 800, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 1, duration: 800, useNativeDriver: true, isInteraction: false }),
+      Animated.timing(pulse, { toValue: 0, duration: 800, useNativeDriver: true, isInteraction: false }),
     ]));
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
+  }, [active, pulse, reduceMotion, sceneActive]);
   return (
     <Animated.View
       style={[

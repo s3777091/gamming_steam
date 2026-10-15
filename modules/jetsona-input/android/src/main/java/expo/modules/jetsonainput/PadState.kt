@@ -29,19 +29,20 @@ object PadButton {
 
   /** Tên nút cho sự kiện điều hướng UI (không phải cờ Moonlight). */
   fun nameOf(keyCode: Int): String? = when (keyCode) {
-    KeyEvent.KEYCODE_BUTTON_A -> "a"
-    KeyEvent.KEYCODE_BUTTON_B -> "b"
+    KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_1 -> "a"
+    KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_2 -> "b"
+    KeyEvent.KEYCODE_BUTTON_C, KeyEvent.KEYCODE_BUTTON_3 -> "x"
     KeyEvent.KEYCODE_BUTTON_X -> "x"
-    KeyEvent.KEYCODE_BUTTON_Y -> "y"
-    KeyEvent.KEYCODE_BUTTON_L1 -> "lb"
-    KeyEvent.KEYCODE_BUTTON_R1 -> "rb"
-    KeyEvent.KEYCODE_BUTTON_L2 -> "lt"
-    KeyEvent.KEYCODE_BUTTON_R2 -> "rt"
-    KeyEvent.KEYCODE_BUTTON_THUMBL -> "l3"
-    KeyEvent.KEYCODE_BUTTON_THUMBR -> "r3"
-    KeyEvent.KEYCODE_BUTTON_START -> "start"
-    KeyEvent.KEYCODE_BUTTON_SELECT -> "select"
-    KeyEvent.KEYCODE_BUTTON_MODE -> "guide"
+    KeyEvent.KEYCODE_BUTTON_Y, KeyEvent.KEYCODE_BUTTON_4 -> "y"
+    KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_5 -> "lb"
+    KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_BUTTON_6 -> "rb"
+    KeyEvent.KEYCODE_BUTTON_L2, KeyEvent.KEYCODE_BUTTON_7 -> "lt"
+    KeyEvent.KEYCODE_BUTTON_R2, KeyEvent.KEYCODE_BUTTON_8 -> "rt"
+    KeyEvent.KEYCODE_BUTTON_SELECT, KeyEvent.KEYCODE_BUTTON_9, KeyEvent.KEYCODE_BACK -> "select"
+    KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_BUTTON_10 -> "start"
+    KeyEvent.KEYCODE_BUTTON_THUMBL, KeyEvent.KEYCODE_BUTTON_11 -> "l3"
+    KeyEvent.KEYCODE_BUTTON_THUMBR, KeyEvent.KEYCODE_BUTTON_12 -> "r3"
+    KeyEvent.KEYCODE_BUTTON_MODE, KeyEvent.KEYCODE_BUTTON_13 -> "guide"
     KeyEvent.KEYCODE_DPAD_UP -> "up"
     KeyEvent.KEYCODE_DPAD_DOWN -> "down"
     KeyEvent.KEYCODE_DPAD_LEFT -> "left"
@@ -50,16 +51,18 @@ object PadButton {
   }
 
   fun flagOf(keyCode: Int): Int = when (keyCode) {
-    KeyEvent.KEYCODE_BUTTON_A -> A
-    KeyEvent.KEYCODE_BUTTON_B -> B
+    KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_1 -> A
+    KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BUTTON_2 -> B
+    KeyEvent.KEYCODE_BUTTON_C, KeyEvent.KEYCODE_BUTTON_3 -> X
     KeyEvent.KEYCODE_BUTTON_X -> X
-    KeyEvent.KEYCODE_BUTTON_Y -> Y
-    KeyEvent.KEYCODE_BUTTON_L1 -> LB
-    KeyEvent.KEYCODE_BUTTON_R1 -> RB
-    KeyEvent.KEYCODE_BUTTON_THUMBL -> LS_CLK
-    KeyEvent.KEYCODE_BUTTON_THUMBR -> RS_CLK
-    KeyEvent.KEYCODE_BUTTON_START -> PLAY
-    KeyEvent.KEYCODE_BUTTON_SELECT -> BACK
+    KeyEvent.KEYCODE_BUTTON_Y, KeyEvent.KEYCODE_BUTTON_4 -> Y
+    KeyEvent.KEYCODE_BUTTON_L1, KeyEvent.KEYCODE_BUTTON_5 -> LB
+    KeyEvent.KEYCODE_BUTTON_R1, KeyEvent.KEYCODE_BUTTON_6 -> RB
+    KeyEvent.KEYCODE_BUTTON_THUMBL, KeyEvent.KEYCODE_BUTTON_11 -> LS_CLK
+    KeyEvent.KEYCODE_BUTTON_THUMBR, KeyEvent.KEYCODE_BUTTON_12 -> RS_CLK
+    KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_BUTTON_10 -> PLAY
+    KeyEvent.KEYCODE_BUTTON_SELECT, KeyEvent.KEYCODE_BUTTON_9, KeyEvent.KEYCODE_BACK -> BACK
+    KeyEvent.KEYCODE_BUTTON_MODE, KeyEvent.KEYCODE_BUTTON_13 -> SPECIAL
     KeyEvent.KEYCODE_DPAD_UP -> UP
     KeyEvent.KEYCODE_DPAD_DOWN -> DOWN
     KeyEvent.KEYCODE_DPAD_LEFT -> LEFT
@@ -73,14 +76,93 @@ fun isGamepadKey(keyCode: Int): Boolean =
   KeyEvent.isGamepadButton(keyCode) || when (keyCode) {
     KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
     KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
-    KeyEvent.KEYCODE_DPAD_CENTER -> true
+    KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_BACK -> true
     else -> false
   }
 
-/** Sự kiện đến từ tay cầm thật chứ không phải bàn phím có phím mũi tên. */
-fun isGamepadSource(source: Int): Boolean =
-  (source and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
-    (source and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
+/**
+ * Kiểm tra xem thiết bị có bàn phím gõ chữ thực thụ (phím Q, W, E, R, Space, Enter...)
+ * hay không. Đây là khả năng gõ chữ, không loại trừ khả năng chơi game của
+ * thiết bị HID có nhiều giao diện được Android gộp lại.
+ */
+fun hasAlphabeticTypingKeys(device: InputDevice?): Boolean {
+  if (device == null) return false
+  return try {
+    val hasKeys = device.hasKeys(
+      KeyEvent.KEYCODE_Q,
+      KeyEvent.KEYCODE_W,
+      KeyEvent.KEYCODE_E,
+      KeyEvent.KEYCODE_R,
+      KeyEvent.KEYCODE_SPACE,
+      KeyEvent.KEYCODE_ENTER,
+    )
+    hasKeys.count { it } >= 4
+  } catch (_: Throwable) {
+    false
+  }
+}
+
+/**
+ * Chỉ coi là bàn phím gõ chữ khi thiết bị có nguồn KEYBOARD, kiểu ALPHABETIC,
+ * và thực sự có các phím chữ cái (Q, W, E, R, Space, Enter).
+ */
+fun isAlphabeticKeyboardDevice(device: InputDevice?): Boolean {
+  if (device == null || device.id <= 0) return false
+  if (device.keyboardType != InputDevice.KEYBOARD_TYPE_ALPHABETIC) return false
+  if ((device.sources and InputDevice.SOURCE_KEYBOARD) != InputDevice.SOURCE_KEYBOARD &&
+    !device.supportsSource(InputDevice.SOURCE_KEYBOARD)
+  ) {
+    return false
+  }
+  return hasAlphabeticTypingKeys(device)
+}
+
+/**
+ * Nhận diện thiết bị có phải là tay cầm chơi game (Bluetooth, USB, hoặc hệ thống).
+ * Kiểm tra bitmask source, các nút tay cầm đặc trưng qua hasKeys, và các trục joystick.
+ * Nguồn GAMEPAD/JOYSTICK luôn ưu tiên hơn khả năng gõ chữ của thiết bị HID gộp.
+ */
+fun isGamepadDevice(device: InputDevice?): Boolean {
+  if (device == null || device.id <= 0) return false
+  return controllerDevicePolicy(device.sources, { isAlphabeticKeyboardDevice(device) }) {
+    // Một số tay cầm Bluetooth rẻ tiền tự khai báo như keyboard/DPAD. Không dùng
+    // `any()` ở đây: bàn phím có thể quảng bá một keycode BUTTON_* phụ và bị biến
+    // thành controller. Chỉ nhận fallback khi có cả cụm nút mặt và nút điều khiển.
+    val hasControllerButtons = try {
+      val hasKeys = device.hasKeys(
+        KeyEvent.KEYCODE_BUTTON_A,
+        KeyEvent.KEYCODE_BUTTON_B,
+        KeyEvent.KEYCODE_BUTTON_X,
+        KeyEvent.KEYCODE_BUTTON_Y,
+        KeyEvent.KEYCODE_BUTTON_START,
+        KeyEvent.KEYCODE_BUTTON_SELECT,
+        KeyEvent.KEYCODE_BUTTON_MODE,
+        KeyEvent.KEYCODE_BUTTON_1,
+        KeyEvent.KEYCODE_BUTTON_THUMBL,
+        KeyEvent.KEYCODE_BUTTON_L1,
+      )
+      val faceButtons = hasKeys.sliceArray(0..3).count { it }
+      val controlButtons = hasKeys.sliceArray(4..9).count { it }
+      faceButtons >= 2 && controlButtons >= 1
+    } catch (_: Throwable) {
+      false
+    }
+
+    if (hasControllerButtons) return@controllerDevicePolicy true
+
+    val isMouse = device.supportsSource(InputDevice.SOURCE_MOUSE) ||
+      device.supportsSource(InputDevice.SOURCE_TOUCHPAD)
+    if (!isMouse) {
+      val hasHat = device.getMotionRange(MotionEvent.AXIS_HAT_X) != null ||
+        device.getMotionRange(MotionEvent.AXIS_HAT_Y) != null
+      val hasRightStick = (device.getMotionRange(MotionEvent.AXIS_Z) != null && device.getMotionRange(MotionEvent.AXIS_RZ) != null) ||
+        (device.getMotionRange(MotionEvent.AXIS_RX) != null && device.getMotionRange(MotionEvent.AXIS_RY) != null)
+      if (hasHat || hasRightStick) return@controllerDevicePolicy true
+    }
+
+    false
+  }
+}
 
 /**
  * Trạng thái một tay cầm, cùng hình dạng với `GamepadState` của moonlight-web:
@@ -114,16 +196,12 @@ class PadState(val deviceId: Int) {
   fun configure(device: InputDevice?) {
     if (device == null) return
     fun has(axis: Int) = device.getMotionRange(axis, InputDevice.SOURCE_JOYSTICK) != null ||
+      device.getMotionRange(axis, InputDevice.SOURCE_GAMEPAD) != null ||
       device.getMotionRange(axis) != null
+    val hasZ = has(MotionEvent.AXIS_Z)
     val hasRz = has(MotionEvent.AXIS_RZ)
     val hasRxRy = has(MotionEvent.AXIS_RX) && has(MotionEvent.AXIS_RY)
-    if (hasRxRy && !(has(MotionEvent.AXIS_Z) && hasRz)) {
-      rightAxisX = MotionEvent.AXIS_RX
-      rightAxisY = MotionEvent.AXIS_RY
-    } else {
-      rightAxisX = MotionEvent.AXIS_Z
-      rightAxisY = MotionEvent.AXIS_RZ
-    }
+
     leftTriggerAxis = when {
       has(MotionEvent.AXIS_LTRIGGER) -> MotionEvent.AXIS_LTRIGGER
       has(MotionEvent.AXIS_BRAKE) -> MotionEvent.AXIS_BRAKE
@@ -134,17 +212,30 @@ class PadState(val deviceId: Int) {
       has(MotionEvent.AXIS_GAS) -> MotionEvent.AXIS_GAS
       else -> -1
     }
+
+    if (hasRxRy && !(hasZ && hasRz)) {
+      rightAxisX = MotionEvent.AXIS_RX
+      rightAxisY = MotionEvent.AXIS_RY
+    } else if (hasRxRy && hasZ && hasRz && leftTriggerAxis == -1) {
+      rightAxisX = MotionEvent.AXIS_RX
+      rightAxisY = MotionEvent.AXIS_RY
+      leftTriggerAxis = MotionEvent.AXIS_Z
+      rightTriggerAxis = MotionEvent.AXIS_RZ
+    } else {
+      rightAxisX = MotionEvent.AXIS_Z
+      rightAxisY = MotionEvent.AXIS_RZ
+    }
   }
 
   /** Cập nhật nút; trả về true khi trạng thái thật sự đổi. */
   fun applyKey(keyCode: Int, down: Boolean): Boolean {
     when (keyCode) {
-      KeyEvent.KEYCODE_BUTTON_L2 -> {
+      KeyEvent.KEYCODE_BUTTON_L2, KeyEvent.KEYCODE_BUTTON_7 -> {
         if (digitalLt == down) return false
         digitalLt = down
         return true
       }
-      KeyEvent.KEYCODE_BUTTON_R2 -> {
+      KeyEvent.KEYCODE_BUTTON_R2, KeyEvent.KEYCODE_BUTTON_8 -> {
         if (digitalRt == down) return false
         digitalRt = down
         return true

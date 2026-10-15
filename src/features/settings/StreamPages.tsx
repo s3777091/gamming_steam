@@ -1,13 +1,13 @@
-// Bốn trang cài đặt stream theo ngôn ngữ thiết kế Apple:
-// Chất lượng, Hình ảnh (gồm lớp phủ màn hình), Độ trễ & độ mượt, Mạng.
-// Thẻ Inset Grouped bo tròn viền xám mỏng, nền trắng, chữ đen, dấu tích xanh #007AFF.
+// Stream settings use the shared dark grouped controls.
 
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Check, RadioTower, RotateCcw } from 'lucide-react-native';
+import { Check, RadioTower, Sparkles } from 'lucide-react-native';
+import { getDisplayInfo } from 'jetsona-input';
 
 import { getLiveBorderEnabled, setLiveBorderEnabled } from '@/lib/stream-overlay-settings';
-import { PROFILE_META, REGION_META, type StreamSettings } from '@/lib/stream-settings';
+import { clientDisplayGeometry, DEFAULT_STREAM_SETTINGS, PROFILE_META, REGION_META, resolveMoonlightSettings, type StreamSettings } from '@/lib/stream-settings';
+import { preferredRefreshHz } from '@/lib/stream-display-policy';
 import {
   CODEC_OPTIONS,
   frameRateChoice,
@@ -28,24 +28,58 @@ import {
   ActionRow,
   appleColors,
   ChoiceRow,
-  ConfirmActionRow,
   InfoRow,
-  PillButton,
   rowStyle,
   SettingsGroup,
   SliderRow,
   ToggleRow,
 } from './controls';
 import type { Notify, StreamSettingsDraft } from './useStreamSettingsDraft';
+import { useSettingsRestore } from './SettingsRestore';
 
 type PageProps = { draft: StreamSettingsDraft; settings: StreamSettings };
+
+function DeviceStreamRecommendation({ draft, settings }: PageProps) {
+  const [panel] = useState(() => {
+    const display = clientDisplayGeometry();
+    const native = getDisplayInfo();
+    const refreshHz = preferredRefreshHz(native?.refreshRate ?? null, native?.supportedRefreshRates);
+    return { display, refreshHz };
+  });
+  const auto = resolveMoonlightSettings(
+    { ...DEFAULT_STREAM_SETTINGS, user_id: settings.user_id, region: settings.region },
+    null, null, panel.refreshHz, panel.display, draft.deviceClass,
+  );
+
+  return (
+    <SettingsGroup
+      title="Tối ưu cho thiết bị này"
+      footer="Auto dùng số pixel và Hz màn hình hỗ trợ, kể cả tablet nhỏ. Chất lượng thực tế còn phụ thuộc máy chủ và đường truyền."
+    >
+      <InfoRow label="Độ phân giải màn hình" value={`${panel.display.width} × ${panel.display.height}`} />
+      <InfoRow label="Tần số quét hỗ trợ" value={panel.refreshHz ? `${Math.round(panel.refreshHz)} Hz` : 'Chưa xác định'} />
+      <ActionRow
+        icon={Sparkles}
+        iconBg={appleColors.purple}
+        tone="accent"
+        label="Dùng Auto theo màn hình"
+        detail={`Mục tiêu ${auto.videoSizeCustom.width} × ${auto.videoSizeCustom.height} · ${auto.fps} FPS · bitrate thích ứng`}
+        onPress={() => draft.selectProfile('auto')}
+      />
+    </SettingsGroup>
+  );
+}
 
 export function QualityPage({ draft, settings }: PageProps) {
   const { s } = useUi();
   const copy = streamSettingsCopy(draft.deviceClass);
+  useSettingsRestore(draft.restoreDefaults, {
+    label: 'Khôi phục cài đặt tốt nhất', disabled: !draft.hasDrift, confirm: true,
+  });
 
   return (
     <>
+      <DeviceStreamRecommendation draft={draft} settings={settings} />
       <SettingsGroup
         title="Profile streaming"
         footer="Chọn profile phù hợp với khả năng xử lý của máy và chất lượng đường truyền mạng."
@@ -93,29 +127,11 @@ export function QualityPage({ draft, settings }: PageProps) {
               </View>
 
               {active ? (
-                <Check size={s(16)} color={appleColors.blue} strokeWidth={2.6} />
+                <Check size={s(16)} color={appleColors.accent} strokeWidth={2.6} />
               ) : null}
             </Press>
           );
         })}
-      </SettingsGroup>
-
-      <SettingsGroup
-        title="Cấu hình chuẩn"
-        footer="Đưa mọi thông số về cấu hình đã tinh chỉnh cho độ mượt và chất lượng tối ưu."
-      >
-        <ConfirmActionRow
-          icon={RotateCcw}
-          label="Khôi phục cài đặt tốt nhất"
-          confirmLabel="Khôi phục mọi thông số?"
-          detail={
-            draft.hasDrift
-              ? 'Đưa thông số về cấu hình chuẩn cho thiết bị này.'
-              : 'Bạn đang dùng đúng cấu hình chuẩn.'
-          }
-          disabled={!draft.hasDrift}
-          onConfirm={draft.restoreDefaults}
-        />
       </SettingsGroup>
     </>
   );
@@ -132,6 +148,7 @@ export function VideoPage({ draft, settings }: PageProps) {
 
   return (
     <>
+      <DeviceStreamRecommendation draft={draft} settings={settings} />
       <SettingsGroup title="Hình ảnh">
         <ChoiceRow
           label="Độ phân giải"
@@ -266,19 +283,20 @@ function MetricCard({ label, value, unit }: { label: string; value: string; unit
       style={{
         flex: 1,
         minWidth: 0,
-        borderRadius: s(10),
+        borderRadius: s(12),
         backgroundColor: appleColors.card,
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: appleColors.cardBorder,
         paddingHorizontal: s(12),
         paddingVertical: s(10),
+        overflow: 'hidden',
       }}
     >
       <T size={9.4} weight="semibold" color={appleColors.textSecondary} tracking={0.06}>
         {label.toUpperCase()}
       </T>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: s(3), marginTop: s(4) }}>
-        <T size={17} weight="semibold" color={appleColors.text} tabular>
+        <T size={17} weight="bold" color="#FFFFFF" tabular>
           {value}
         </T>
         <T size={9.8} color={appleColors.textTertiary}>
@@ -306,7 +324,6 @@ export function NetworkPage({ draft, settings, notify }: PageProps & { notify: N
     }
   };
 
-  const recommended = result?.recommendation.profile;
   const region = REGION_META[settings.region];
 
   return (
@@ -349,41 +366,6 @@ export function NetworkPage({ draft, settings, notify }: PageProps & { notify: N
             <MetricCard label="Jitter" value={result.jitter.toFixed(1)} unit="ms" />
             <MetricCard label="Mất gói" value={result.loss.toFixed(1)} unit="%" />
             <MetricCard label="Băng thông" value={result.bandwidth.toFixed(0)} unit="Mbps" />
-          </View>
-
-          <View
-            style={{
-              marginTop: s(10),
-              padding: s(14),
-              borderRadius: s(10),
-              backgroundColor: 'rgba(31, 111, 235, 0.12)',
-              borderWidth: StyleSheet.hairlineWidth,
-              borderColor: 'rgba(102, 168, 255, 0.28)',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: s(12),
-            }}
-          >
-            <View style={{ flex: 1 }}>
-              <T size={12.8} weight="semibold" color={appleColors.blue}>
-                {result.recommendation.title}
-              </T>
-              <T size={10.4} color={appleColors.textSecondary} leading={1.4} style={{ marginTop: s(2) }}>
-                {result.recommendation.detail}
-              </T>
-            </View>
-            {recommended && recommended !== settings.profile ? (
-              <PillButton tone="accent" onPress={() => draft.selectProfile(recommended)}>
-                {`Dùng ${PROFILE_META[recommended].label}`}
-              </PillButton>
-            ) : (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(4) }}>
-                <Check size={s(15)} color={appleColors.blue} strokeWidth={2.4} />
-                <T size={11} weight="medium" color={appleColors.blue}>
-                  Đang dùng
-                </T>
-              </View>
-            )}
           </View>
         </View>
       ) : null}

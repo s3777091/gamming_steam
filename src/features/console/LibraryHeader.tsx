@@ -98,113 +98,118 @@ function DeviceStatusButton({ devices, open, onPress }: { devices: LocalDevice[]
     : (N > 0 ? `Thiết bị đang kết nối: ${N} thiết bị` : 'Thiết bị đang kết nối');
 
   return (
-    <Animated.View
-      style={[
-        styles.devices,
-        {
-          width: animatedWidth,
-          height: s(32),
-          borderRadius: s(16),
-          paddingHorizontal: PADDING_H,
-          backgroundColor: pillBg,
-          borderColor: pillBorder,
-          overflow: 'hidden',
-        },
-      ]}
+    <Press
+      onPress={onPress}
+      sound="confirm"
+      accessibilityLabel={accessibilityLabel}
+      focusRadius={s(16)}
+      style={{ borderRadius: s(16) }}
     >
-      <GlassBackdrop material="control" intensity={40} radius={s(16)} />
-      <Press
-        onPress={onPress}
-        sound="confirm"
-        accessibilityLabel={accessibilityLabel}
-        style={{
-          flex: 1,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: N > 0 ? 'flex-start' : 'center',
-        }}
+      <Animated.View
+        style={[
+          styles.devices,
+          {
+            width: animatedWidth,
+            height: s(32),
+            borderRadius: s(16),
+            paddingHorizontal: PADDING_H,
+            backgroundColor: pillBg,
+            borderColor: pillBorder,
+            overflow: 'hidden',
+          },
+        ]}
       >
-        {N > 0 ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {displayDevices.map((device, i) => {
-              const Icon = KIND_ICONS[device.kind];
-              const translateX = anim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-i * SHIFT_DELTA, 0],
-              });
+        <GlassBackdrop material="control" intensity={40} radius={s(16)} />
+        <View
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: N > 0 ? 'flex-start' : 'center',
+          }}
+        >
+          {N > 0 ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {displayDevices.map((device, i) => {
+                const Icon = KIND_ICONS[device.kind];
+                const translateX = anim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [-i * SHIFT_DELTA, 0],
+                });
 
-              return (
+                return (
+                  <Animated.View
+                    key={device.id}
+                    style={[
+                      styles.deviceIconWrapper,
+                      {
+                        width: ICON_WRAP,
+                        height: ICON_WRAP,
+                        borderRadius: ICON_WRAP / 2,
+                        marginLeft: i > 0 ? SEPARATED_GAP : 0,
+                        zIndex: i + 1,
+                        transform: [{ translateX }],
+                        backgroundColor: i === 0 ? 'transparent' : anim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['rgba(18, 22, 30, 0.95)', 'rgba(0, 0, 0, 0)'],
+                        }),
+                        borderWidth: i === 0 ? 0 : 1.5,
+                        borderColor: i === 0 ? 'transparent' : anim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['rgba(28, 34, 46, 0.9)', 'rgba(0, 0, 0, 0)'],
+                        }),
+                      },
+                    ]}
+                  >
+                    <Icon size={ICON_SIZE} color={open ? colors.accent : colors.text} strokeWidth={1.8} />
+                  </Animated.View>
+                );
+              })}
+
+              {hasBattery ? (
                 <Animated.View
-                  key={device.id}
-                  style={[
-                    styles.deviceIconWrapper,
-                    {
-                      width: ICON_WRAP,
-                      height: ICON_WRAP,
-                      borderRadius: ICON_WRAP / 2,
-                      marginLeft: i > 0 ? SEPARATED_GAP : 0,
-                      zIndex: i + 1,
-                      transform: [{ translateX }],
-                      backgroundColor: i === 0 ? 'transparent' : anim.interpolate({
+                  style={{
+                    marginLeft: s(4),
+                    transform: [{
+                      translateX: anim.interpolate({
                         inputRange: [0, 1],
-                        outputRange: ['rgba(18, 22, 30, 0.95)', 'rgba(0, 0, 0, 0)'],
+                        outputRange: [-(N - 1) * SHIFT_DELTA, 0],
                       }),
-                      borderWidth: i === 0 ? 0 : 1.5,
-                      borderColor: i === 0 ? 'transparent' : anim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['rgba(28, 34, 46, 0.9)', 'rgba(0, 0, 0, 0)'],
-                      }),
-                    },
-                  ]}
+                    }],
+                  }}
                 >
-                  <Icon size={ICON_SIZE} color={open ? colors.accent : colors.text} strokeWidth={1.8} />
+                  <T size={10.5} weight="bold" color={batteryColor(controllerBattery)} tabular>
+                    {controllerBattery}%
+                  </T>
                 </Animated.View>
-              );
-            })}
+              ) : null}
 
-            {hasBattery ? (
-              <Animated.View
-                style={{
-                  marginLeft: s(4),
-                  transform: [{
-                    translateX: anim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-(N - 1) * SHIFT_DELTA, 0],
-                    }),
-                  }],
-                }}
-              >
-                <T size={10.5} weight="bold" color={batteryColor(controllerBattery)} tabular>
-                  {controllerBattery}%
-                </T>
-              </Animated.View>
-            ) : null}
-
-            {overflowCount > 0 ? (
-              <Animated.View
-                style={{
-                  marginLeft: s(4),
-                  transform: [{
-                    translateX: anim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [-(N - 1) * SHIFT_DELTA, 0],
-                    }),
-                  }],
-                }}
-              >
-                <T size={9.6} weight="bold" color={colors.accentSoft} tabular>
-                  +{overflowCount}
-                </T>
-              </Animated.View>
-            ) : null}
-          </View>
-        ) : (
-          <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}>
-            <MonitorSmartphone size={ICON_SIZE} color={colors.text3} strokeWidth={1.8} />
-          </View>
-        )}
-      </Press>
-    </Animated.View>
+              {overflowCount > 0 ? (
+                <Animated.View
+                  style={{
+                    marginLeft: s(4),
+                    transform: [{
+                      translateX: anim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-(N - 1) * SHIFT_DELTA, 0],
+                      }),
+                    }],
+                  }}
+                >
+                  <T size={9.6} weight="bold" color={colors.accentSoft} tabular>
+                    +{overflowCount}
+                  </T>
+                </Animated.View>
+              ) : null}
+            </View>
+          ) : (
+            <View style={{ width: '100%', alignItems: 'center', justifyContent: 'center' }}>
+              <MonitorSmartphone size={ICON_SIZE} color={colors.text3} strokeWidth={1.8} />
+            </View>
+          )}
+        </View>
+      </Animated.View>
+    </Press>
   );
 }
 
@@ -215,12 +220,14 @@ function RemoteStatusButton({
   stage,
   reachable,
   onPress,
+  anchorRef,
 }: {
   open: boolean;
   online: boolean | null;
   stage?: string;
   reachable: boolean;
   onPress: () => void;
+  anchorRef?: RefObject<View | null>;
 }) {
   const { s } = useUi();
   const isOnline = reachable || online === true;
@@ -228,41 +235,44 @@ function RemoteStatusButton({
   const statusColor = isOnline ? colors.success : isConnecting ? colors.warning : colors.text4;
 
   return (
-    <Press
-      onPress={onPress}
-      sound="confirm"
-      accessibilityLabel={`Kết nối PC: ${isOnline ? 'Đã kết nối' : isConnecting ? 'Đang kết nối' : 'Ngoại tuyến'}`}
-      style={[
-        styles.remoteButton,
-        {
-          width: s(32),
-          height: s(32),
-          borderRadius: s(16),
-          backgroundColor: open ? 'rgba(102,168,255,0.24)' : 'rgba(255,255,255,0.08)',
-          borderColor: open ? colors.accent : 'rgba(255,255,255,0.18)',
-        },
-      ]}
-    >
-      <GlassBackdrop material="control" intensity={40} radius={s(16)} />
-      <Monitor
-        size={s(15)}
-        color={open ? colors.accent : isOnline ? colors.white : 'rgba(255,255,255,0.72)'}
-        strokeWidth={1.8}
-      />
+    <View ref={anchorRef} collapsable={false} style={styles.remoteButtonWrap}>
+      <Press
+        onPress={onPress}
+        sound="confirm"
+        accessibilityLabel={`Kết nối PC: ${isOnline ? 'Đã kết nối' : isConnecting ? 'Đang kết nối' : 'Ngoại tuyến'}`}
+        style={[
+          styles.remoteButton,
+          {
+            width: s(32),
+            height: s(32),
+            borderRadius: s(16),
+            backgroundColor: open ? 'rgba(102,168,255,0.24)' : 'rgba(255,255,255,0.08)',
+            borderColor: open ? colors.accent : 'rgba(255,255,255,0.18)',
+          },
+        ]}
+      >
+        <GlassBackdrop material="control" intensity={40} radius={s(16)} />
+        <Monitor
+          size={s(15)}
+          color={open ? colors.accent : isOnline ? colors.white : 'rgba(255,255,255,0.72)'}
+          strokeWidth={1.8}
+        />
+      </Press>
       <View
+        pointerEvents="none"
         style={[
           styles.statusDot,
           {
-            width: s(7),
-            height: s(7),
-            borderRadius: s(3.5),
+            width: s(8),
+            height: s(8),
+            borderRadius: s(4),
             backgroundColor: statusColor,
-            top: s(2),
-            right: s(2),
+            top: s(1.5),
+            right: s(1.5),
           },
         ]}
       />
-    </Press>
+    </View>
   );
 }
 
@@ -340,7 +350,7 @@ function ConsoleTabItem({
   return (
     <Press
       focusable={false}
-      sound="navigate"
+      sound={false}
       pressScale={0.96}
       onPress={onPress}
       accessibilityRole="tab"
@@ -587,15 +597,14 @@ export function LibraryHeader({
           />
         </View>
         {onToggleRemoteMenu ? (
-          <View ref={remoteAnchorRef} collapsable={false}>
-            <RemoteStatusButton
-              open={Boolean(remoteMenuOpen)}
-              online={remoteOnline ?? null}
-              stage={remoteStage}
-              reachable={Boolean(remoteReachable)}
-              onPress={onToggleRemoteMenu}
-            />
-          </View>
+          <RemoteStatusButton
+            anchorRef={remoteAnchorRef}
+            open={Boolean(remoteMenuOpen)}
+            online={remoteOnline ?? null}
+            stage={remoteStage}
+            reachable={Boolean(remoteReachable)}
+            onPress={onToggleRemoteMenu}
+          />
         ) : null}
         <View ref={bellRef} collapsable={false} style={styles.notificationButtonWrap}>
           <Press
@@ -740,6 +749,10 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   presence: { position: 'absolute', right: 0, bottom: 0, borderWidth: 1, borderColor: '#111821' },
+  remoteButtonWrap: {
+    position: 'relative',
+    overflow: 'visible',
+  },
   remoteButton: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -753,8 +766,9 @@ const styles = StyleSheet.create({
   },
   statusDot: {
     position: 'absolute',
-    borderWidth: 1.2,
+    borderWidth: 1.5,
     borderColor: '#080c12',
+    zIndex: 2,
   },
   glassCircleButton: {
     alignItems: 'center',

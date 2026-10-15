@@ -3,7 +3,7 @@ import { setCaptureMode, type CaptureMode } from 'jetsona-input';
 
 // Nhiều màn có thể đòi chế độ bắt khác nhau (UI mặc định, stream khi vào phiên).
 // Màn mở sau cùng thắng; đóng nó thì trở về chế độ của màn bên dưới.
-const stack: Array<{ id: number; mode: CaptureMode }> = [];
+const stack: { id: number; mode: CaptureMode }[] = [];
 let counter = 0;
 
 function apply() {

@@ -11,11 +11,11 @@
 
 import { useEffect, useRef } from 'react';
 import {
-  addListener, rumble as nativeRumble, setPointerCapture, stopRumble,
+  addListener, getDevices, rumble as nativeRumble, setPointerCapture, stopRumble,
   type NativeGamepadState,
 } from 'jetsona-input';
 
-import { useInputDevices, type LocalDevice } from '@/features/devices/useInputDevices';
+import { toLocal, useInputDevices, type LocalDevice } from '@/features/devices/useInputDevices';
 import { useCaptureMode } from '@/features/gamepad/captureMode';
 import { listenGuideCombo } from '@/features/gamepad/guideCombo';
 import { webCodeForKeyCode, vkForWebCode } from '@/features/settings/keycodes';
@@ -26,7 +26,7 @@ const MAX_SLOTS = 16;
 // Mọi cờ nút Moonlight mà tay cầm Android có thể báo (không gồm paddle/touchpad).
 const SUPPORTED_BUTTONS = 0x1000 | 0x2000 | 0x4000 | 0x8000 | 0x0001 | 0x0002 | 0x0004 | 0x0008
   | 0x0100 | 0x0200 | 0x0010 | 0x0020 | 0x0040 | 0x0080 | 0x0400;
-const CAPABILITY_RUMBLE = 1;
+const CAPABILITY_RUMBLE = 2;
 const A = 0x1000; const B = 0x2000; const X = 0x4000; const Y = 0x8000;
 
 type Options = {
@@ -68,16 +68,20 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
 } {
   const { devices } = useInputDevices();
   const clientRef = useRef(client);
+  const inputReadyRef = useRef(inputReady);
+  const liveRef = useRef(live);
   const guideOpenRef = useRef(guideOpen);
   const onGuideRef = useRef(onGuide);
   const onShortcutRef = useRef(onShortcut);
 
   useEffect(() => {
     clientRef.current = client;
+    inputReadyRef.current = inputReady;
+    liveRef.current = live;
     guideOpenRef.current = guideOpen;
     onGuideRef.current = onGuide;
     onShortcutRef.current = onShortcut;
-  }, [client, guideOpen, onGuide, onShortcut]);
+  }, [client, inputReady, live, guideOpen, onGuide, onShortcut]);
 
   const slots = useRef(new Map<number, number>());
   const latest = useRef(new Map<number, NativeGamepadState>());
@@ -85,10 +89,44 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
   // Tay cầm/bàn phím/chuột vật lý thuộc về PC suốt phiên.
   useCaptureMode('stream', live);
 
+  const allocateSlot = (nativeId: number, rumble = false): number | undefined => {
+    const target = clientRef.current;
+    if (!target || !inputReadyRef.current || !liveRef.current) return undefined;
+    const existing = slots.current.get(nativeId);
+    if (existing !== undefined) return existing;
+    const used = new Set(slots.current.values());
+    let slot = 0;
+    while (used.has(slot) && slot < MAX_SLOTS) slot += 1;
+    if (slot >= MAX_SLOTS) return undefined;
+    slots.current.set(nativeId, slot);
+    target.sendControllerAdd(slot, SUPPORTED_BUTTONS, rumble ? CAPABILITY_RUMBLE : 0);
+    // Gửi ngay trạng thái trung tính hoặc trạng thái hiện tại để ViGEmBus/Sunshine khởi tạo tay cầm trên PC
+    const last = latest.current.get(nativeId);
+    target.sendControllerState(
+      slot,
+      last && !guideOpenRef.current ? adjust(last, settingsRef.current) : NEUTRAL,
+    );
+    // ViGEmBus cần 100-300ms để Windows nhận diện virtual device xusb, gửi lại state để game không bỏ sót
+    const resend = () => {
+      const current = latest.current.get(nativeId);
+      target.sendControllerState(
+        slot,
+        current && !guideOpenRef.current ? adjust(current, settingsRef.current) : NEUTRAL,
+      );
+    };
+    setTimeout(resend, 150);
+    setTimeout(resend, 400);
+    return slot;
+  };
+
   const sendPad = (nativeId: number, state: NativeGamepadState | null) => {
     const target = clientRef.current;
-    const slot = slots.current.get(nativeId);
-    if (!target || slot === undefined) return;
+    if (!target || !inputReadyRef.current || !liveRef.current) return;
+    let slot = slots.current.get(nativeId);
+    if (slot === undefined) {
+      slot = allocateSlot(nativeId, false);
+      if (slot === undefined) return;
+    }
     const settings = settingsRef.current;
     target.sendControllerState(
       slot,
@@ -99,10 +137,19 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
   // Khai báo / gỡ tay cầm theo sự kiện cắm rút.
   useEffect(() => {
     if (!client || !inputReady || !live) return;
-    const pads = devices.filter((device): device is LocalDevice => device.kind === 'controller');
-    const present = new Set(pads.map((pad) => pad.nativeId));
+    const currentDevices = devices.length > 0 ? devices : getDevices().map(toLocal);
+    const pads = currentDevices.filter((device): device is LocalDevice => device.kind === 'controller');
+    // Ưu tiên tay cầm Bluetooth / vật lý thật lên trước để nhận slot 0 (Player 1)
+    pads.sort((a, b) => {
+      if (a.bluetooth && !b.bluetooth) return -1;
+      if (!a.bluetooth && b.bluetooth) return 1;
+      return a.nativeId - b.nativeId;
+    });
+    const presentNativeIds = new Set(pads.map((pad) => pad.nativeId));
+    const nativeDevices = getDevices();
     for (const [nativeId, slot] of Array.from(slots.current)) {
-      if (!present.has(nativeId)) {
+      const stillAttached = presentNativeIds.has(nativeId) || nativeDevices.some((d) => d.nativeId === nativeId && d.kind === 'controller');
+      if (!stillAttached) {
         client.sendControllerRemove(slot);
         slots.current.delete(nativeId);
         latest.current.delete(nativeId);
@@ -110,17 +157,29 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
     }
     for (const pad of pads) {
       if (slots.current.has(pad.nativeId)) continue;
-      const used = new Set(slots.current.values());
-      let slot = 0;
-      while (used.has(slot) && slot < MAX_SLOTS) slot += 1;
-      if (slot >= MAX_SLOTS) break;
-      slots.current.set(pad.nativeId, slot);
-      client.sendControllerAdd(slot, SUPPORTED_BUTTONS, pad.rumble ? CAPABILITY_RUMBLE : 0);
-      const last = latest.current.get(pad.nativeId);
-      if (last) sendPad(pad.nativeId, last);
+      allocateSlot(pad.nativeId, pad.rumble);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client, devices, inputReady, live]);
+
+  // Đồng bộ định kỳ (1s) trạng thái tay cầm sang PC để game mới mở hay chuyển cảnh luôn nhận diện
+  useEffect(() => {
+    if (!client || !inputReady || !live) return;
+    const interval = setInterval(() => {
+      if (guideOpenRef.current) return;
+      const target = clientRef.current;
+      if (!target) return;
+      for (const [nativeId, slot] of slots.current) {
+        const last = latest.current.get(nativeId);
+        target.sendControllerState(
+          slot,
+          last ? adjust(last, settingsRef.current) : NEUTRAL,
+        );
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client, inputReady, live]);
 
   // Phiên đóng hoặc kết nối lại: quên slot để lần sau khai báo lại từ đầu.
   useEffect(() => {

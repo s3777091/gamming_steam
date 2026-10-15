@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
-import { MonitorSmartphone, Settings, X } from 'lucide-react-native';
+import { MonitorSmartphone, Settings } from 'lucide-react-native';
 
 import { batteryColor, batteryPercent } from '@/features/devices/battery';
 import { KIND_ICONS } from '@/features/devices/kindIcons';
@@ -203,7 +203,7 @@ export function DeviceConnectionMenu({ open, anchorRef, devices, onClose, onOpen
       <View style={[StyleSheet.absoluteFill, { zIndex: 60, elevation: 60 }]}>
         {/* Lớp nền trong suốt bắt chạm ngoài để đóng */}
         <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0, 0, 0, 0.32)', opacity: anim }]}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => closeWithAnimation()} accessibilityLabel="Đóng menu thiết bị" />
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => closeWithAnimation()} focusable={false} accessibilityLabel="Đóng menu thiết bị" />
         </Animated.View>
 
         {/* Khung nổi glass trượt xuống từ trên với ease-out */}
@@ -234,26 +234,18 @@ export function DeviceConnectionMenu({ open, anchorRef, devices, onClose, onOpen
             <T size={10} weight="semibold" color={colors.text2} numberOfLines={1}>
               {sorted.length ? `Thiết bị · ${sorted.length}` : 'Thiết bị'}
             </T>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(5) }}>
-              <Press
-                onPress={openSettings}
-                sound="navigate"
-                autoFocus={sorted.length === 0}
-                accessibilityLabel="Mở cài đặt thiết bị"
-                style={[styles.closeBtn, { width: s(18), height: s(18), borderRadius: s(9) }]}
-              >
-                <Settings size={s(10)} color={colors.text3} />
-              </Press>
-              <Press
-                onPress={() => closeWithAnimation()}
-                sound="back"
-                focusable={false}
-                accessibilityLabel="Đóng menu"
-                style={[styles.closeBtn, { width: s(18), height: s(18), borderRadius: s(9) }]}
-              >
-                <X size={s(10)} color={colors.text3} />
-              </Press>
-            </View>
+            <Press
+              onPress={openSettings}
+              sound="navigate"
+              autoFocus={sorted.length === 0}
+              focusVariant="card"
+              focusRadius={s(10)}
+              pressScale={0.92}
+              accessibilityLabel="Mở cài đặt thiết bị"
+              style={[styles.closeBtn, { width: s(20), height: s(20), borderRadius: s(10) }]}
+            >
+              <Settings size={s(11)} color={colors.text3} />
+            </Press>
           </View>
 
           {sorted.length ? (

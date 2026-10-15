@@ -1,176 +1,279 @@
-import { useEffect, useMemo } from 'react';
-import { Animated, Easing, View } from 'react-native';
+import { useContext, useEffect, useMemo } from 'react';
+import { Animated, Easing } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
-const RING = 2;
-const GAP = 3;
+import { UiContext } from './scale';
+import { useMotion } from './motion';
 
 /**
- * Viền tiêu điểm của tay cầm, kiểu PS5: một nét trắng mảnh bao ngoài phần tử, bên
- * ngoài là quầng sáng mờ dần thở nhẹ. Không dùng shadow/elevation của Android vì
- * nó vẽ một khối đen đục ngay dưới phần tử bán trong suốt.
+ * Viền tiêu điểm chuẩn Console Liquid Glass (đồng bộ theo phong cách ảnh 2):
  *
- * - `card`: ảnh, thẻ, nút tròn — chỉ có viền và quầng sáng, không phủ màu lên nội dung.
- * - `row`: hàng cài đặt, nút dài — thêm một lớp sáng nhẹ để thấy rõ cả hàng đang chọn.
+ * Gồm hệ thống viền đa tầng tạo cảm giác kính nổi 3D đa chiều:
+ * 1. Viền specular trong (Inner Specular Edge): Nét trắng ánh kim mảnh sát mép phần tử,
+ *    độ mờ vừa phải (~0.58), giúp định hình sắc nét đối tượng đang chọn mà không bị thô cứng.
+ * 2. Viền quầng sáng nổi ngoài (Outer Floating Halo): Nét thanh mảnh nổi tự do cách mép
+ *    phần tử một khoảng gap tỉ lệ, ánh xanh cyan/white dịu mắt, thở nhẹ theo chu kỳ sin êm ái.
+ * 3. Dải tán sắc mờ ngoài cùng (Ambient Bloom): Tỏa sáng nhẹ giúp tạo chiều sâu quang học.
  *
- * Đặt làm con CUỐI của phần tử được chọn; nó tràn ra ngoài nên không đổi bố cục.
- * `visible` về false thì mờ đi rồi gọi `onHidden` để cha gỡ nó khỏi cây.
+ * - `card` & `glassCard`: Dành cho thẻ game, nút, icon tròn, pill... Tự động co giãn khoảng gap
+ *   theo kích thước phần tử để nút nhỏ không bị quầng sáng quá xa.
+ * - `row`: Cho hàng cài đặt, danh sách. Dùng viên nang kính nổi lùi vào trong (inset floating glass)
+ *   để không bao giờ bị bo góc cha (overflow: hidden) cắt phạm và đồng bộ tuyệt đối với phong cách ảnh 2.
  */
-export function FocusRing({ radius, variant = 'card', tint = 'accent', visible = true, onHidden }: {
+export function FocusRing({
+  radius,
+  variant = 'card',
+  tint = 'accent',
+  isSmall: isSmallProp,
+  visible = true,
+  onHidden,
+}: {
   radius: number;
   variant?: 'card' | 'glassCard' | 'row';
   tint?: 'accent' | 'danger';
+  isSmall?: boolean;
   visible?: boolean;
   onHidden?: () => void;
 }) {
+  const ui = useContext(UiContext);
+  const { active, reduceMotion } = useMotion();
+  const s = ui ? ui.s : (n: number) => n;
+
   const appear = useMemo(() => new Animated.Value(0), []);
   const breathe = useMemo(() => new Animated.Value(0), []);
 
   useEffect(() => {
     const animation = Animated.timing(appear, {
       toValue: visible ? 1 : 0,
-      duration: visible ? 170 : 120,
-      easing: Easing.out(Easing.cubic),
+      duration: reduceMotion ? 0 : visible ? 180 : 130,
+      easing: visible ? Easing.bezier(0.16, 1, 0.3, 1) : Easing.out(Easing.cubic),
       useNativeDriver: true,
+      isInteraction: false,
     });
-    animation.start(({ finished }) => { if (finished && !visible) onHidden?.(); });
+    animation.start(({ finished }) => {
+      if (finished && !visible) onHidden?.();
+    });
     return () => animation.stop();
-  }, [appear, onHidden, visible]);
+  }, [appear, onHidden, reduceMotion, visible]);
 
   useEffect(() => {
-    if (!visible) return;
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(breathe, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      Animated.timing(breathe, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-    ]));
+    if (!visible || !active || reduceMotion) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breathe, {
+          toValue: 1,
+          duration: 1250,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+        Animated.timing(breathe, {
+          toValue: 0,
+          duration: 1250,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+          isInteraction: false,
+        }),
+      ])
+    );
     loop.start();
     return () => loop.stop();
-  }, [breathe, visible]);
+  }, [active, breathe, reduceMotion, visible]);
 
   const isDanger = tint === 'danger';
+
+  // Biến thể HÀNG (Settings Row / Danh sách)
+  if (variant === 'row') {
+    const isInsetRow = radius <= 0;
+    const hInset = isInsetRow ? s(5) : 0;
+    const vInset = isInsetRow ? s(2.5) : 0;
+    const pillRadius = isInsetRow ? s(10) : radius;
+
+    return (
+      <Animated.View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          opacity: appear,
+          transform: [
+            {
+              scale: appear.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.985, 1],
+              }),
+            },
+          ],
+        }}
+      >
+        {/* Lớp tán sắc mờ ngoài cùng (Ambient Bloom) */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: vInset - s(4),
+            bottom: vInset - s(4),
+            left: hInset - s(4),
+            right: hInset - s(4),
+            borderRadius: pillRadius + s(4),
+            borderWidth: 1.5,
+            borderColor: isDanger ? 'rgba(239, 68, 68, 0.16)' : 'rgba(102, 168, 255, 0.16)',
+            opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [0.75, 0.35] }),
+          }}
+        />
+
+        {/* Viền quầng sáng nổi ngoài (Outer Floating Halo) đồng bộ ảnh 2 */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: vInset - s(2),
+            bottom: vInset - s(2),
+            left: hInset - s(2),
+            right: hInset - s(2),
+            borderRadius: pillRadius + s(2),
+            borderWidth: 1.25,
+            borderColor: isDanger ? 'rgba(248, 113, 113, 0.40)' : 'rgba(138, 192, 255, 0.38)',
+            opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 0.58] }),
+          }}
+        />
+
+        {/* Lớp nền kính Liquid Glass mờ nhẹ, êm dịu ("nhẹ tí") */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: vInset,
+            bottom: vInset,
+            left: hInset,
+            right: hInset,
+            borderRadius: pillRadius,
+            backgroundColor: isDanger ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255, 255, 255, 0.05)',
+            opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 0.8] }),
+            overflow: 'hidden',
+          }}
+        >
+          {/* Ánh phản quang mép trên (Top rim specular sheen) */}
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.30)', 'rgba(255, 255, 255, 0.02)', 'transparent']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 1.2,
+            }}
+          />
+        </Animated.View>
+
+        {/* Viền specular trong (Inner Specular Edge) thanh lịch, sắc sảo */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: vInset,
+            bottom: vInset,
+            left: hInset,
+            right: hInset,
+            borderRadius: pillRadius,
+            borderWidth: 1.1,
+            borderColor: isDanger ? 'rgba(255, 140, 130, 0.80)' : 'rgba(255, 255, 255, 0.58)',
+            opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 0.75] }),
+          }}
+        />
+      </Animated.View>
+    );
+  }
+
+  // Biến thể CARD / GLASSCARD (Thẻ game, Nút, Icon, Tab, Pill... Chuẩn phong cách ảnh 2)
+  const isSmall = isSmallProp ?? (radius <= 18);
+  const gap = isSmall ? s(2.5) : s(4.5);
+  const bloomOffset = isSmall ? s(1.5) : s(2.5);
+  const innerRingWidth = isSmall ? 1.1 : 1.25;
+  const outerRingWidth = isSmall ? 1.2 : 1.4;
+  const bloomWidth = isSmall ? 1.5 : 2;
+
   const band = (inset: number, width: number, color: string, alpha: number, extra: number) => ({
     position: 'absolute' as const,
-    top: -inset, left: -inset, right: -inset, bottom: -inset,
-    borderRadius: radius + inset,
+    top: -inset,
+    left: -inset,
+    right: -inset,
+    bottom: -inset,
+    borderRadius: Math.max(0, radius + inset),
     borderWidth: width,
     borderColor: color,
-    opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [alpha, alpha * (1 - extra)] }),
+    opacity: breathe.interpolate({
+      inputRange: [0, 1],
+      outputRange: [alpha, alpha * (1 - extra)],
+    }),
   });
-
-  if (variant === 'row') {
-    return (
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-          opacity: appear,
-        }}
-      >
-        {/* Lớp phủ sáng Liquid Glass mờ cho cả hàng đang chọn */}
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-            borderRadius: radius,
-            backgroundColor: isDanger ? 'rgba(239, 68, 68, 0.14)' : 'rgba(102, 168, 255, 0.12)',
-          }}
-        />
-        {/* Viền quầng sáng thở nhẹ */}
-        <Animated.View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: -1, left: -1, right: -1, bottom: -1,
-            borderRadius: radius + 1,
-            borderWidth: 1.5,
-            borderColor: isDanger ? 'rgba(248, 113, 113, 0.55)' : 'rgba(102, 168, 255, 0.45)',
-            opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [0.85, 0.4] }),
-          }}
-        />
-        {/* Viền tiêu điểm trắng specular sắc nét */}
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: 0, left: 0, right: 0, bottom: 0,
-            borderRadius: radius,
-            borderWidth: RING,
-            borderColor: 'rgba(255,255,255,0.95)',
-          }}
-        />
-      </Animated.View>
-    );
-  }
-
-  if (variant === 'glassCard') {
-    return (
-      <Animated.View
-        pointerEvents="none"
-        style={{
-          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-          opacity: appear,
-        }}
-      >
-        <Animated.View
-          pointerEvents="none"
-          style={band(
-            GAP + 4,
-            2,
-            isDanger ? 'rgba(248, 113, 113, 0.28)' : 'rgba(138, 192, 255, 0.28)',
-            0.8,
-            0.45,
-          )}
-        />
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: -1, left: -1, right: -1, bottom: -1,
-            borderRadius: radius + 1,
-            borderWidth: 1.25,
-            borderColor: 'rgba(255, 255, 255, 0.54)',
-          }}
-        />
-      </Animated.View>
-    );
-  }
 
   return (
     <Animated.View
       pointerEvents="none"
       style={{
-        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         opacity: appear,
+        transform: [
+          {
+            scale: appear.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.975, 1],
+            }),
+          },
+        ],
       }}
     >
-      {/* Quầng sáng quang học Liquid Glass */}
+      {/* 1. Dải tán sắc mờ ngoài cùng (Ambient Bloom) */}
       <Animated.View
         pointerEvents="none"
         style={band(
-          GAP + RING + 8,
-          4,
-          isDanger ? 'rgba(239, 68, 68, 0.22)' : 'rgba(102, 168, 255, 0.22)',
-          1,
-          0.5,
+          gap + bloomOffset,
+          bloomWidth,
+          isDanger ? 'rgba(239, 68, 68, 0.18)' : 'rgba(102, 168, 255, 0.16)',
+          0.8,
+          0.45,
         )}
       />
+
+      {/* 2. Viền quầng sáng nổi ngoài (Outer Floating Halo) — đúng như ảnh 2 */}
       <Animated.View
         pointerEvents="none"
         style={band(
-          GAP + RING + 3,
-          3,
-          isDanger ? 'rgba(248, 113, 113, 0.45)' : 'rgba(138, 192, 255, 0.42)',
+          gap,
+          outerRingWidth,
+          isDanger ? 'rgba(248, 113, 113, 0.45)' : 'rgba(138, 192, 255, 0.38)',
           1,
-          0.3,
+          0.42,
         )}
       />
-      <View
+
+      {/* 3. Viền specular trong (Inner Specular Edge) ôm khít mép đối tượng */}
+      <Animated.View
         pointerEvents="none"
         style={{
           position: 'absolute',
-          top: -GAP - RING, left: -GAP - RING, right: -GAP - RING, bottom: -GAP - RING,
-          borderRadius: radius + GAP + RING,
-          borderWidth: RING,
-          borderColor: 'rgba(255, 255, 255, 0.98)',
+          top: -0.5,
+          left: -0.5,
+          right: -0.5,
+          bottom: -0.5,
+          borderRadius: Math.max(0, radius + 0.5),
+          borderWidth: innerRingWidth,
+          borderColor: isDanger ? 'rgba(255, 140, 130, 0.85)' : 'rgba(255, 255, 255, 0.58)',
+          opacity: breathe.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1, 0.72],
+          }),
         }}
       />
     </Animated.View>

@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { Animated, Easing, Platform, StyleSheet, View, ScrollView } from 'react-native';
-import { FocusScroll } from '@/features/gamepad/focus';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { Animated, Easing, FlatList, Platform, StyleSheet, View, type ListRenderItemInfo, type ScrollViewProps } from 'react-native';
+import { FocusScroll, useSceneActive } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Download, Ellipsis, FileText, HardDrive, Monitor, Pause, Play, Trash2, Trophy } from 'lucide-react-native';
 
@@ -10,8 +10,12 @@ import type { LibraryPanel, PcGame } from '@/features/library/types';
 import type { PcLibrary } from '@/features/library/usePcLibrary';
 import type { SteamDownloads } from '@/features/library/useSteamDownloads';
 import { type GameDownload, type GameUninstall, downloadForApp, primaryDownload, uninstallForApp } from '@/lib/steam-downloads';
+import { shelfItemLayout } from '@/lib/game-shelf-layout';
+import { nearbyBackdropUrls } from '@/lib/backdrop-preloader';
 import { colors, glass } from '@/theme';
 import { Img } from '@/ui/Img';
+import { useBackdropPreload } from '@/ui/useBackdropPreload';
+import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -19,14 +23,17 @@ import { T } from '@/ui/Text';
 import { DownloadStatusLine, ProgressRing, downloadInProgress } from './DownloadViews';
 import type { FlightRect } from './DownloadFlight';
 
-function GameTitle({ game }: { game: PcGame }) {
+const GameTitle = memo(function GameTitle({ game }: { game: PcGame }) {
   const { s, width } = useUi();
+  const { reduceMotion } = useMotion();
   const [failedLogo, setFailedLogo] = useState<string | null>(null);
   const logoUrl = game.art?.logoUrl && game.art.logoUrl !== failedLogo ? game.art.logoUrl : null;
   const [enter] = useState(() => new Animated.Value(0));
   useEffect(() => {
-    Animated.timing(enter, { toValue: 1, duration: 760, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  }, [enter]);
+    const animation = Animated.timing(enter, { toValue: 1, duration: reduceMotion ? 0 : 420, easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false });
+    animation.start();
+    return () => animation.stop();
+  }, [enter, reduceMotion]);
 
   const maxHeight = Math.min(s(128), s(120));
   const maxWidth = Math.min(s(384), width * 0.4);
@@ -57,7 +64,7 @@ function GameTitle({ game }: { game: PcGame }) {
       )}
     </Animated.View>
   );
-}
+});
 
 function PrimaryAction({ library, download, uninstall, canControl, onPlay, onInstall, onDownloadPress, reachable }: {
   library: PcLibrary;
@@ -70,6 +77,8 @@ function PrimaryAction({ library, download, uninstall, canControl, onPlay, onIns
   reachable: boolean;
 }) {
   const { s } = useUi();
+  const { active: appActive, reduceMotion } = useMotion();
+  const sceneActive = useSceneActive();
   const { selected, launchingId, installingId } = library;
   const installed = selected?.installed !== false;
   // Đang tải: nút thành vòng tiến trình; bấm để tạm dừng/tiếp tục hoặc xem điều khoản.
@@ -81,14 +90,14 @@ function PrimaryAction({ library, download, uninstall, canControl, onPlay, onIns
   const busy = Boolean(launchingId || installingId || library.uninstallingId || uninstalling)
     || Boolean(tracking && ['preparing', 'working', 'queued', 'installed'].includes(tracking.status));
   useEffect(() => {
-    if (!busy) { pulse.setValue(1); return; }
+    if (!busy || !appActive || !sceneActive || reduceMotion) { pulse.setValue(1); return; }
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 0.55, duration: 600, useNativeDriver: true }),
-      Animated.timing(pulse, { toValue: 1, duration: 600, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0.55, duration: 600, useNativeDriver: true, isInteraction: false }),
+      Animated.timing(pulse, { toValue: 1, duration: 600, useNativeDriver: true, isInteraction: false }),
     ]));
     loop.start();
     return () => loop.stop();
-  }, [busy, pulse]);
+  }, [appActive, busy, pulse, reduceMotion, sceneActive]);
 
   const size = s(44);
   return (
@@ -152,6 +161,13 @@ const GAP = 12;
 // Vạch đứng ngăn game đã cài (bên trái) với game chưa cài (bên phải).
 const DIVIDER = { w: 1.5, h: 88 };
 
+// Keep gamepad scroll ancestry intact inside FlatList's virtualized cells.
+function renderFocusRail(props: ScrollViewProps) {
+  return <FocusScroll {...props} />;
+}
+
+const gameKey = (game: PcGame) => game.id;
+
 function ShelfDivider() {
   const { s } = useUi();
   return (
@@ -163,33 +179,41 @@ function ShelfDivider() {
   );
 }
 
-function GameCard({ game, active, achievements, onSelect, cardRef }: {
+const GameCard = memo(function GameCard({ game, active, achievements, onSelect, cardRef }: {
   game: PcGame;
   active: boolean;
-  achievements: PcLibrary['achievements'];
-  onSelect: () => void;
+  achievements: PcLibrary['achievements']['data'];
+  onSelect: (id: string) => void;
   /** Gắn vào thẻ đang chọn: điểm xuất phát của hiệu ứng thẻ bay vào thông báo. */
   cardRef: RefObject<View | null>;
 }) {
   const { s } = useUi();
+  const select = useCallback(() => onSelect(game.id), [game.id, onSelect]);
+  const { reduceMotion } = useMotion();
+  const previousActive = useRef(active);
   const [selection] = useState(() => new Animated.Value(active ? 1 : 0));
   useEffect(() => {
+    const changed = previousActive.current !== active;
+    previousActive.current = active;
+    if (reduceMotion) { selection.setValue(active ? 1 : 0); return; }
+    if (!changed) return;
     const animation = Animated.spring(selection, {
       toValue: active ? 1 : 0,
       stiffness: 260,
       damping: 26,
       mass: 0.72,
       useNativeDriver: true,
+      isInteraction: false,
     });
     animation.start();
     return () => animation.stop();
-  }, [active, selection]);
+  }, [active, reduceMotion, selection]);
 
-  const data = achievements.data;
+  const data = achievements;
   const percent = data?.supported && data.total ? Math.round(((data.unlocked || 0) / data.total) * 100) : null;
   return (
     <View ref={active ? cardRef : undefined} collapsable={false}>
-    <Press onPress={onSelect} onFocused={onSelect} focusRadius={s(active ? 20 : 16)} focusVariant="glassCard" pressScale={0.98} accessibilityLabel={game.title}>
+    <Press onPress={select} onFocused={select} focusRadius={s(active ? 20 : 16)} focusVariant="glassCard" pressScale={0.98} accessibilityLabel={game.title}>
       <Animated.View
         style={[
           styles.card,
@@ -241,10 +265,10 @@ function GameCard({ game, active, achievements, onSelect, cardRef }: {
     </Press>
     </View>
   );
-}
+});
 
 /** Tab Games: logo + nút của game đang chọn, phía dưới là kệ mọi game trên PC. */
-export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenChange, onSelectGame, onOpenPanel, onPlay, onUninstall, onOpenPrompt, onInstallStart, onInstallResult }: {
+export const GamesView = memo(function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenChange, onSelectGame, onOpenPanel, onPlay, onUninstall, onOpenPrompt, onInstallStart, onInstallResult }: {
   library: PcLibrary;
   downloads: SteamDownloads;
   reachable: boolean;
@@ -261,7 +285,7 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
   onInstallResult: (ok: boolean) => void;
 }) {
   const router = useRouter();
-  const { s, width, insets } = useUi();
+  const { s } = useUi();
   const activeCard = useRef<View>(null);
   const { games, selected, error, installOpenedId } = library;
   const selectedAppId = isSteamAppId(selected?.steamAppId) ? Number(selected.steamAppId) : null;
@@ -305,45 +329,6 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
     else if (download.status === 'downloading') downloads.pause(download.appid);
     else if (download.status === 'paused') downloads.resume(download.appid);
   };
-  const estimatedRailWidth = Math.max(100, width - (s(44) + insets.left + insets.right));
-  const rail = useRef<ScrollView>(null);
-  const railWidth = useRef(estimatedRailWidth);
-  // Game đã cài đứng trước, game chưa cài đứng sau vạch ngăn; thứ tự trong mỗi nhóm giữ nguyên.
-  const shelf = useMemo(() => {
-    const installed = games.filter((game) => game.installed !== false);
-    const missing = games.filter((game) => game.installed === false);
-    return { ordered: [...installed, ...missing], installedCount: installed.length, hasDivider: installed.length > 0 && missing.length > 0 };
-  }, [games]);
-  const selectedIndex = Math.max(0, shelf.ordered.findIndex((game) => game.id === selected?.id));
-
-  const getSelectedScrollX = useCallback((rWidth: number) => {
-    const idleW = s(IDLE.w);
-    const activeW = s(ACTIVE.w);
-    const dividerShift = shelf.hasDivider && selectedIndex >= shelf.installedCount ? s(DIVIDER.w) + s(GAP) : 0;
-    const left = selectedIndex * (idleW + s(GAP)) + dividerShift;
-    return Math.max(0, left - (rWidth - activeW) / 2);
-  }, [s, selectedIndex, shelf.hasDivider, shelf.installedCount]);
-
-  // Vị trí thẻ đang chọn tính được từ kích thước đã biết, không cần đo layout.
-  const centerSelected = useCallback((animated: boolean) => {
-    const currentW = railWidth.current > 0 ? railWidth.current : estimatedRailWidth;
-    const x = getSelectedScrollX(currentW);
-    rail.current?.scrollTo({ x, animated });
-  }, [estimatedRailWidth, getSelectedScrollX]);
-
-  const initialScrollX = useMemo(() => {
-    return getSelectedScrollX(estimatedRailWidth);
-  }, [estimatedRailWidth, getSelectedScrollX]);
-
-  const mounted = useRef(false);
-  useEffect(() => {
-    if (!mounted.current) {
-      mounted.current = true;
-      return;
-    }
-    const frame = requestAnimationFrame(() => centerSelected(true));
-    return () => cancelAnimationFrame(frame);
-  }, [selected?.id, games.length, shelf.installedCount, centerSelected]);
 
   return (
     <View style={{ flex: 1 }}>
@@ -423,8 +408,101 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
         ) : null}
       </View>
 
-      <FocusScroll
+      <GameShelf
+        games={games}
+        selectedId={selected?.id ?? null}
+        selectedAchievements={library.achievements.data}
+        activeCard={activeCard}
+        onSelectGame={onSelectGame}
+      />
+    </View>
+  );
+});
+
+/** Download progress never invalidates the virtualized game shelf. */
+const GameShelf = memo(function GameShelf({ games, selectedId, selectedAchievements, activeCard, onSelectGame }: {
+  games: PcGame[];
+  selectedId: string | null;
+  selectedAchievements: PcLibrary['achievements']['data'];
+  activeCard: RefObject<View | null>;
+  onSelectGame: (id: string) => void;
+}) {
+  const { s, width, insets } = useUi();
+  const estimatedRailWidth = Math.max(100, width - (s(44) + insets.left + insets.right));
+  const rail = useRef<FlatList<PcGame>>(null);
+  const railWidth = useRef(estimatedRailWidth);
+  // Game đã cài đứng trước, game chưa cài đứng sau vạch ngăn; thứ tự trong mỗi nhóm giữ nguyên.
+  const shelf = useMemo(() => {
+    const installed = games.filter((game) => game.installed !== false);
+    const missing = games.filter((game) => game.installed === false);
+    return { ordered: [...installed, ...missing], installedCount: installed.length, hasDivider: installed.length > 0 && missing.length > 0 };
+  }, [games]);
+  const selectedIndex = Math.max(0, shelf.ordered.findIndex((game) => game.id === selectedId));
+  const heroUrls = useMemo(() => shelf.ordered.map((game) => game.heroUrl || (game.steamAppId
+    ? `https://shared.steamstatic.com/store_item_assets/steam/apps/${game.steamAppId}/library_hero.jpg` : null)), [shelf.ordered]);
+  const preloadUrls = useMemo(() => nearbyBackdropUrls(heroUrls, selectedIndex), [heroUrls, selectedIndex]);
+  useBackdropPreload(preloadUrls);
+  const metrics = useMemo(() => ({
+    idleWidth: s(IDLE.w), activeWidth: s(ACTIVE.w), gap: s(GAP), dividerWidth: s(DIVIDER.w), padding: s(10),
+  }), [s]);
+  const dividerIndex = shelf.hasDivider ? shelf.installedCount : null;
+  const getItemLayout = useCallback((_data: ArrayLike<PcGame> | null | undefined, index: number) => (
+    shelfItemLayout(index, selectedIndex, dividerIndex, metrics)
+  ), [dividerIndex, metrics, selectedIndex]);
+  const renderGame = useCallback(({ item: game, index }: ListRenderItemInfo<PcGame>) => (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: metrics.gap, marginRight: metrics.gap }}>
+      {index === dividerIndex ? <ShelfDivider /> : null}
+      <GameCard
+        game={game}
+        active={game.id === selectedId}
+        achievements={game.id === selectedId ? selectedAchievements : null}
+        onSelect={onSelectGame}
+        cardRef={activeCard}
+      />
+    </View>
+  ), [activeCard, dividerIndex, metrics.gap, onSelectGame, selectedId, selectedAchievements]);
+
+  const getSelectedScrollX = useCallback((rWidth: number) => {
+    const cell = shelfItemLayout(selectedIndex, selectedIndex, dividerIndex, metrics);
+    const left = cell.offset + (selectedIndex === dividerIndex ? metrics.dividerWidth + metrics.gap : 0);
+    return Math.max(0, left - (rWidth - metrics.activeWidth) / 2);
+  }, [dividerIndex, metrics, selectedIndex]);
+
+  // Vị trí thẻ đang chọn tính được từ kích thước đã biết, không cần đo layout.
+  const centerSelected = useCallback((animated: boolean) => {
+    const currentW = railWidth.current > 0 ? railWidth.current : estimatedRailWidth;
+    const x = getSelectedScrollX(currentW);
+    rail.current?.scrollToOffset({ offset: x, animated });
+  }, [estimatedRailWidth, getSelectedScrollX]);
+
+  const initialScrollX = useMemo(() => {
+    return getSelectedScrollX(estimatedRailWidth);
+  }, [estimatedRailWidth, getSelectedScrollX]);
+
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    const frame = requestAnimationFrame(() => centerSelected(true));
+    return () => cancelAnimationFrame(frame);
+  }, [selectedId, games.length, shelf.installedCount, centerSelected]);
+
+  return (
+      <FlatList
         ref={rail}
+        data={shelf.ordered}
+        renderItem={renderGame}
+        keyExtractor={gameKey}
+        getItemLayout={getItemLayout}
+        renderScrollComponent={renderFocusRail}
+        initialScrollIndex={selectedIndex}
+        initialNumToRender={12}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        removeClippedSubviews={false}
+        ListFooterComponent={<View style={{ width: metrics.activeWidth }} />}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentOffset={{ x: initialScrollX, y: 0 }}
@@ -439,27 +517,12 @@ export function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenC
           }
         }}
         style={{ flexGrow: 0, height: s(142) }}
-        contentContainerStyle={{ alignItems: 'flex-end', gap: s(GAP), paddingHorizontal: s(10), paddingTop: s(10), paddingBottom: s(12) }}
+        contentContainerStyle={{ alignItems: 'flex-end', paddingHorizontal: s(10), paddingTop: s(10), paddingBottom: s(12) }}
         decelerationRate="fast"
         accessibilityRole="list"
-      >
-        {shelf.ordered.map((game, index) => (
-          <Fragment key={game.id}>
-            {shelf.hasDivider && index === shelf.installedCount ? <ShelfDivider /> : null}
-            <GameCard
-              game={game}
-              active={game.id === selected?.id}
-              achievements={library.achievements}
-              onSelect={() => onSelectGame(game.id)}
-              cardRef={activeCard}
-            />
-          </Fragment>
-        ))}
-        <View style={{ width: s(ACTIVE.w) }} />
-      </FocusScroll>
-    </View>
+      />
   );
-}
+});
 
 const styles = StyleSheet.create({
   play: {

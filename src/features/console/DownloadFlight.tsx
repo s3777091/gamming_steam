@@ -7,13 +7,14 @@
 
 import * as Haptics from 'expo-haptics';
 import { Download } from 'lucide-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { colors } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useUi } from '@/ui/scale';
+import { useMotion } from '@/ui/motion';
 
 export type FlightRect = { x: number; y: number; w: number; h: number };
 
@@ -37,13 +38,14 @@ const haptic = (run: () => Promise<void>) => { void run().catch(() => {}); };
 
 export function DownloadFlight({ flight, onDone }: { flight: Flight; onDone: () => void }) {
   const { s } = useUi();
+  const { reduceMotion, active } = useMotion();
   const { from, to } = flight;
-  const t = useRef(new Animated.Value(0)).current;
-  const bob = useRef(new Animated.Value(0)).current;
-  const ring = useRef(new Animated.Value(0)).current;
+  const [t] = useState(() => new Animated.Value(0));
+  const [bob] = useState(() => new Animated.Value(0));
+  const [ring] = useState(() => new Animated.Value(0));
   const [folded, setFolded] = useState(false);
   const doneRef = useRef(onDone);
-  doneRef.current = onDone;
+  useLayoutEffect(() => { doneRef.current = onDone; }, [onDone]);
 
   const geometry = useMemo(() => {
     const tile = Math.min(s(60), from.h * 0.72);
@@ -58,42 +60,42 @@ export function DownloadFlight({ flight, onDone }: { flight: Flight; onDone: () 
   useEffect(() => {
     playUiSound('select');
     haptic(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
-    const fold = Animated.timing(t, { toValue: 1, duration: FOLD_MS, easing: Easing.inOut(Easing.cubic), useNativeDriver: false });
+    const fold = Animated.timing(t, { toValue: 1, duration: reduceMotion ? 0 : FOLD_MS, easing: Easing.inOut(Easing.cubic), useNativeDriver: false, isInteraction: false });
     fold.start(({ finished }) => { if (finished) setFolded(true); });
     return () => fold.stop();
-  }, [t]);
+  }, [reduceMotion, t]);
 
   // Chờ PC trả lời: ô nhấp nhô nhẹ trên không.
   useEffect(() => {
-    if (!folded || flight.result) return;
+    if (!folded || flight.result || reduceMotion || !active) return;
     const loop = Animated.loop(Animated.sequence([
-      Animated.timing(bob, { toValue: 1, duration: 520, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
-      Animated.timing(bob, { toValue: 0, duration: 520, easing: Easing.inOut(Easing.sin), useNativeDriver: false }),
+      Animated.timing(bob, { toValue: 1, duration: 520, easing: Easing.inOut(Easing.sin), useNativeDriver: false, isInteraction: false }),
+      Animated.timing(bob, { toValue: 0, duration: 520, easing: Easing.inOut(Easing.sin), useNativeDriver: false, isInteraction: false }),
     ]));
     loop.start();
     return () => loop.stop();
-  }, [bob, flight.result, folded]);
+  }, [active, bob, flight.result, folded, reduceMotion]);
 
   useEffect(() => {
     if (!folded || !flight.result) return;
     bob.setValue(0);
     if (flight.result === 'fail') {
-      const unfold = Animated.timing(t, { toValue: 0, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: false });
-      unfold.start(() => doneRef.current());
+      const unfold = Animated.timing(t, { toValue: 0, duration: reduceMotion ? 0 : 320, easing: Easing.out(Easing.cubic), useNativeDriver: false, isInteraction: false });
+      unfold.start(({ finished }) => { if (finished) doneRef.current(); });
       return () => unfold.stop();
     }
     playUiSound('transition');
-    const fly = Animated.timing(t, { toValue: 2, duration: FLY_MS, easing: Easing.bezier(0.55, 0, 0.2, 1), useNativeDriver: false });
+    const fly = Animated.timing(t, { toValue: 2, duration: reduceMotion ? 0 : FLY_MS, easing: Easing.bezier(0.55, 0, 0.2, 1), useNativeDriver: false, isInteraction: false });
     let landed: Animated.CompositeAnimation | null = null;
     fly.start(({ finished }) => {
       if (!finished) return;
       playUiSound('confirm');
       haptic(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success));
-      landed = Animated.timing(ring, { toValue: 1, duration: RING_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true });
-      landed.start(() => doneRef.current());
+      landed = Animated.timing(ring, { toValue: 1, duration: reduceMotion ? 0 : RING_MS, easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false });
+      landed.start(({ finished }) => { if (finished) doneRef.current(); });
     });
     return () => { fly.stop(); landed?.stop(); };
-  }, [bob, flight.result, folded, ring, t]);
+  }, [bob, flight.result, folded, reduceMotion, ring, t]);
 
   // Vị trí tâm đi theo cung parabol: lên cao rồi lao xuống chuông.
   const path = (point: (e: number) => number) => ({

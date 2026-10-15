@@ -19,6 +19,7 @@ import LoginScreen from '@/features/login/LoginScreen';
 import { playUiSound, UiSoundProvider } from '@/features/sound/UiSoundProvider';
 import { colors } from '@/theme';
 import { UiProvider } from '@/ui/scale';
+import { MotionProvider } from '@/ui/motion';
 import { T } from '@/ui/Text';
 
 void SplashScreen.preventAutoHideAsync();
@@ -76,12 +77,14 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <UiProvider>
-        <UiSoundProvider>
-          <AuthProvider>
-            <StatusBar hidden />
-            <Gate />
-          </AuthProvider>
-        </UiSoundProvider>
+        <MotionProvider>
+          <UiSoundProvider>
+            <AuthProvider>
+              <StatusBar hidden />
+              <Gate />
+            </AuthProvider>
+          </UiSoundProvider>
+        </MotionProvider>
       </UiProvider>
     </SafeAreaProvider>
   );

@@ -47,7 +47,8 @@ class JetsonaMultipathModule : Module() {
       "onMultipathStatusChanged",
       "onCellularStatusChanged",
       "onSecondaryWifiStatusChanged",
-      "onWifiScanCompleted"
+      "onWifiScanCompleted",
+      "onCaptivePortalDetected"
     )
 
     OnDestroy {
@@ -64,6 +65,17 @@ class JetsonaMultipathModule : Module() {
 
     Function("getAvailableWifiNetworks") {
       scanAvailableWifi()
+    }
+
+    Function("openCaptivePortalPage") {
+      try {
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("http://connectivitycheck.gstatic.com/generate_204"))
+        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        context?.startActivity(intent)
+        true
+      } catch (_: Exception) {
+        false
+      }
     }
 
     Function("enableCellularFallback") {
@@ -161,23 +173,35 @@ class JetsonaMultipathModule : Module() {
 
   private fun scanAvailableWifi(): List<Map<String, Any?>> {
     val wm = wifiManager ?: return emptyList()
+
+    try {
+      @Suppress("DEPRECATION")
+      wm.startScan()
+    } catch (_: Exception) {}
+
     val results: List<ScanResult> = try {
       wm.scanResults ?: emptyList()
-    } catch (_: SecurityException) {
+    } catch (_: Exception) {
       emptyList()
     }
 
     val unique = mutableMapOf<String, ScanResult>()
     for (res in results) {
-      val ssid = res.SSID?.trim() ?: continue
-      if (ssid.isEmpty()) continue
+      var ssid = res.SSID?.trim() ?: continue
+      if (ssid.startsWith("\"") && ssid.endsWith("\"") && ssid.length >= 2) {
+        ssid = ssid.substring(1, ssid.length - 1)
+      }
+      if (ssid.isEmpty() || ssid == "<unknown ssid>") continue
       val existing = unique[ssid]
       if (existing == null || res.level > existing.level) {
         unique[ssid] = res
       }
     }
 
-    return unique.values.map { item ->
+    val primaryInfo = getPrimaryWifiInfo()
+    val primarySsid = (primaryInfo["ssid"] as? String)?.trim() ?: ""
+
+    val list = unique.values.map { item ->
       val freq = item.frequency
       val band = when {
         freq in 2400..2500 -> "2.4GHz"
@@ -185,16 +209,27 @@ class JetsonaMultipathModule : Module() {
         freq in 5925..7125 -> "6GHz"
         else -> "${freq}MHz"
       }
+      var cleanSsid = item.SSID ?: ""
+      if (cleanSsid.startsWith("\"") && cleanSsid.endsWith("\"") && cleanSsid.length >= 2) {
+        cleanSsid = cleanSsid.substring(1, cleanSsid.length - 1)
+      }
       mapOf(
-        "ssid" to item.SSID,
-        "bssid" to item.BSSID,
+        "ssid" to cleanSsid,
+        "bssid" to (item.BSSID ?: ""),
         "frequency" to freq,
         "band" to band,
         "level" to item.level,
-        "isHbsCandidate" to (freq >= 5000),
-        "capabilities" to item.capabilities
+        "isHbsCandidate" to (freq >= 4900),
+        "capabilities" to (item.capabilities ?: "")
       )
-    }.sortedByDescending { (it["level"] as? Int) ?: -100 }
+    }
+    .filter {
+      val s = (it["ssid"] as? String)?.trim() ?: ""
+      s.isNotEmpty() && !s.equals(primarySsid, ignoreCase = true)
+    }
+    .sortedByDescending { (it["level"] as? Int) ?: -100 }.toMutableList()
+
+    return list
   }
 
   private fun startCellularFallback(): Boolean {
@@ -299,6 +334,13 @@ class JetsonaMultipathModule : Module() {
         )
         sendEvent("onSecondaryWifiStatusChanged", payload)
         emitMultipathStatus()
+      }
+
+      override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+        val hasCaptive = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)
+        if (hasCaptive) {
+          sendEvent("onCaptivePortalDetected", mapOf("ssid" to ssid))
+        }
       }
 
       override fun onLost(network: Network) {

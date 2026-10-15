@@ -33,8 +33,19 @@ export function Mouse2DVisualizer({ sensitivity = 1.0 }: Mouse2DVisualizerProps)
 
   // Vị trí con trỏ trong sân khấu kiểm tra chuyển động (Radar Pad)
   const [pointerPos, setPointerPos] = useState({ x: 90, y: 70 });
-  const scrollTimer = useRef<any>(null);
-  const buttonTimers = useRef<Map<number, any>>(new Map());
+  const pointer = useRef({ x: 90, y: 70 });
+  const frame = useRef<number | null>(null);
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const buttonTimers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+
+  useEffect(() => {
+    const timers = buttonTimers.current;
+    return () => {
+      if (scrollTimer.current) clearTimeout(scrollTimer.current);
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
 
   // Thu thập sự kiện chuột trực tiếp
   useEffect(() => {
@@ -43,6 +54,7 @@ export function Mouse2DVisualizer({ sensitivity = 1.0 }: Mouse2DVisualizerProps)
     const offMouse = addListener('onMouse', (event: NativeMouseEvent) => {
       if (event.type === 'button') {
         setActiveButtons((prev) => {
+          if (prev.has(event.button) === event.down) return prev;
           const next = new Set(prev);
           if (event.down) {
             next.add(event.button);
@@ -56,25 +68,24 @@ export function Mouse2DVisualizer({ sensitivity = 1.0 }: Mouse2DVisualizerProps)
         if (scrollTimer.current) clearTimeout(scrollTimer.current);
         scrollTimer.current = setTimeout(() => setScrollDirection(null), 300);
       } else if (event.type === 'move') {
-        setPointerPos((prev) => {
-          const radarW = 180;
-          const radarH = 140;
-          let newX = prev.x + event.dx * 0.8 * sensitivity;
-          let newY = prev.y + event.dy * 0.8 * sensitivity;
-
-          // Kẹp vị trí trong khung Radar
-          if (newX < 10) newX = 10;
-          if (newX > radarW - 10) newX = radarW - 10;
-          if (newY < 10) newY = 10;
-          if (newY > radarH - 10) newY = radarH - 10;
-
-          return { x: newX, y: newY };
+        // Accumulate every hardware delta, but render only once per frame.
+        // Fast mice can emit hundreds of events between two displayed frames.
+        const x = Math.min(170, Math.max(10, pointer.current.x + event.dx * 0.8 * sensitivity));
+        const y = Math.min(130, Math.max(10, pointer.current.y + event.dy * 0.8 * sensitivity));
+        if (x === pointer.current.x && y === pointer.current.y) return;
+        pointer.current = { x, y };
+        if (frame.current !== null) return;
+        frame.current = requestAnimationFrame(() => {
+          frame.current = null;
+          setPointerPos(pointer.current);
         });
       }
     });
 
     return () => {
       offMouse();
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+      frame.current = null;
       setCaptureMode('ui');
       setPointerCapture(false);
     };
@@ -85,6 +96,7 @@ export function Mouse2DVisualizer({ sensitivity = 1.0 }: Mouse2DVisualizerProps)
     setActiveButtons((prev) => new Set(prev).add(btn));
     if (buttonTimers.current.has(btn)) clearTimeout(buttonTimers.current.get(btn));
     const timer = setTimeout(() => {
+      buttonTimers.current.delete(btn);
       setActiveButtons((prev) => {
         const next = new Set(prev);
         next.delete(btn);

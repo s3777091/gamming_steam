@@ -119,7 +119,7 @@ function cleanRemaps(value: unknown): Record<string, string> {
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>)
       .filter(([source, target]) => /^\w/.test(source) && typeof target === 'string' && /^\w/.test(target))
-      .slice(0, 24) as Array<[string, string]>,
+      .slice(0, 24) as [string, string][],
   );
 }
 
@@ -143,7 +143,7 @@ function cleanHostShortcuts(value: unknown, hostKey: string): Record<string, Hos
         && typeof action === 'string'
         && HOST_SHORTCUT_ACTIONS.includes(action as HostShortcutAction)
       ))
-      .slice(0, 24) as Array<[string, HostShortcutAction]>,
+      .slice(0, 24) as [string, HostShortcutAction][],
   );
   return shortcuts;
 }

@@ -5,7 +5,7 @@
 // sang lần đăng nhập sau — cùng bảng và cùng quy tắc "bên nào `updatedAt` mới
 // hơn thì thắng" như bản web, nên cài đặt đi theo tài khoản.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { ensureClientDeviceId } from '@/lib/client-device';
 import {
@@ -39,7 +39,7 @@ export function useInputSettings() {
   const [dirty, setDirty] = useState(false);
   const [syncState, setSyncState] = useState<InputSyncState>('local');
   const settingsRef = useRef(settings);
-  settingsRef.current = settings;
+  useLayoutEffect(() => { settingsRef.current = settings; }, [settings]);
 
   useEffect(() => {
     let disposed = false;
@@ -74,7 +74,6 @@ export function useInputSettings() {
 
   useEffect(() => {
     if (!dirty) return;
-    setSyncState('saving');
     const timeout = setTimeout(async () => {
       try {
         const supabase = createClient();
@@ -101,10 +100,10 @@ export function useInputSettings() {
       return next;
     });
     setDirty(true);
-    setSyncState('local');
+    setSyncState('saving');
   }, []);
 
-  return { settings, update, syncState };
+  return { settings, update, syncState, dirty };
 }
 
 export type InputSettingsState = ReturnType<typeof useInputSettings>;

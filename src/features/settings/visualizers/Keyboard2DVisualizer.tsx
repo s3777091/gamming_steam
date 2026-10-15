@@ -123,10 +123,11 @@ const KEYBOARD_ROWS: KeyItem[][] = [
 
 export function Keyboard2DVisualizer() {
   const [activeCodes, setActiveCodes] = useState<Set<string>>(new Set());
-  const timerMap = useRef<Map<string, any>>(new Map());
+  const timerMap = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   // Bật chế độ thu thập tín hiệu phím khi mở trang
   useEffect(() => {
+    const timers = timerMap.current;
     setCaptureMode('stream');
 
     const offKey = addListener('onKey', (event) => {
@@ -134,6 +135,7 @@ export function Keyboard2DVisualizer() {
       if (!code) return;
 
       setActiveCodes((prev) => {
+        if (prev.has(code) === event.down) return prev;
         const next = new Set(prev);
         if (event.down) {
           next.add(code);
@@ -146,6 +148,8 @@ export function Keyboard2DVisualizer() {
 
     return () => {
       offKey();
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
       setCaptureMode('ui');
     };
   }, []);
@@ -155,6 +159,7 @@ export function Keyboard2DVisualizer() {
     setActiveCodes((prev) => new Set(prev).add(code));
     if (timerMap.current.has(code)) clearTimeout(timerMap.current.get(code));
     const timer = setTimeout(() => {
+      timerMap.current.delete(code);
       setActiveCodes((prev) => {
         const next = new Set(prev);
         next.delete(code);

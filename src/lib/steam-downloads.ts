@@ -94,10 +94,45 @@ export type DownloadsState = {
   controllers: string[];
 };
 
+function sameDownloadValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return Array.isArray(left) && Array.isArray(right) && left.length === right.length
+      && left.every((value, index) => sameDownloadValue(value, right[index]));
+  }
+  const a = left as Record<string, unknown>;
+  const b = right as Record<string, unknown>;
+  const keys = Object.keys(a).filter((key) => key !== 'updatedAt');
+  return keys.length === Object.keys(b).filter((key) => key !== 'updatedAt').length
+    && keys.every((key) => Object.hasOwn(b, key) && sameDownloadValue(a[key], b[key]));
+}
+
+/** Agent timestamps alone do not change any displayed state. */
+export function reuseDownloadSnapshot(previous: DownloadsState | null, next: DownloadsState): DownloadsState {
+  if (!previous) return next;
+  return sameDownloadValue(previous.steam, next.steam)
+    && sameDownloadValue(previous.active, next.active)
+    && sameDownloadValue(previous.queue, next.queue)
+    && sameDownloadValue(previous.installs, next.installs)
+    && sameDownloadValue(previous.uninstalls ?? [], next.uninstalls ?? [])
+    && sameDownloadValue(previous.controllers, next.controllers) ? previous : next;
+}
+
 export type AgentMessage =
   | DownloadsState
   | { type: 'bye'; reason: string | null; state: DownloadsState | null }
   | { type: 'notice'; appid: number; message: string };
+
+/** Completed history must not keep the fast polling cadence alive. */
+export function hasPendingDownloads(state: DownloadsState | null): boolean {
+  return Boolean(state && (
+    state.active
+    || state.queue.some((item) => !item.completed && !item.error)
+    || state.installs.some((flow) => !['installed', 'failed', 'cancelled', 'manual'].includes(flow.phase))
+    || state.uninstalls?.some((flow) => flow.phase === 'starting' || flow.phase === 'uninstalling')
+  ));
+}
 
 export type AppCommand =
   | { type: 'hello' }

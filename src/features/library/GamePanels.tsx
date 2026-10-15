@@ -23,7 +23,10 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 
+import { useGamepadTabs } from '@/features/gamepad/hooks';
 import { PC_ROUTES, pcFetchJson } from '@/lib/pc-api';
+import { TimedCache } from '@/lib/timed-cache';
+import { colors, glass } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { PanelMessage, SidePanel, SteamLink } from '@/ui/SidePanel';
@@ -44,8 +47,7 @@ type DetailTabItem = {
   badge?: string | number | null;
 };
 
-// Giữ cache suốt vòng đời app để mở lại là có ngay
-const newsCache = { current: new Map<number, NewsResponse>() };
+const newsCache = { current: new TimedCache<number, NewsResponse>(32, 5 * 60_000) };
 
 function fetchNews(appId: number, signal: AbortSignal) {
   return pcFetchJson<NewsResponse>(
@@ -87,6 +89,9 @@ function AppleTabItem({
   return (
     <Press
       onPress={onPress}
+      onFocused={onPress}
+      requestFocus={active}
+      autoFocus={active}
       pressScale={0.985}
       sound="focus"
       style={{
@@ -98,7 +103,6 @@ function AppleTabItem({
         paddingHorizontal: s(8),
         borderRadius: s(9),
         gap: s(6),
-        overflow: 'hidden',
       }}
     >
       <Animated.View
@@ -107,9 +111,9 @@ function AppleTabItem({
           StyleSheet.absoluteFill,
           {
             borderRadius: s(9),
-            backgroundColor: 'rgba(255,255,255,0.15)',
+            backgroundColor: glass.controlActive,
             borderWidth: StyleSheet.hairlineWidth,
-            borderColor: 'rgba(255,255,255,0.18)',
+            borderColor: glass.controlBorderActive,
             opacity: activeAnim,
             transform: [{ scale: activeAnim.interpolate({ inputRange: [0, 1], outputRange: [0.97, 1] }) }],
           },
@@ -117,13 +121,13 @@ function AppleTabItem({
       />
       <Icon
         size={s(13)}
-        color={active ? '#ffffff' : 'rgba(255,255,255,0.5)'}
+        color={active ? colors.white : colors.text3}
         strokeWidth={active ? 2.2 : 1.8}
       />
       <T
         size={11.5}
         weight={active ? 'semibold' : 'medium'}
-        color={active ? '#ffffff' : 'rgba(255,255,255,0.55)'}
+        color={active ? colors.white : colors.text2}
         numberOfLines={1}
       >
         {tab.label}
@@ -134,10 +138,10 @@ function AppleTabItem({
             paddingHorizontal: s(5),
             paddingVertical: s(1),
             borderRadius: s(6),
-            backgroundColor: active ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)',
+            backgroundColor: active ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.08)',
           }}
         >
-          <T size={9.5} weight="bold" color={active ? '#ffffff' : 'rgba(255,255,255,0.45)'} tabular>
+          <T size={9.5} weight="bold" color={active ? colors.white : colors.text3} tabular>
             {String(tab.badge)}
           </T>
         </View>
@@ -187,21 +191,20 @@ function AppleTabBar({
     <View
       style={{
         paddingHorizontal: s(16),
-        paddingTop: s(10),
+        paddingTop: s(8),
         paddingBottom: s(10),
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: 'rgba(255,255,255,0.08)',
-        backgroundColor: 'rgba(13,21,32,0.98)',
+        borderBottomColor: glass.borderSubtle,
       }}
     >
       <View
         style={{
           flexDirection: 'row',
-          backgroundColor: 'rgba(255,255,255,0.06)',
+          backgroundColor: glass.control,
           borderRadius: s(12),
           padding: s(3),
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: 'rgba(255,255,255,0.08)',
+          borderColor: glass.controlBorder,
           gap: s(4),
         }}
       >
@@ -1115,6 +1118,18 @@ export function GameDetailPanel({
     }
     return list;
   }, [appId, achievementsData]);
+
+  useGamepadTabs((direction) => {
+    if (tabs.length <= 1) return false;
+    const currentIndex = tabs.findIndex((t) => t.id === effectiveTab);
+    if (currentIndex === -1) return false;
+    const nextIndex = currentIndex + direction;
+    if (nextIndex >= 0 && nextIndex < tabs.length) {
+      handleSelectTab(tabs[nextIndex].id);
+      return true;
+    }
+    return false;
+  }, tabs.length > 1);
 
   const subtitle = useMemo(() => {
     if (effectiveTab === 'info') return game.title;

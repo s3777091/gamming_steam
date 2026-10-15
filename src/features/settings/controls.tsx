@@ -1,48 +1,56 @@
-// Hàng cài đặt theo ngôn ngữ thiết kế của Apple (iOS / iPadOS Settings):
-// Card nhóm Inset Grouped bo tròn viền trắng, công tắc UISwitch xanh lá cây (#34C759),
-// đường phân cách thụt lề, font chữ chuẩn SF Pro / Inter với nhãn đen (#000000) và
-// chi tiết màu xám (#8E8E93 / #6D6D72), dấu tích xanh (#007AFF) và mũi tên xám (#C7C7CC).
+// Shared dark settings controls: quiet grouped surfaces, inset separators,
+// and section headings spaced clear of the rounded card edges.
 
 import Slider from '@react-native-community/slider';
-import React, { useEffect, useRef, useState, type ReactNode } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
-import { Check, ChevronDown, ChevronRight, Loader, type LucideIcon } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Check, ChevronRight, Loader, type LucideIcon } from 'lucide-react-native';
 
 import { useFocusable } from '@/features/gamepad/focus';
 import { playUiSound, type UiSound } from '@/features/sound/UiSoundProvider';
 import { FocusRing } from '@/ui/FocusRing';
+import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 export const appleColors = {
-  // Nền & khung
-  bg: '#080c12',             // Nền chính Console (#080c12 đồng bộ với toàn app)
-  sidebarBg: 'rgba(10, 16, 26, 0.75)',      // Nền sidebar Console glass
-  card: 'rgba(255, 255, 255, 0.045)',       // Nền card liquid glass
-  cardBorder: 'rgba(255, 255, 255, 0.12)',     // Viền card tinh gọn
-  separator: 'rgba(255, 255, 255, 0.07)',      // Đường kẻ phân cách giữa các hàng
-  pressedBg: 'rgba(255, 255, 255, 0.08)',      // Màu phản hồi khi chạm hàng
-  cardRaised: 'rgba(24, 32, 44, 0.7)',     // Nền nhóm phụ hoặc dropdown inline
+  // Nền & khung — Console Dark Liquid Glass (đồng bộ #080c12 và SidePanel)
+  bg: '#080c12',
+  sidebarBg: 'rgba(10, 16, 26, 0.82)',
+  card: 'rgba(255, 255, 255, 0.045)',
+  cardBorder: 'rgba(255, 255, 255, 0.09)',
+  cardBorderSpecular: 'rgba(255, 255, 255, 0.20)',
+  separator: 'rgba(255, 255, 255, 0.065)',
+  pressedBg: 'rgba(255, 255, 255, 0.08)',
+  cardRaised: 'rgba(18, 26, 38, 0.75)',
+  inset: 'rgba(6, 10, 16, 0.50)',
+
+  // Trạng thái "đã chọn": kính sáng trắng / xanh console đồng bộ với GamePanels
+  accent: '#1f6feb',
+  selectedBg: 'rgba(255, 255, 255, 0.12)',
+  selectedBorder: 'rgba(255, 255, 255, 0.20)',
+  selectedText: '#ffffff',
 
   // Văn bản
-  text: 'rgba(255, 255, 255, 0.95)',          // Nhãn chính màu trắng sáng
-  textSecondary: 'rgba(255, 255, 255, 0.65)', // Tiêu đề nhóm, chú thích dưới card
-  textTertiary: 'rgba(255, 255, 255, 0.45)',  // Giá trị bên phải, phụ đề mờ
-  chevron: 'rgba(255, 255, 255, 0.35)',       // Mũi tên điều hướng phụ
+  text: 'rgba(255, 255, 255, 0.95)',
+  textSecondary: 'rgba(255, 255, 255, 0.60)',
+  textTertiary: 'rgba(255, 255, 255, 0.42)',
+  chevron: 'rgba(255, 255, 255, 0.32)',
 
   // Màu hệ thống
-  blue: '#1f6feb',           // Nút, hàng chọn, dấu tích
-  green: '#34c759',          // Công tắc bật (UISwitch), chấm online
-  red: '#ff453a',            // Hành động xóa, cảnh báo lỗi
-  orange: '#ff9f0a',         // Cảnh báo, pin yếu, icon khôi phục
+  blue: '#1f6feb',
+  green: '#34c759',
+  red: '#ff453a',
+  orange: '#ff9f0a',
   yellow: '#ffd60a',
   purple: '#bf5af2',
   indigo: '#5e5ce6',
   teal: '#40c8e0',
   pink: '#ff375f',
   gray: '#8e8e93',
-  switchOff: 'rgba(255, 255, 255, 0.16)',     // Nền công tắc khi tắt
+  switchOff: 'rgba(255, 255, 255, 0.16)',
 } as const;
 
 export function SettingsGroup({
@@ -60,16 +68,17 @@ export function SettingsGroup({
   if (!items.length) return null;
 
   return (
-    <View style={{ marginTop: s(18) }}>
+    <View style={{ marginTop: s(20) }}>
       {title ? (
         <T
-          size={10.4}
+          size={11.2}
           weight="semibold"
           color={appleColors.textSecondary}
-          tracking={0.06}
-          style={{ marginBottom: s(6), paddingHorizontal: s(16) }}
+          leading={1.5}
+          accessibilityRole="header"
+          style={{ marginBottom: s(10), paddingHorizontal: s(16) }}
         >
-          {title.toUpperCase()}
+          {title}
         </T>
       ) : null}
 
@@ -77,29 +86,11 @@ export function SettingsGroup({
         style={{
           backgroundColor: appleColors.card,
           borderRadius: s(16),
-          borderWidth: 1,
+          borderWidth: StyleSheet.hairlineWidth,
           borderColor: appleColors.cardBorder,
           overflow: 'hidden',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.2,
-          shadowRadius: 10,
-          elevation: 2,
         }}
       >
-        {/* Specular top rim highlight */}
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: StyleSheet.hairlineWidth,
-            backgroundColor: 'rgba(255, 255, 255, 0.18)',
-          }}
-          pointerEvents="none"
-        />
-
         {items.map((child, index) => (
           <View key={index}>
             {index > 0 ? (
@@ -107,7 +98,7 @@ export function SettingsGroup({
                 style={{
                   height: StyleSheet.hairlineWidth,
                   backgroundColor: appleColors.separator,
-                  marginLeft: s(16),
+                  marginHorizontal: s(16),
                 }}
               />
             ) : null}
@@ -120,8 +111,8 @@ export function SettingsGroup({
         <T
           size={10.4}
           color={appleColors.textSecondary}
-          leading={1.38}
-          style={{ marginTop: s(6), paddingHorizontal: s(16) }}
+          leading={1.5}
+          style={{ marginTop: s(8), paddingHorizontal: s(16) }}
         >
           {footer}
         </T>
@@ -185,16 +176,20 @@ export function rowStyle(s: (n: number) => number, extra?: object) {
  */
 export function Switch({ checked }: { checked: boolean }) {
   const { s } = useUi();
+  const { reduceMotion } = useMotion();
   const [slide] = useState(() => new Animated.Value(checked ? 1 : 0));
 
   useEffect(() => {
-    Animated.timing(slide, {
+    const animation = Animated.timing(slide, {
       toValue: checked ? 1 : 0,
-      duration: 180,
+      duration: reduceMotion ? 0 : 180,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [checked, slide]);
+      useNativeDriver: true,
+      isInteraction: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [checked, reduceMotion, slide]);
 
   const trackWidth = s(46);
   const trackHeight = s(27);
@@ -208,19 +203,39 @@ export function Switch({ checked }: { checked: boolean }) {
         width: trackWidth,
         height: trackHeight,
         borderRadius: trackHeight / 2,
-        backgroundColor: slide.interpolate({
-          inputRange: [0, 1],
-          outputRange: [appleColors.switchOff, appleColors.green],
-        }),
+        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.20)',
         justifyContent: 'center',
         paddingHorizontal: thumbPadding,
         shadowColor: '#34c759',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: checked ? 0.4 : 0,
-        shadowRadius: 6,
-        elevation: checked ? 3 : 0,
+        shadowOpacity: checked ? 0.45 : 0,
+        shadowRadius: 8,
+        elevation: checked ? 4 : 0,
       }}
     >
+      <Animated.View
+        pointerEvents="none"
+        style={[StyleSheet.absoluteFill, {
+          borderRadius: trackHeight / 2,
+          backgroundColor: appleColors.green,
+          borderWidth: 1,
+          borderColor: 'rgba(52, 199, 89, 0.65)',
+          opacity: slide,
+        }]}
+      />
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: trackHeight / 4,
+          right: trackHeight / 4,
+          height: 1,
+          backgroundColor: 'rgba(255, 255, 255, 0.28)',
+        }}
+      />
       <Animated.View
         style={{
           width: thumbSize,
@@ -237,9 +252,9 @@ export function Switch({ checked }: { checked: boolean }) {
           ],
           shadowColor: '#000000',
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.25,
-          shadowRadius: 3,
-          elevation: 2,
+          shadowOpacity: 0.35,
+          shadowRadius: 4,
+          elevation: 3,
         }}
       />
     </Animated.View>
@@ -315,47 +330,66 @@ export function ChoiceRow<V extends string>({
         </View>
       </Press>
       {open ? (
-        <View style={{ backgroundColor: '#0c121a', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: appleColors.separator }}>
+        <View
+          style={{
+            backgroundColor: appleColors.inset,
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderTopColor: appleColors.separator,
+          }}
+        >
           {options.map((option, idx) => {
             const active = option.value === value;
             return (
-              <Press
-                key={option.value}
-                onPress={() => {
-                  onChange(option.value);
-                  setOpen(false);
-                }}
-                pressScale={0.995}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: active }}
-                style={{
-                  minHeight: s(42),
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: s(12),
-                  paddingLeft: s(24),
-                  paddingRight: s(16),
-                  paddingVertical: s(7),
-                  borderTopWidth: idx ? StyleSheet.hairlineWidth : 0,
-                  borderTopColor: appleColors.separator,
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <T
-                    size={12.6}
-                    weight={active ? 'semibold' : 'regular'}
-                    color={appleColors.text}
-                  >
-                    {option.label}
-                  </T>
-                  {option.description ? (
-                    <T size={10.2} color={appleColors.textTertiary} leading={1.35}>
-                      {option.description}
+              <View key={option.value}>
+                {idx ? (
+                  <View
+                    style={{
+                      height: StyleSheet.hairlineWidth,
+                      backgroundColor: appleColors.separator,
+                      marginLeft: s(16),
+                    }}
+                  />
+                ) : null}
+                <Press
+                  onPress={() => {
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                  pressScale={0.995}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: active }}
+                  style={{
+                    minHeight: s(40),
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: s(12),
+                    paddingHorizontal: s(14),
+                    paddingVertical: s(6),
+                    marginHorizontal: s(6),
+                    marginVertical: s(1.5),
+                    borderRadius: s(9),
+                    backgroundColor: active ? appleColors.selectedBg : 'transparent',
+                    borderWidth: 1,
+                    borderColor: active ? appleColors.selectedBorder : 'transparent',
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <T
+                      size={12.6}
+                      weight={active ? 'semibold' : 'regular'}
+                      color={active ? appleColors.selectedText : appleColors.text}
+                    >
+                      {option.label}
                     </T>
-                  ) : null}
-                </View>
-                {active ? <Check size={s(16)} color={appleColors.blue} strokeWidth={2.4} /> : null}
-              </Press>
+                    {option.description ? (
+                      <T size={10.2} color={appleColors.textTertiary} leading={1.35}>
+                        {option.description}
+                      </T>
+                    ) : null}
+                  </View>
+                  {active ? <Check size={s(16)} color={appleColors.accent} strokeWidth={2.6} /> : null}
+                </Press>
+              </View>
             );
           })}
         </View>
@@ -384,12 +418,16 @@ export function SliderRow({
   onChange: (value: number) => void;
 }) {
   const { s, width } = useUi();
+  const [previousValue, setPreviousValue] = useState(value);
   const [local, setLocal] = useState(value);
-  useEffect(() => setLocal(value), [value]);
+  if (previousValue !== value) {
+    setPreviousValue(value);
+    setLocal(value);
+  }
 
   const hostRef = useRef<View>(null);
   const localRef = useRef(local);
-  localRef.current = local;
+  useLayoutEffect(() => { localRef.current = local; }, [local]);
   const commit = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(commit.current), []);
 
@@ -410,7 +448,7 @@ export function SliderRow({
 
   return (
     <View ref={hostRef} style={rowStyle(s)}>
-      {focused ? <FocusRing radius={s(8)} variant="row" /> : null}
+      {focused ? <FocusRing radius={0} variant="row" /> : null}
       <RowText label={label} detail={detail} />
       <View
         style={{
@@ -426,22 +464,35 @@ export function SliderRow({
           maximumValue={max}
           step={step}
           value={local}
-          minimumTrackTintColor={appleColors.blue}
+          minimumTrackTintColor={appleColors.accent}
           maximumTrackTintColor={appleColors.cardBorder}
           thumbTintColor="#FFFFFF"
           onValueChange={setLocal}
           onSlidingComplete={onChange}
           accessibilityLabel={label}
         />
-        <T
-          size={11.4}
-          weight="medium"
-          color={appleColors.textTertiary}
-          tabular
-          style={{ width: s(52), textAlign: 'right' }}
+        <View
+          style={{
+            minWidth: s(54),
+            paddingHorizontal: s(6),
+            paddingVertical: s(3),
+            borderRadius: s(6),
+            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            borderWidth: 1,
+            borderColor: 'rgba(255, 255, 255, 0.12)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
         >
-          {format(local)}
-        </T>
+          <T
+            size={11}
+            weight="semibold"
+            color="rgba(255, 255, 255, 0.9)"
+            tabular
+          >
+            {format(local)}
+          </T>
+        </View>
       </View>
     </View>
   );
@@ -517,12 +568,26 @@ export function ActionRow({
           style={{
             width: s(28),
             height: s(28),
-            borderRadius: s(7),
+            borderRadius: s(8),
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: bg,
+            borderWidth: StyleSheet.hairlineWidth,
+            borderColor: 'rgba(255, 255, 255, 0.35)',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.25,
+            shadowRadius: 2,
+            overflow: 'hidden',
           }}
         >
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.32)', 'transparent']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 0.65 }}
+            pointerEvents="none"
+            style={StyleSheet.absoluteFill}
+          />
           {busy ? (
             <Animated.View
               style={{
@@ -636,24 +701,32 @@ export function Keycap({
       style={{
         height: s(24),
         minWidth: s(24),
-        paddingHorizontal: s(6),
-        borderRadius: s(5),
+        paddingHorizontal: s(7),
+        borderRadius: s(6),
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: accent ? appleColors.blue : 'rgba(255, 255, 255, 0.15)',
-        backgroundColor: accent ? 'rgba(31, 111, 235, 0.2)' : 'rgba(255, 255, 255, 0.08)',
+        borderColor: accent ? 'rgba(102, 168, 255, 0.45)' : 'rgba(255, 255, 255, 0.18)',
+        backgroundColor: accent ? 'rgba(31, 111, 235, 0.22)' : 'rgba(255, 255, 255, 0.08)',
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.08,
-        shadowRadius: 1,
+        shadowOpacity: 0.15,
+        shadowRadius: 2,
         elevation: 1,
+        overflow: 'hidden',
       }}
     >
+      <LinearGradient
+        colors={['rgba(255, 255, 255, 0.20)', 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.7 }}
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+      />
       <T
         size={10.2}
         weight="semibold"
-        color={accent ? appleColors.blue : appleColors.text}
+        color={accent ? '#8bbcff' : appleColors.text}
       >
         {children}
       </T>
@@ -677,22 +750,29 @@ export function PillButton({
   const { s } = useUi();
   const bg =
     tone === 'danger'
-      ? 'rgba(255, 69, 58, 0.15)'
+      ? 'rgba(239, 68, 68, 0.18)'
       : tone === 'accent'
-        ? appleColors.blue
+        ? 'rgba(31, 111, 235, 0.28)'
         : 'rgba(255, 255, 255, 0.08)';
+  const border =
+    tone === 'danger'
+      ? 'rgba(248, 113, 113, 0.40)'
+      : tone === 'accent'
+        ? 'rgba(102, 168, 255, 0.45)'
+        : 'rgba(255, 255, 255, 0.14)';
   const fg =
     tone === 'danger'
-      ? appleColors.red
+      ? '#fca5a5'
       : tone === 'accent'
         ? '#FFFFFF'
-        : 'rgba(255, 255, 255, 0.85)';
+        : 'rgba(255, 255, 255, 0.90)';
 
   return (
     <Press
       onPress={onPress}
       disabled={disabled}
       accessibilityLabel={label}
+      pressScale={0.97}
       style={{
         height: s(28),
         paddingHorizontal: s(12),
@@ -702,9 +782,24 @@ export function PillButton({
         justifyContent: 'center',
         gap: s(5),
         backgroundColor: bg,
+        borderWidth: 1,
+        borderColor: border,
         opacity: disabled ? 0.4 : 1,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: tone === 'accent' ? 0.35 : 0.15,
+        shadowRadius: 4,
+        elevation: 2,
       }}
     >
+      <LinearGradient
+        colors={['rgba(255, 255, 255, 0.22)', 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 0.8 }}
+        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
+      />
       {typeof children === 'string' ? (
         <T size={10.4} weight="semibold" color={fg}>
           {children}
