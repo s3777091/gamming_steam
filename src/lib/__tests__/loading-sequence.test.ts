@@ -40,3 +40,10 @@ test('video failure can finish an opening but cannot bypass loading or the hold'
   assert.equal(reduceLoadingSequence('loading', 'ended'), 'loading');
   assert.equal(reduceLoadingSequence('finished', 'ready'), 'finished');
 });
+
+test('reconnecting a running game skips the door opening and goes straight to the stream', () => {
+  assert.equal(reduceLoadingSequence('loading', 'readyDirect'), 'finished');
+  assert.equal(reduceLoadingSequence('settling', 'readyDirect'), 'finished');
+  assert.equal(reduceLoadingSequence('opening', 'readyDirect'), 'opening');
+  assert.equal(reduceLoadingSequence(reduceLoadingSequence('finished', 'blocked'), 'readyDirect'), 'finished');
+});

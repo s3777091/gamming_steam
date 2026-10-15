@@ -16,16 +16,25 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useSignedInUser } from '@/features/auth';
 import { useBack } from '@/features/gamepad/hooks';
 import { readPendingGameLaunch, type PendingGameLaunch } from '@/lib/game-launch';
-import { PC_ROUTES, pcFetch } from '@/lib/pc-api';
+import { PC_ROUTES, pcFetch, pcPostJson } from '@/lib/pc-api';
+import {
+  forgetStreamGame,
+  rememberStreamGame,
+  takeStreamResume,
+  type ResumableGame,
+} from '@/lib/stream-resume';
 import { streamStretchStyle } from '@/lib/stream-fit';
+import { getLiveBorderEnabled, subscribeLiveBorderEnabled } from '@/lib/stream-overlay-settings';
 import type { HostShortcutAction } from '@/lib/input-settings';
 import { BlurView } from 'expo-blur';
 import { glass, glassShadowSubtle } from '@/theme';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
-import { GuideMenu } from './GuideMenu';
+import { ExitGameOverlay } from './ExitGameOverlay';
+import { GuideMenu, type ExitingGame } from './GuideMenu';
 import { StreamHud } from './StreamHud';
+import { StreamLiveBorder, type BorderOrigin } from './StreamLiveBorder';
 import { StreamTouchpad } from './StreamTouchpad';
 import { StreamTelemetry } from './useStreamTelemetry';
 import { StreamLoading } from './StreamLoading';
@@ -43,6 +52,16 @@ export default function StreamScreen() {
 
   // Bàn giao từ kệ game: đọc đúng một lần khi màn mở.
   const [launch] = useState<PendingGameLaunch | null>(() => readPendingGameLaunch());
+  // Quay lại từ ô game của Control Center ở màn chính: nối lại rồi đưa đúng game lên.
+  const [resume] = useState<ResumableGame | null>(() => {
+    const pending = takeStreamResume();
+    return launch ? null : pending;
+  });
+  // Nối lại một game đang chạy (Tải lại, hoặc quay lại từ Home): đoàn tàu chạy trong lúc
+  // nối nhưng tan thẳng vào game, không mở cửa tàu / giới thiệu game lần nữa.
+  const [directReconnect, setDirectReconnect] = useState(() => Boolean(resume));
+  const [exitingGame, setExitingGame] = useState<ExitingGame | null>(null);
+  const [exitDone, setExitDone] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [guideOpen, setGuideOpen] = useState(false);
   const [guideStatus, setGuideStatus] = useState<string | null>(null);
@@ -145,8 +164,29 @@ export default function StreamScreen() {
 
   const reload = useCallback(() => {
     closeGuide(true);
+    setDirectReconnect(true);
     setAttempt((value) => value + 1);
   }, [closeGuide]);
+
+  // Thoát game: hoạt cảnh thoát chạy trong lúc PC đóng game, rồi mới về kệ game.
+  const exitGame = useCallback((game: ExitingGame) => {
+    closeGuide(false);
+    setExitDone(false);
+    setExitingGame(game);
+    const minimum = new Promise<void>((resolve) => { setTimeout(resolve, 1_100); });
+    void Promise.all([
+      pcPostJson(PC_ROUTES.gameRuntime, { action: 'quit', gameId: game.gameId ?? '' }, 'Không đóng được game trên máy tính.'),
+      minimum,
+    ])
+      .then(() => {
+        forgetStreamGame();
+        setExitDone(true);
+      })
+      .catch((error: Error) => {
+        setExitingGame(null);
+        flashHint(error.message || 'Không đóng được game trên máy tính.');
+      });
+  }, [closeGuide, flashHint]);
 
   const persistHud = useCallback((enabled: boolean) => {
     void persistSettings({ hud_enabled: enabled });
@@ -202,8 +242,8 @@ export default function StreamScreen() {
 
   const stretch = useMemo(() => streamStretchStyle(videoSize, stage), [stage, videoSize]);
   const controller = useMemo(
-    () => ({ name: profile.displayName, avatarUrl: profile.avatarUrl }),
-    [profile.avatarUrl, profile.displayName],
+    () => ({ name: profile.displayName, avatarUrl: profile.avatarUrl, email: profile.email }),
+    [profile.avatarUrl, profile.displayName, profile.email],
   );
   const watchParty = useWatchPartyHost({
     sessionId,
@@ -211,6 +251,48 @@ export default function StreamScreen() {
     userId,
     name: controller.name,
   });
+
+  // Viền xanh "đang streaming" (giống web): giữ component sống tới khi viền thu
+  // hết về nút Streaming thì mới gỡ.
+  const [liveBorderEnabled, setLiveBorderEnabledState] = useState(true);
+  const [borderOrigin, setBorderOrigin] = useState<BorderOrigin | null>(null);
+  const [borderMounted, setBorderMounted] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void getLiveBorderEnabled().then((enabled) => { if (alive) setLiveBorderEnabledState(enabled); });
+    const unsubscribe = subscribeLiveBorderEnabled(setLiveBorderEnabledState);
+    return () => { alive = false; unsubscribe(); };
+  }, []);
+  if (watchParty.live && !borderMounted) setBorderMounted(true);
+
+  // Game mở từ kệ: nhớ lại để bấm Home xong vẫn quay lại được từ Control Center.
+  useEffect(() => {
+    if (!launch) return;
+    rememberStreamGame({ gameId: launch.gameId, title: launch.title, heroUrl: launch.heroUrl, logoUrl: launch.logoUrl });
+  }, [launch]);
+
+  // Quay lại từ Home: stream lên thì đưa game đó lên foreground trên PC.
+  const resumeGameId = resume?.gameId ?? null;
+  useEffect(() => {
+    if (!resumeGameId || !live) return;
+    void pcFetch(PC_ROUTES.gameRuntime, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'focus', gameId: resumeGameId }),
+    })
+      .then((response) => {
+        if (response.ok) return;
+        // Chỉ quên khi PC xác nhận game không còn chạy; lỗi mạng tạm thời thì giữ ô game.
+        if (response.status === 404) forgetStreamGame(resumeGameId);
+        flashHint(response.status === 404 ? 'Game này đã tắt trên máy tính.' : 'Chưa đưa được game lên màn hình máy tính.');
+      })
+      .catch(() => flashHint('Chưa đưa được game lên màn hình máy tính.'));
+  }, [flashHint, live, resumeGameId]);
+
+  // Màn loading dùng artwork của game đang quay lại khi không có lượt bấm Play.
+  const loadingLaunch = useMemo<PendingGameLaunch | null>(() => launch ?? (resume ? {
+    sessionId: '', gameId: resume.gameId, title: resume.title, heroUrl: resume.heroUrl, logoUrl: resume.logoUrl, createdAt: 0,
+  } : null), [launch, resume]);
 
   return (
     <View
@@ -235,9 +317,10 @@ export default function StreamScreen() {
         visible={!live || covering}
         phase={live ? 'connecting' : phase}
         status={covering ? gate.label : status}
-        progress={!launch || phase === 'error' ? progress : covering ? 55 + gate.progress * 0.45 : Math.min(progress, 100) * 0.55}
+        progress={!launch || phase === 'error' || directReconnect ? progress : covering ? 55 + gate.progress * 0.45 : Math.min(progress, 100) * 0.55}
         themeId={loadingThemeId}
-        launch={launch}
+        launch={loadingLaunch}
+        direct={directReconnect}
         highlights={gate.highlights}
         detail={errorDetail}
         onRetry={() => setAttempt((value) => value + 1)}
@@ -260,9 +343,19 @@ export default function StreamScreen() {
         onClose={() => closeGuide(true)}
         onHome={() => { closeGuide(false); exit(); }}
         onReload={reload}
-        onSwitched={() => { closeGuide(false); flashHint('Đã chuyển sang game đã chọn'); }}
-        onExitGame={() => { closeGuide(false); exit(); }}
+        onExitGame={exitGame}
+        onStreamOrigin={setBorderOrigin}
       />
+
+      {exitingGame ? <ExitGameOverlay game={exitingGame} done={exitDone} onFinished={exit} /> : null}
+
+      {liveBorderEnabled && borderMounted ? (
+        <StreamLiveBorder
+          open={watchParty.live}
+          origin={borderOrigin}
+          onRetracted={() => setBorderMounted(false)}
+        />
+      ) : null}
 
       {visibleHint && live ? (
         <View pointerEvents="none" style={[styles.hint, { bottom: s(24) + insets.bottom, paddingHorizontal: s(16), paddingVertical: s(8), borderRadius: s(18) }]}>

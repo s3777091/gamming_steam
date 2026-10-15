@@ -7,14 +7,14 @@ import { OPENING_DISSOLVE_TIME, OPENING_FINISH_TIME } from '../loading-sequence.
 
 const componentSource = readFileSync(new URL('../../features/stream/TrainVideo.tsx', import.meta.url), 'utf8');
 
-function mount(opening: boolean, playing = true) {
+function mount(opening: boolean, playing = true, volume = 0.5) {
   let released = false;
   const calls: string[] = [];
   const effects: (() => void | (() => void))[] = [];
   const listeners = new Map<string, (event: unknown) => void>();
   const callbacks: string[] = [];
   const player = {
-    loop: false, muted: false, timeUpdateEventInterval: 0,
+    loop: false, muted: false, volume: 1, audioMixingMode: 'auto', timeUpdateEventInterval: 0,
     play() { assert.equal(released, false, 'play after native release'); calls.push('play'); },
     pause() { assert.equal(released, false, 'pause after native release'); calls.push('pause'); },
     release() { assert.equal(released, false); released = true; calls.push('release'); },
@@ -49,7 +49,7 @@ function mount(opening: boolean, playing = true) {
       return modules[name];
     },
   });
-  exports.TrainVideo!({ opening, playing, onDissolve: () => callbacks.push('dissolve'), onEnded: () => callbacks.push('ended') });
+  exports.TrainVideo!({ opening, playing, volume, onDissolve: () => callbacks.push('dissolve'), onEnded: () => callbacks.push('ended') });
   const cleanups = effects.map((effect) => effect()).filter((cleanup): cleanup is () => void => typeof cleanup === 'function');
   return { player, calls, callbacks, listeners, unmount: () => cleanups.forEach((cleanup) => cleanup()) };
 }
@@ -76,4 +76,13 @@ test('backgrounded or failed loading pauses only while the video is still owned'
   assert.deepEqual(paused.calls, ['pause']);
   assert.doesNotThrow(paused.unmount);
   assert.deepEqual(paused.calls, ['pause', 'release']);
+});
+
+test('train audio follows the UI sound volume and mutes at zero', () => {
+  const audible = mount(false);
+  assert.equal(audible.player.muted, false);
+  assert.equal(audible.player.volume, 0.5);
+  assert.equal(audible.player.audioMixingMode, 'mixWithOthers');
+  const silent = mount(true, true, 0);
+  assert.equal(silent.player.muted, true);
 });

@@ -29,7 +29,8 @@ function Gate() {
   const pathname = usePathname();
   const previousPathname = useRef(pathname);
   useHardwareBack();
-  useTemporarySystemBars(pathname !== '/stream');
+  // Màn chính dùng Start + Select để mở Control Center; stream tự xử lý tổ hợp này.
+  useTemporarySystemBars(pathname !== '/stream' && pathname !== '/');
 
   useEffect(() => {
     if (previousPathname.current !== pathname) playUiSound('transition');

@@ -1,4 +1,4 @@
-// Loop the lightweight train video until the stream/game gate is ready, hold for two seconds,
+// Loop the silent train video until the stream/game gate is ready, hold for two seconds,
 // then play the door opening once and reveal the game artwork and title.
 import { LinearGradient } from 'expo-linear-gradient';
 import { Monitor, RefreshCw, X } from 'lucide-react-native';
@@ -12,6 +12,7 @@ import {
   OPENING_WATCHDOG_MS,
   reduceLoadingSequence,
 } from '@/lib/loading-sequence';
+import { useUiSounds } from '@/features/sound/UiSoundProvider';
 import { glass, glassShadowSubtle } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
@@ -39,6 +40,12 @@ export type StreamLoadingProps = {
   onRetry: () => void;
   onExit: () => void;
   onReveal?: () => void;
+  /**
+   * Nối lại phiên game đang chạy (nút Tải lại / quay lại từ Home): vẫn chạy
+   * đoàn tàu trong lúc nối, nhưng xong thì tan thẳng vào stream, không mở cửa
+   * tàu hay giới thiệu lại game.
+   */
+  direct?: boolean;
 };
 
 export function StreamLoading(props: StreamLoadingProps) {
@@ -59,10 +66,12 @@ function StreamLoadingSequence({
   onRetry,
   onExit,
   onReveal,
+  direct = false,
   onHidden,
 }: StreamLoadingProps & { onHidden: () => void }) {
   const { s, width, insets } = useUi();
   const { active, reduceMotion } = useMotion();
+  const sounds = useUiSounds();
   const failure = phase === 'error';
   const canReveal = Boolean(visible && onReveal);
   // Only the parent knows whether BOTH the stream and game launch gate are done.
@@ -85,8 +94,8 @@ function StreamLoadingSequence({
   const ended = useCallback(() => dispatch('ended'), []);
 
   useEffect(() => {
-    dispatch(ready ? 'ready' : 'blocked');
-  }, [ready]);
+    dispatch(ready ? (direct ? 'readyDirect' : 'ready') : 'blocked');
+  }, [direct, ready]);
 
   useEffect(() => {
     if (!ready || stage !== 'settling') return;
@@ -271,7 +280,8 @@ function StreamLoadingSequence({
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: videoOpacity }]} pointerEvents="none">
         {stage !== 'finished' ? (
           <TrainVideo key={openingActive ? 'opening' : 'loop'} opening={openingActive}
-            playing={active && !failure && (openingActive || !reduceMotion)} onDissolve={dissolve} onEnded={ended} />
+            playing={active && !failure && (openingActive || !reduceMotion)}
+            volume={sounds.enabled ? sounds.volume : 0} onDissolve={dissolve} onEnded={ended} />
         ) : null}
       </Animated.View>
 
@@ -354,7 +364,7 @@ function StreamLoadingSequence({
         },
       ]}>
         <T size={11} leading={1.2} color="rgba(255,255,255,0.85)" numberOfLines={1} style={styles.statusText}>
-          {failure ? 'Kết nối bị gián đoạn' : ready ? 'Sẵn sàng' : status || 'Đang tải trò chơi'}
+          {failure ? 'Kết nối bị gián đoạn' : ready ? 'Sẵn sàng' : status || (direct ? 'Đang nối lại phiên chơi' : 'Đang tải trò chơi')}
         </T>
         <T size={11} leading={1.2} tabular color="rgba(255,255,255,0.85)">{Math.round(displayedProgress)}%</T>
       </View>

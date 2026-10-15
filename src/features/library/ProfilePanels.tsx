@@ -16,6 +16,7 @@ import { useBack } from '@/features/gamepad/hooks';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 
 import { PERSONA_STATE_LABEL, formatHours, formatNumber, formatStorePrice } from './format';
+import { GameScreenshots } from './GameScreenshots';
 import type { ProfileAchievement, SteamProfile, SteamPromotion, SteamStoreItem, SteamUserDetails } from './types';
 import type { SteamProfileState } from './useSteamProfile';
 
@@ -227,6 +228,9 @@ export function SteamProfilePanel({
           )}
         </View>
       ) : null}
+      <View style={{ marginTop: s(16) }}>
+        <GameScreenshots />
+      </View>
     </SidePanel>
   );
 }

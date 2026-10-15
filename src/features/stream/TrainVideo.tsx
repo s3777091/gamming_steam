@@ -10,17 +10,24 @@ const TRAIN_LOOP = require('../../../assets/video/train_waiting_mobile.mp4');
 const TRAIN_POSTER = require('../../../assets/video/train_waiting_poster.jpg');
 const TRAIN_OPENING = require('../../../assets/video/train_opening_mobile.mp4');
 
-/** One decoder at a time; useVideoPlayer owns disposal, including source changes. */
-export function TrainVideo({ opening, playing, onDissolve, onEnded }: {
+/**
+ * One decoder at a time; useVideoPlayer owns disposal, including source changes.
+ * The waiting loop is silent; the opening clip carries a softened door sound so it
+ * stays in sync with the picture. `volume` 0 mutes it.
+ */
+export function TrainVideo({ opening, playing, volume, onDissolve, onEnded }: {
   opening: boolean;
   playing: boolean;
+  volume: number;
   onDissolve: () => void;
   onEnded: () => void;
 }) {
   const [firstFrame, setFirstFrame] = useState(false);
   const player = useVideoPlayer(opening ? TRAIN_OPENING : TRAIN_LOOP, (p) => {
     p.loop = !opening;
-    p.muted = true;
+    p.audioMixingMode = 'mixWithOthers';
+    p.muted = volume <= 0;
+    p.volume = volume;
     p.timeUpdateEventInterval = opening ? 0.1 : 0;
   });
   useEffect(() => {

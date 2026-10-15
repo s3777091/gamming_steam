@@ -2,7 +2,7 @@
 // hồ sơ Steam. Bản native của components/MobileVersionSelector.tsx — cùng bố cục
 // ngang, cùng thao tác, cùng dữ liệu.
 
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { BlurTargetView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { Trash2, X } from 'lucide-react-native';
@@ -11,7 +11,9 @@ import { Animated, StyleSheet, TextInput, View } from 'react-native';
 
 import { useSignedInUser } from '@/features/auth';
 import { resetFocusToTab } from '@/features/gamepad/focus';
-import { useBack, useGamepadTabs } from '@/features/gamepad/hooks';
+import { useBack, useGamepadTabs, useGuide } from '@/features/gamepad/hooks';
+import { HomeControlCenter } from '@/features/control-center/HomeControlCenter';
+import { useUserProfile } from '@/hooks/useUserProfile';
 import { useCaptureMode } from '@/features/gamepad/captureMode';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { formatStorePrice, isSteamAppId } from '@/features/library/format';
@@ -30,6 +32,13 @@ import { useDeviceStatus } from '@/features/devices/useDeviceStatus';
 import { useInputDevices } from '@/features/devices/useInputDevices';
 import ConsoleSettings, { type SettingsCategory } from '@/features/settings/ConsoleSettings';
 import { clearPendingGameLaunch, savePendingGameLaunch } from '@/lib/game-launch';
+import {
+  hydrateResumableGame,
+  readResumableGame,
+  requestStreamResume,
+  subscribeResumableGame,
+  type ResumableGame,
+} from '@/lib/stream-resume';
 import { type GameDownload, allDownloads, downloadForApp, isDownloadActive, uninstallForApp } from '@/lib/steam-downloads';
 import { type PurchaseOffer, type PurchaseTarget, purchaseKind } from '@/lib/steam-purchase';
 import { useUi } from '@/ui/scale';
@@ -168,7 +177,8 @@ export default function ConsoleScreen() {
   // Ở màn thư viện, tay cầm điều hướng giao diện (không phải PC).
   useCaptureMode('ui');
 
-  const { userId } = useSignedInUser();
+  const { userId, email } = useSignedInUser();
+  const { profile: appProfile } = useUserProfile(userId, email);
   const library = usePcLibrary();
   const { selected } = library;
   const notifications = useNotifications(library.games);
@@ -206,6 +216,21 @@ export default function ConsoleScreen() {
 
   const deviceStatus = useDeviceStatus();
   const inputDevices = useInputDevices();
+
+  // Control Center ở màn chính (Start + Select): ô game quay lại game vẫn chạy trên PC sau khi bấm Home.
+  const pathname = usePathname();
+  const [controlCenterOpen, setControlCenterOpen] = useState(false);
+  const [resumable, setResumable] = useState<ResumableGame | null>(readResumableGame);
+  useEffect(() => subscribeResumableGame(setResumable), []);
+  useGuide(() => setControlCenterOpen((value) => !value), pathname === '/');
+  // App bị Android giết khi nằm nền thì đọc lại game đang chơi dở đã lưu.
+  useEffect(() => { void hydrateResumableGame(); }, []);
+  const resumeGame = useCallback((game: ResumableGame) => {
+    setControlCenterOpen(false);
+    clearPendingGameLaunch();
+    requestStreamResume(game);
+    router.push('/stream');
+  }, [router]);
   const { sleepPcAndExit, wakePc } = usePcSleepWake(useCallback(() => {
     void library.reload(true);
   }, [library]));
@@ -854,6 +879,18 @@ export default function ConsoleScreen() {
           devices={inputDevices.devices}
           onClose={() => setDeviceMenuOpen(false)}
           onOpenSettings={() => openSettings('devices')}
+        />
+
+        <HomeControlCenter
+          open={controlCenterOpen}
+          game={resumable}
+          profile={{ name: appProfile.displayName, avatarUrl: appProfile.avatarUrl, email: appProfile.email }}
+          devices={inputDevices.devices}
+          notifications={notifications.notifications}
+          unreadCount={notifications.unreadCount}
+          onMarkAllRead={() => void notifications.markAllAsRead()}
+          onResume={resumeGame}
+          onClose={() => setControlCenterOpen(false)}
         />
       </View>
     </GlassBlurProvider>
