@@ -5,7 +5,11 @@ export const noelTheme = createTheme({
   id: 'noel',
   label: 'Noel',
   detail: 'Đỏ Giáng sinh trên nền xanh thông',
-  decor: { particles: 'snow', ambience: 'frost' },
+  decor: {
+    particles: 'snow',
+    ambience: 'frost',
+    season: { glyph: 'snowflake', greeting: 'Giáng sinh an lành' },
+  },
   seed: {
     bg: '#06190f',
     bgDeep: '#03100a',

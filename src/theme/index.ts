@@ -3,9 +3,22 @@
 
 export { alpha, mix } from './color';
 export { createTheme, type ThemeSeed, type ThemeSpec } from './createTheme';
+export { AvatarFrame, HeaderAccent, SeasonalIcon, SeasonGlyphIcon, SeasonGreeting, useSeason } from './decor/season';
 export { ThemeDecor } from './decor/ThemeDecor';
 export { DEFAULT_THEME_ID, getTheme, isThemeId, THEMES } from './registry';
 export { DESIGN, fonts, glassShadow, glassShadowSubtle } from './static';
 export { makeStyles, ThemeProvider, useDecorEnabled, useTheme, useThemeControl, type ThemeChangeOptions } from './ThemeProvider';
 export type { ThemeTransitionOrigin } from './ThemeTransition';
-export type { AmbienceKind, GlassTokens, Palette, ParticleKind, SettingsTokens, Theme, ThemeDecorSpec, ThemeId } from './types';
+export type {
+  AmbienceKind,
+  DecorAsset,
+  GlassTokens,
+  Palette,
+  ParticleKind,
+  SeasonGlyph,
+  SeasonSpec,
+  SettingsTokens,
+  Theme,
+  ThemeDecorSpec,
+  ThemeId,
+} from './types';

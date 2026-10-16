@@ -120,10 +120,10 @@ export function AppearancePage() {
           <ThemeRow key={theme.id} theme={theme} active={theme.id === themeId} onSelect={select} />
         ))}
       </SettingsGroup>
-      <SettingsGroup footer="Tuyết, sương, hoa rơi và ánh sáng nền theo từng theme. Không hiện khi đang stream.">
+      <SettingsGroup footer="Hiệu ứng nền (tuyết, sương, hoa rơi), khung avatar, biểu tượng và lời chúc theo mùa. Không hiện khi đang chơi game.">
         <ToggleRow
           label="Hiệu ứng trang trí"
-          detail="Hiệu ứng nhẹ phía sau giao diện"
+          detail="Dấu ấn mùa của theme đang dùng"
           checked={decorEnabled}
           onChange={setDecorEnabled}
         />

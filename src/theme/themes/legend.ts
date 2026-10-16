@@ -5,7 +5,11 @@ export const legendTheme = createTheme({
   id: 'legend',
   label: 'Legend',
   detail: 'Vàng huyền thoại trên nền tím hoàng gia',
-  decor: { particles: 'motes', ambience: 'goldSheen' },
+  decor: {
+    particles: 'motes',
+    ambience: 'goldSheen',
+    season: { glyph: 'crown' },
+  },
   seed: {
     bg: '#130c28',
     bgDeep: '#0b0719',

@@ -13,7 +13,7 @@ import {
   reduceLoadingSequence,
 } from '@/lib/loading-sequence';
 import { useUiSounds } from '@/features/sound/UiSoundProvider';
-import { alpha, glassShadowSubtle, makeStyles, useTheme } from '@/theme';
+import { alpha, glassShadowSubtle, makeStyles, SeasonGreeting, ThemeDecor, useSeason, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -70,6 +70,7 @@ function StreamLoadingSequence({
   onHidden,
 }: StreamLoadingProps & { onHidden: () => void }) {
   const { colors } = useTheme();
+  const season = useSeason();
   const styles = useStyles();
   const { s, width, insets } = useUi();
   const { active, reduceMotion } = useMotion();
@@ -287,6 +288,13 @@ function StreamLoadingSequence({
         ) : null}
       </Animated.View>
 
+      {/* Không khí và hạt của theme mùa trên video chờ; tan cùng video khi vào game. */}
+      {stage !== 'finished' && !failure ? (
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: videoOpacity }]} pointerEvents="none">
+          <ThemeDecor />
+        </Animated.View>
+      ) : null}
+
       {/* Artwork and title appear only when the doors open. */}
       <Animated.View
         style={[
@@ -357,6 +365,12 @@ function StreamLoadingSequence({
         </View>
       ) : null}
 
+      {!failure && !ready ? (
+        <View pointerEvents="none" style={{ position: 'absolute', left: insets.left + s(12), bottom: insets.bottom + s(28) }}>
+          <SeasonGreeting />
+        </View>
+      ) : null}
+
       <View pointerEvents="none" style={[
         styles.loadingStatus,
         {
@@ -383,7 +397,7 @@ function StreamLoadingSequence({
             styles.progressBar,
             {
               width: progressPercentWidth,
-              backgroundColor: failure ? 'rgba(248,113,113,0.95)' : 'rgba(255,255,255,0.92)',
+              backgroundColor: failure ? 'rgba(248,113,113,0.95)' : season ? colors.accent : 'rgba(255,255,255,0.92)',
             },
           ]}
         />

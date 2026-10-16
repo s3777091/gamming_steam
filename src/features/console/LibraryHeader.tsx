@@ -7,7 +7,7 @@ import { DEVICE_KIND_ORDER, type LocalDevice } from '@/features/devices/useInput
 import { KIND_ICONS } from '@/features/devices/kindIcons';
 import { formatClock } from '@/features/library/format';
 import type { SteamProfile, StoreTab } from '@/features/library/types';
-import { alpha, makeStyles, useTheme } from '@/theme';
+import { alpha, AvatarFrame, HeaderAccent, makeStyles, SeasonalIcon, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
@@ -290,21 +290,23 @@ function SteamAccountButton({ profile, onPress }: { profile: SteamProfile | null
       accessibilityLabel={profile?.personaName ? `Hồ sơ ${profile.personaName}` : 'Xem hồ sơ'}
       style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center' }}
     >
-      <View style={[styles.avatar, { width: s(32), height: s(32), borderRadius: s(16) }]}>
-        {profile?.avatarUrl ? (
-          <Img source={{ uri: profile.avatarUrl }} style={{ width: '100%', height: '100%', borderRadius: s(16) }} contentFit="cover" />
-        ) : (
-          <Gamepad2 size={s(16)} color="rgba(255,255,255,0.7)" strokeWidth={1.7} />
-        )}
-        {profile ? (
-          <View
-            style={[
-              styles.presence,
-              { width: s(8), height: s(8), borderRadius: s(4), backgroundColor: profile.personState > 0 ? colors.accent : 'rgba(255,255,255,0.35)' },
-            ]}
-          />
-        ) : null}
-      </View>
+      <AvatarFrame size={s(32)}>
+        <View style={[styles.avatar, { width: s(32), height: s(32), borderRadius: s(16) }]}>
+          {profile?.avatarUrl ? (
+            <Img source={{ uri: profile.avatarUrl }} style={{ width: '100%', height: '100%', borderRadius: s(16) }} contentFit="cover" />
+          ) : (
+            <Gamepad2 size={s(16)} color="rgba(255,255,255,0.7)" strokeWidth={1.7} />
+          )}
+          {profile ? (
+            <View
+              style={[
+                styles.presence,
+                { width: s(8), height: s(8), borderRadius: s(4), backgroundColor: profile.personState > 0 ? colors.accent : 'rgba(255,255,255,0.35)' },
+              ]}
+            />
+          ) : null}
+        </View>
+      </AvatarFrame>
     </Press>
   );
 }
@@ -326,6 +328,7 @@ function HeaderClock() {
   return (
     <View style={[styles.clockBadge, { height: s(32), paddingHorizontal: s(10), borderRadius: s(16) }]}>
       <GlassBackdrop material="control" intensity={40} radius={s(16)} />
+      <HeaderAccent />
       <T size={13} weight="semibold" color="rgba(255,255,255,0.95)" tabular>{clock}</T>
     </View>
   );
@@ -618,29 +621,31 @@ export function LibraryHeader({
           />
         ) : null}
         <View ref={bellRef} collapsable={false} style={styles.notificationButtonWrap}>
-          <Press
-            onPress={onOpenNotifications}
-            sound="navigate"
-            accessibilityLabel={totalNotifications > 0 ? `Thông báo, ${totalNotifications} thông báo` : 'Thông báo'}
-            style={[
-              styles.glassCircleButton,
-              {
-                width: s(32),
-                height: s(32),
-                borderRadius: s(16),
-                borderColor: totalNotifications > 0 ? alpha(colors.accent, 0.4) : 'rgba(255,255,255,0.16)',
-                backgroundColor: totalNotifications > 0 ? alpha(colors.accent, 0.14) : 'rgba(255,255,255,0.08)',
-              },
-            ]}
-          >
-            <GlassBackdrop material="control" intensity={40} radius={s(16)} />
-            {downloadPercent !== null ? <ProgressRing size={s(32)} percent={downloadPercent} color={colors.accent} /> : null}
-            <Bell
-              size={s(16)}
-              color={totalNotifications > 0 ? colors.white : 'rgba(255,255,255,0.72)'}
-              strokeWidth={1.8}
-            />
-          </Press>
+          <SeasonalIcon>
+            <Press
+              onPress={onOpenNotifications}
+              sound="navigate"
+              accessibilityLabel={totalNotifications > 0 ? `Thông báo, ${totalNotifications} thông báo` : 'Thông báo'}
+              style={[
+                styles.glassCircleButton,
+                {
+                  width: s(32),
+                  height: s(32),
+                  borderRadius: s(16),
+                  borderColor: totalNotifications > 0 ? alpha(colors.accent, 0.4) : 'rgba(255,255,255,0.16)',
+                  backgroundColor: totalNotifications > 0 ? alpha(colors.accent, 0.14) : 'rgba(255,255,255,0.08)',
+                },
+              ]}
+            >
+              <GlassBackdrop material="control" intensity={40} radius={s(16)} />
+              {downloadPercent !== null ? <ProgressRing size={s(32)} percent={downloadPercent} color={colors.accent} /> : null}
+              <Bell
+                size={s(16)}
+                color={totalNotifications > 0 ? colors.white : 'rgba(255,255,255,0.72)'}
+                strokeWidth={1.8}
+              />
+            </Press>
+          </SeasonalIcon>
           {totalNotifications > 0 ? (
             <View
               pointerEvents="none"
@@ -662,14 +667,16 @@ export function LibraryHeader({
             </View>
           ) : null}
         </View>
-        <Press
-          onPress={() => onOpenSettings('quality')}
-          accessibilityLabel="Cài đặt"
-          style={[styles.glassCircleButton, { width: s(32), height: s(32), borderRadius: s(16) }]}
-        >
-          <GlassBackdrop material="control" intensity={40} radius={s(16)} />
-          <Settings size={s(16)} color="rgba(255,255,255,0.72)" strokeWidth={1.8} />
-        </Press>
+        <SeasonalIcon>
+          <Press
+            onPress={() => onOpenSettings('quality')}
+            accessibilityLabel="Cài đặt"
+            style={[styles.glassCircleButton, { width: s(32), height: s(32), borderRadius: s(16) }]}
+          >
+            <GlassBackdrop material="control" intensity={40} radius={s(16)} />
+            <Settings size={s(16)} color="rgba(255,255,255,0.72)" strokeWidth={1.8} />
+          </Press>
+        </SeasonalIcon>
         <View style={{ width: StyleSheet.hairlineWidth, height: s(20), backgroundColor: 'rgba(255,255,255,0.16)' }} />
         <SteamAccountButton profile={steamProfile} onPress={onOpenProfile} />
       </View>
@@ -680,6 +687,7 @@ export function LibraryHeader({
 const useStyles = makeStyles(({ colors, glass }) => ({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 30 },
   clockBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,

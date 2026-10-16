@@ -1,6 +1,8 @@
 import { Text, type TextProps, type TextStyle } from 'react-native';
 
-import { fonts, useTheme } from '@/theme';
+// Đi thẳng vào file con để tránh vòng import: dấu ấn mùa của theme cũng dùng T.
+import { fonts } from '@/theme/static';
+import { useTheme } from '@/theme/ThemeProvider';
 import { useUi } from './scale';
 
 type Weight = keyof typeof fonts;

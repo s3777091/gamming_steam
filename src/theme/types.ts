@@ -144,6 +144,27 @@ export type AmbienceKind = 'frost' | 'fog' | 'lanternGlow' | 'goldSheen';
 export type ThemeDecorSpec = {
   particles: ParticleKind | null;
   ambience: AmbienceKind | null;
+  /** Dấu ấn mùa trên giao diện; bỏ trống ở theme không theo mùa. */
+  season?: SeasonSpec;
+};
+
+/** Ký hiệu đại diện cho mùa: hiện ở đồng hồ, khung avatar, icon và màn loading. */
+export type SeasonGlyph = 'snowflake' | 'ghost' | 'blossom' | 'crown';
+
+/** Ảnh tĩnh: require('...png') hoặc { uri }. */
+export type DecorAsset = number | { uri: string };
+
+export type SeasonSpec = {
+  glyph: SeasonGlyph;
+  /** Lời chúc nhỏ trên màn loading stream. */
+  greeting?: string;
+  /**
+   * Asset vẽ tay thay cho hình dựng sẵn. Có thì dùng ảnh, không thì dùng bản đơn giản.
+   * - avatarFrame: khung vuông trong suốt, avatar nằm giữa và chiếm ~70% cạnh.
+   * - headerAccent: hình nhỏ cạnh đồng hồ trên thanh trên cùng (khoảng 20dp).
+   * - loadingBadge: hình nhỏ cạnh lời chúc trên màn loading.
+   */
+  assets?: { avatarFrame?: DecorAsset; headerAccent?: DecorAsset; loadingBadge?: DecorAsset };
 };
 
 export type Theme = {

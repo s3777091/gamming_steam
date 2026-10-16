@@ -5,7 +5,11 @@ export const halloweenTheme = createTheme({
   id: 'halloween',
   label: 'Halloween',
   detail: 'Cam bí ngô trên nền tím đêm',
-  decor: { particles: 'embers', ambience: 'fog' },
+  decor: {
+    particles: 'embers',
+    ambience: 'fog',
+    season: { glyph: 'ghost', greeting: 'Halloween vui vẻ' },
+  },
   seed: {
     bg: '#180d24',
     bgDeep: '#0f0718',

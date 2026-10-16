@@ -5,7 +5,11 @@ export const tetTheme = createTheme({
   id: 'tet',
   label: 'Tết',
   detail: 'Đỏ may mắn và vàng hoa mai',
-  decor: { particles: 'petals', ambience: 'lanternGlow' },
+  decor: {
+    particles: 'petals',
+    ambience: 'lanternGlow',
+    season: { glyph: 'blossom', greeting: 'Chúc mừng năm mới' },
+  },
   seed: {
     bg: '#220808',
     bgDeep: '#150404',
