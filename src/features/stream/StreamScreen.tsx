@@ -27,7 +27,7 @@ import { streamStretchStyle } from '@/lib/stream-fit';
 import { getLiveBorderEnabled, subscribeLiveBorderEnabled } from '@/lib/stream-overlay-settings';
 import type { HostShortcutAction } from '@/lib/input-settings';
 import { BlurView } from 'expo-blur';
-import { glass, glassShadowSubtle } from '@/theme';
+import { glassShadowSubtle, makeStyles } from '@/theme';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
@@ -44,6 +44,7 @@ import { useStreamSession } from './useStreamSession';
 import { useWatchPartyHost } from './useWatchPartyHost';
 
 export default function StreamScreen() {
+  const styles = useStyles();
   const { s, insets } = useUi();
   const router = useRouter();
   const { userId, email } = useSignedInUser();
@@ -368,7 +369,7 @@ export default function StreamScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ glass }) => ({
   root: { flex: 1, overflow: 'hidden', backgroundColor: '#020204' },
   black: { ...StyleSheet.absoluteFill, backgroundColor: '#020204' },
   video: { ...StyleSheet.absoluteFill, zIndex: 2, backgroundColor: '#000' },
@@ -383,5 +384,5 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...glassShadowSubtle,
   },
-});
+}));
 

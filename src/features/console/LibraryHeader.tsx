@@ -7,7 +7,7 @@ import { DEVICE_KIND_ORDER, type LocalDevice } from '@/features/devices/useInput
 import { KIND_ICONS } from '@/features/devices/kindIcons';
 import { formatClock } from '@/features/library/format';
 import type { SteamProfile, StoreTab } from '@/features/library/types';
-import { colors, glass } from '@/theme';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
@@ -32,6 +32,8 @@ const TAB_ITEM_WIDTH = 66;
  *  - Canh chỉnh linh hoạt theo số lượng icon và thiết bị thực tế bên trong.
  */
 function DeviceStatusButton({ devices, open, onPress }: { devices: LocalDevice[]; open: boolean; onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const [anim] = useState(() => new Animated.Value(open ? 1 : 0));
 
@@ -85,7 +87,7 @@ function DeviceStatusButton({ devices, open, onPress }: { devices: LocalDevice[]
 
   const pillBg = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(255, 255, 255, 0.08)', 'rgba(102, 168, 255, 0.22)'],
+    outputRange: ['rgba(255, 255, 255, 0.08)', alpha(colors.accent, 0.22)],
   });
 
   const pillBorder = anim.interpolate({
@@ -178,7 +180,7 @@ function DeviceStatusButton({ devices, open, onPress }: { devices: LocalDevice[]
                     }],
                   }}
                 >
-                  <T size={10.5} weight="bold" color={batteryColor(controllerBattery)} tabular>
+                  <T size={10.5} weight="bold" color={batteryColor(controllerBattery, colors)} tabular>
                     {controllerBattery}%
                   </T>
                 </Animated.View>
@@ -229,6 +231,8 @@ function RemoteStatusButton({
   onPress: () => void;
   anchorRef?: RefObject<View | null>;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const isOnline = reachable || online === true;
   const isConnecting = stage === 'network' || stage === 'signal_sent' || (online === null && !reachable);
@@ -246,7 +250,7 @@ function RemoteStatusButton({
             width: s(32),
             height: s(32),
             borderRadius: s(16),
-            backgroundColor: open ? 'rgba(102,168,255,0.24)' : 'rgba(255,255,255,0.08)',
+            backgroundColor: open ? alpha(colors.accent, 0.24) : 'rgba(255,255,255,0.08)',
             borderColor: open ? colors.accent : 'rgba(255,255,255,0.18)',
           },
         ]}
@@ -277,6 +281,8 @@ function RemoteStatusButton({
 }
 
 function SteamAccountButton({ profile, onPress }: { profile: SteamProfile | null; onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   return (
     <Press
@@ -304,6 +310,7 @@ function SteamAccountButton({ profile, onPress }: { profile: SteamProfile | null
 }
 
 function HeaderClock() {
+  const styles = useStyles();
   const { s } = useUi();
   const [clock, setClock] = useState(() => formatClock(new Date()));
   useEffect(() => {
@@ -335,6 +342,7 @@ function ConsoleTabItem({
   onPress: () => void;
   tabWidth: number;
 }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const [anim] = useState(() => new Animated.Value(active ? 1 : 0));
 
@@ -392,6 +400,7 @@ function ConsoleTabs({
   activeTab: StoreTab;
   onTabChange: (tab: StoreTab) => void;
 }) {
+  const styles = useStyles();
   const { s } = useUi();
   const tabWidth = s(TAB_ITEM_WIDTH);
 
@@ -573,6 +582,8 @@ export function LibraryHeader({
   /** Không truyền thì chạm cụm icon mở thẳng Cài đặt > Thiết bị. */
   onToggleDeviceMenu?: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const totalNotifications = notificationCount !== undefined
     ? notificationCount
@@ -617,8 +628,8 @@ export function LibraryHeader({
                 width: s(32),
                 height: s(32),
                 borderRadius: s(16),
-                borderColor: totalNotifications > 0 ? 'rgba(102,168,255,0.4)' : 'rgba(255,255,255,0.16)',
-                backgroundColor: totalNotifications > 0 ? 'rgba(102,168,255,0.14)' : 'rgba(255,255,255,0.08)',
+                borderColor: totalNotifications > 0 ? alpha(colors.accent, 0.4) : 'rgba(255,255,255,0.16)',
+                backgroundColor: totalNotifications > 0 ? alpha(colors.accent, 0.14) : 'rgba(255,255,255,0.08)',
               },
             ]}
           >
@@ -666,7 +677,7 @@ export function LibraryHeader({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, glass }) => ({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 30 },
   clockBadge: {
     alignItems: 'center',
@@ -732,7 +743,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(7, 16, 28, 0.9)',
+    borderColor: alpha(colors.panelSolid, 0.9),
     backgroundColor: colors.primary,
   },
   avatar: {
@@ -748,7 +759,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-  presence: { position: 'absolute', right: 0, bottom: 0, borderWidth: 1, borderColor: '#111821' },
+  presence: { position: 'absolute', right: 0, bottom: 0, borderWidth: 1, borderColor: colors.card },
   remoteButtonWrap: {
     position: 'relative',
     overflow: 'visible',
@@ -767,7 +778,7 @@ const styles = StyleSheet.create({
   statusDot: {
     position: 'absolute',
     borderWidth: 1.5,
-    borderColor: '#080c12',
+    borderColor: colors.bg,
     zIndex: 2,
   },
   glassCircleButton: {
@@ -783,4 +794,4 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-});
+}));

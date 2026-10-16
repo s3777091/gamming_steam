@@ -3,7 +3,7 @@ import { Platform, StyleSheet, View, type View as NativeView } from 'react-nativ
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { glass } from '@/theme';
+import { useTheme } from '@/theme';
 
 type GlassMaterial = 'control' | 'panel' | 'scrim';
 
@@ -38,6 +38,7 @@ export function GlassBackdrop({
   intensity?: number;
   radius?: number;
 }) {
+  const { glass } = useTheme();
   const blurTarget = useContext(GlassBlurTargetContext);
   const isControl = material === 'control';
   const isScrim = material === 'scrim';

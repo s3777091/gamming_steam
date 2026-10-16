@@ -30,18 +30,13 @@ import {
 } from 'lucide-react-native';
 
 import { useMultipathAi, type AvailableWifi } from '@/lib/multipath-ai';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 import { useSettingsRestore } from './SettingsRestore';
 
-import {
-  ActionRow,
-  appleColors,
-  InfoRow,
-  SettingsGroup,
-  ToggleRow,
-} from './controls';
+import { ActionRow, InfoRow, SettingsGroup, ToggleRow } from './controls';
 
 // Kích hoạt LayoutAnimation trên Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -78,6 +73,8 @@ function isLikelyCaptivePortal(capabilities?: string, ssid?: string): boolean {
 }
 
 export function MultipathSection() {
+  const { settings: appleColors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const {
     capabilities,
@@ -683,7 +680,7 @@ export function MultipathSection() {
     );
   }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, settings: appleColors }) => ({
   secondaryCardContainer: {
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -743,9 +740,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: 'rgba(31, 111, 235, 0.12)',
+    backgroundColor: alpha(colors.primary, 0.12),
     borderWidth: 1,
-    borderColor: 'rgba(31, 111, 235, 0.22)',
+    borderColor: alpha(colors.primary, 0.22),
   },
   captivePortalAction: {
     paddingHorizontal: 8,
@@ -793,7 +790,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 9,
-    backgroundColor: 'rgba(31, 111, 235, 0.16)',
+    backgroundColor: alpha(colors.primary, 0.16),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -819,9 +816,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 12,
-    backgroundColor: 'rgba(31, 111, 235, 0.12)',
+    backgroundColor: alpha(colors.primary, 0.12),
     borderWidth: 1,
-    borderColor: 'rgba(31, 111, 235, 0.28)',
+    borderColor: alpha(colors.primary, 0.28),
   },
   glassListContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.035)',
@@ -838,7 +835,7 @@ const styles = StyleSheet.create({
     height: 42,
   },
   wifiRowSelected: {
-    backgroundColor: 'rgba(31, 111, 235, 0.16)',
+    backgroundColor: alpha(colors.primary, 0.16),
   },
   rowSeparator: {
     height: StyleSheet.hairlineWidth,
@@ -939,4 +936,4 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 2,
   },
-});
+}));

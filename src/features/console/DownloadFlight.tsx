@@ -11,7 +11,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
 import { playUiSound } from '@/features/sound/UiSoundProvider';
-import { colors } from '@/theme';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useUi } from '@/ui/scale';
 import { useMotion } from '@/ui/motion';
@@ -37,6 +37,8 @@ const GHOSTS = [0.2, 0.34, 0.5];
 const haptic = (run: () => Promise<void>) => { void run().catch(() => {}); };
 
 export function DownloadFlight({ flight, onDone }: { flight: Flight; onDone: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const { reduceMotion, active } = useMotion();
   const { from, to } = flight;
@@ -179,6 +181,7 @@ function FlightTrail({ source, lag, size, c0, c1, arc, opacity }: {
   arc: number;
   opacity: number;
 }) {
+  const styles = useStyles();
   // Lùi t một đoạn: ô bóng đi sau ô thật `lag` (tính theo đơn vị t, 0..1 là cả chuyến bay).
   const lagged = useMemo(() => Animated.subtract(source, lag), [lag, source]);
   const points = ARC_POINTS.slice(1);
@@ -200,7 +203,7 @@ function FlightTrail({ source, lag, size, c0, c1, arc, opacity }: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   tile: {
     position: 'absolute',
     overflow: 'hidden',
@@ -213,7 +216,7 @@ const styles = StyleSheet.create({
   },
   rim: { borderWidth: 1.5, borderColor: colors.accentGlow },
   glyph: { alignItems: 'center', justifyContent: 'center' },
-  glyphDisc: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(31,111,235,0.92)' },
+  glyphDisc: { alignItems: 'center', justifyContent: 'center', backgroundColor: alpha(colors.primary, 0.92) },
   trail: { position: 'absolute', backgroundColor: colors.accent },
   ring: { position: 'absolute', borderWidth: 2, borderColor: colors.accentGlow },
-});
+}));

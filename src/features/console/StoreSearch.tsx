@@ -8,7 +8,7 @@ import { Search, WifiOff, X, type LucideIcon } from 'lucide-react-native';
 import { formatStorePrice } from '@/features/library/format';
 import type { SteamStoreItem } from '@/features/library/types';
 import type { useStoreSearch } from '@/features/library/useSteamStore';
-import { colors, fonts } from '@/theme';
+import { alpha, fonts, makeStyles, useTheme } from '@/theme';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { useMotion } from '@/ui/motion';
@@ -36,6 +36,8 @@ export function StoreSearchField({ open, query, inputRef, onOpen, onQueryChange,
   onSubmit: () => void;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width } = useUi();
   const { reduceMotion } = useMotion();
   const fieldHeight = s(32);
@@ -65,11 +67,11 @@ export function StoreSearchField({ open, query, inputRef, onOpen, onQueryChange,
           width: grow.interpolate({ inputRange: [0, 1], outputRange: [fieldHeight, openWidth] }),
           borderColor: grow.interpolate({
             inputRange: [0, 1],
-            outputRange: ['rgba(255,255,255,0.18)', 'rgba(102,168,255,0.7)'],
+            outputRange: ['rgba(255,255,255,0.18)', alpha(colors.accent, 0.7)],
           }),
           backgroundColor: grow.interpolate({
             inputRange: [0, 1],
-            outputRange: ['rgba(12,20,32,0.5)', 'rgba(10,18,30,0.88)'],
+            outputRange: [alpha(colors.panel, 0.5), alpha(colors.panelSolid, 0.88)],
           }),
         },
       ]}
@@ -172,13 +174,15 @@ export function StoreSearchField({ open, query, inputRef, onOpen, onQueryChange,
 }
 
 function SearchMessage({ icon: Icon, title, detail, accent = false }: { icon: LucideIcon; title: string; detail: string; accent?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: s(24) }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(12) }}>
         {accent ? (
           <View style={[styles.accentIcon, { width: s(40), height: s(40), borderRadius: s(20) }]}>
-            <Icon size={s(16)} color="#8bbcff" strokeWidth={1.7} />
+            <Icon size={s(16)} color={colors.accentSoft} strokeWidth={1.7} />
           </View>
         ) : (
           <Icon size={s(20)} color="rgba(255,255,255,0.36)" />
@@ -193,6 +197,8 @@ function SearchMessage({ icon: Icon, title, detail, accent = false }: { icon: Lu
 }
 
 const SearchResultCard = memo(function SearchResultCard({ item, onOpen }: { item: SteamStoreItem; onOpen: (item: SteamStoreItem) => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width } = useUi();
   const open = useCallback(() => onOpen(item), [item, onOpen]);
   const cardWidth = Math.min(s(106), Math.max(s(86), width * 0.11));
@@ -206,7 +212,7 @@ const SearchResultCard = memo(function SearchResultCard({ item, onOpen }: { item
       />
       {/* Liquid glass light refraction gradient */}
       <LinearGradient
-        colors={['rgba(255,255,255,0.12)', 'rgba(6,16,29,0.08)', 'rgba(6,16,29,0.5)', 'rgba(6,16,29,0.97)']}
+        colors={['rgba(255,255,255,0.12)', alpha(colors.panelSolid, 0.08), alpha(colors.panelSolid, 0.5), alpha(colors.panelSolid, 0.97)]}
         locations={[0, 0.35, 0.7, 1]}
         style={StyleSheet.absoluteFill}
       />
@@ -229,7 +235,7 @@ const SearchResultCard = memo(function SearchResultCard({ item, onOpen }: { item
             paddingVertical: s(2),
             borderWidth: StyleSheet.hairlineWidth,
             borderColor: 'rgba(255,255,255,0.4)',
-            shadowColor: '#66a8ff',
+            shadowColor: colors.accent,
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.5,
             shadowRadius: 6,
@@ -272,6 +278,8 @@ const SearchResults = memo(function SearchResults({ query, search, onOpenGame }:
 function Key({ label, onPress, flex = 1, accent = false, disabled = false }: {
   label: string; onPress: () => void; flex?: number; accent?: boolean; disabled?: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   return (
     <Press
@@ -291,7 +299,7 @@ function Key({ label, onPress, flex = 1, accent = false, disabled = false }: {
           borderColor: accent
             ? (disabled ? 'transparent' : 'rgba(255,255,255,0.4)')
             : 'rgba(255,255,255,0.13)',
-          shadowColor: accent && !disabled ? '#66a8ff' : '#000',
+          shadowColor: accent && !disabled ? colors.accent : '#000',
           shadowOffset: { width: 0, height: 1 },
           shadowOpacity: accent && !disabled ? 0.35 : 0.2,
           shadowRadius: 3,
@@ -323,6 +331,7 @@ const StoreKeyboard = memo(function StoreKeyboard({ canSubmit, onKey, onErase, o
   onErase: () => void;
   onSubmit: () => void;
 }) {
+  const styles = useStyles();
   const { s } = useUi();
   return (
     <View style={[styles.keyboard, { padding: s(10), borderRadius: s(18) }]}>
@@ -362,6 +371,7 @@ export function StoreSearchPanel({ query, search, onOpenGame, onKey, onErase, on
   onErase: () => void;
   onSubmit: () => void;
 }) {
+  const styles = useStyles();
   const { s } = useUi();
   const trimmed = query.trim();
   return (
@@ -392,7 +402,7 @@ export function StoreSearchPanel({ query, search, onOpenGame, onKey, onErase, on
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   field: {
     overflow: 'hidden',
     borderWidth: 1,
@@ -407,15 +417,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(102,168,255,0.3)',
-    backgroundColor: 'rgba(102,168,255,0.1)',
+    borderColor: alpha(colors.accent, 0.3),
+    backgroundColor: alpha(colors.accent, 0.1),
   },
   result: {
     overflow: 'hidden',
     alignSelf: 'stretch',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(12,20,32,0.8)',
+    backgroundColor: alpha(colors.panel, 0.8),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
@@ -432,7 +442,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(10,18,30,0.82)',
+    backgroundColor: alpha(colors.panelSolid, 0.82),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
@@ -443,11 +453,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(10,18,30,0.76)',
+    backgroundColor: alpha(colors.panelSolid, 0.76),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4,
     shadowRadius: 20,
     elevation: 10,
   },
-});
+}));

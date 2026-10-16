@@ -35,21 +35,12 @@ import {
 import { KIND_ICONS } from '@/features/devices/kindIcons';
 import { DEFAULT_INPUT_SETTINGS, keyCodeLabel, type HostShortcutAction } from '@/lib/input-settings';
 import { useUiSounds } from '@/features/sound/UiSoundProvider';
+import { alpha, type SettingsTokens, useTheme } from '@/theme';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
-import {
-  ActionRow,
-  appleColors,
-  ChoiceRow,
-  Keycap,
-  PillButton,
-  rowStyle,
-  SettingsGroup,
-  SliderRow,
-  ToggleRow,
-} from './controls';
+import { ActionRow, ChoiceRow, Keycap, PillButton, rowStyle, SettingsGroup, SliderRow, ToggleRow } from './controls';
 import { useSuspendCursor } from '@/features/gamepad/hooks';
 import { webCodeForKeyCode } from './keycodes';
 import { useSettingsRestore } from './SettingsRestore';
@@ -61,8 +52,8 @@ import {
   Mouse2DVisualizer,
 } from './visualizers';
 
-
 function Battery({ value }: { value: number }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   const percent = Math.round(value * 100);
   const low = percent <= 20;
@@ -85,18 +76,19 @@ function deviceStatus(device: LocalDevice): string {
   return device.bluetooth ? 'Bluetooth' : 'Có dây / USB';
 }
 
-const DEVICE_COLORS: Record<string, string> = {
-  controller: appleColors.red,
-  keyboard: appleColors.indigo,
-  mouse: appleColors.teal,
-  headset: appleColors.pink,
-  display: appleColors.gray,
+const DEVICE_COLORS: Record<string, keyof SettingsTokens> = {
+  controller: 'red',
+  keyboard: 'indigo',
+  mouse: 'teal',
+  headset: 'pink',
+  display: 'gray',
 };
 
 function DeviceRow({ device }: { device: LocalDevice }) {
+  const { settings: appleColors, colors } = useTheme();
   const { s } = useUi();
   const Icon = KIND_ICONS[device.kind];
-  const bg = DEVICE_COLORS[device.kind] ?? appleColors.gray;
+  const bg = appleColors[DEVICE_COLORS[device.kind] ?? 'gray'];
   return (
     <View style={rowStyle(s, { minHeight: s(50) })}>
       <View
@@ -119,7 +111,7 @@ function DeviceRow({ device }: { device: LocalDevice }) {
             right: -s(1),
             bottom: -s(1),
             borderWidth: 1.5,
-            borderColor: 'rgba(16, 23, 34, 0.95)',
+            borderColor: alpha(colors.card, 0.95),
             backgroundColor: appleColors.green,
           }}
         />
@@ -138,6 +130,7 @@ function DeviceRow({ device }: { device: LocalDevice }) {
 }
 
 export function DevicesPage({ notify }: { notify: Notify }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   const { devices, bluetooth, refresh } = useInputDevices();
   const [asking, setAsking] = useState(false);
@@ -228,6 +221,7 @@ const BUTTON_FLAGS: [number, string][] = [
 ];
 
 function Bar({ label, value, signed }: { label: string; value: number; signed?: boolean }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   const ratio = signed ? (value + 1) / 2 : value;
   return (
@@ -274,6 +268,7 @@ function ControllerInspector({
   rightDeadzone?: number;
   triggerDeadzone?: number;
 }) {
+  const { settings: appleColors, colors } = useTheme();
   const { s } = useUi();
   const [state, setState] = useState<NativeGamepadState | null>(null);
   const [viewMode, setViewMode] = useState<'2d' | 'classic'>('2d');
@@ -344,9 +339,9 @@ function ControllerInspector({
                     borderRadius: s(6),
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: on ? 'rgba(31, 111, 235, 0.28)' : 'rgba(255, 255, 255, 0.08)',
+                    backgroundColor: on ? alpha(colors.primary, 0.28) : 'rgba(255, 255, 255, 0.08)',
                     borderWidth: 1,
-                    borderColor: on ? 'rgba(102, 168, 255, 0.45)' : 'rgba(255, 255, 255, 0.12)',
+                    borderColor: on ? alpha(colors.accent, 0.45) : 'rgba(255, 255, 255, 0.12)',
                   }}
                 >
                   <T size={10} weight="semibold" color={on ? '#FFFFFF' : 'rgba(255, 255, 255, 0.75)'}>
@@ -368,9 +363,9 @@ function ControllerInspector({
                   borderRadius: s(6),
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: on ? 'rgba(31, 111, 235, 0.28)' : 'rgba(255, 255, 255, 0.08)',
+                  backgroundColor: on ? alpha(colors.primary, 0.28) : 'rgba(255, 255, 255, 0.08)',
                   borderWidth: 1,
-                  borderColor: on ? 'rgba(102, 168, 255, 0.45)' : 'rgba(255, 255, 255, 0.12)',
+                  borderColor: on ? alpha(colors.accent, 0.45) : 'rgba(255, 255, 255, 0.12)',
                 }}
               >
                 <T size={10} weight="semibold" color={on ? '#FFFFFF' : 'rgba(255, 255, 255, 0.75)'}>
@@ -392,6 +387,7 @@ function ControllerInspector({
 }
 
 export function ControllerPage({ input }: { input: InputSettingsState }) {
+  const { settings: appleColors } = useTheme();
   const { settings, update } = input;
   const { devices } = useInputDevices();
   const pads = devices.filter((device) => device.kind === 'controller');
@@ -522,6 +518,7 @@ export function ControllerPage({ input }: { input: InputSettingsState }) {
 // ---------------------------------------------------------------- chuột
 
 export function MousePage({ input }: { input: InputSettingsState }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   const { settings, update } = input;
   const { devices } = useInputDevices();
@@ -598,6 +595,7 @@ function KeyCapture({
   placeholder: string;
   onCapture: (code: string) => void;
 }) {
+  const { colors, settings: appleColors } = useTheme();
   const { s } = useUi();
   const [listening, setListening] = useState(false);
 
@@ -629,15 +627,15 @@ function KeyCapture({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: listening ? 'rgba(102, 168, 255, 0.45)' : 'rgba(255, 255, 255, 0.18)',
-        backgroundColor: listening ? 'rgba(31, 111, 235, 0.22)' : 'rgba(255, 255, 255, 0.08)',
+        borderColor: listening ? alpha(colors.accent, 0.45) : 'rgba(255, 255, 255, 0.18)',
+        backgroundColor: listening ? alpha(colors.primary, 0.22) : 'rgba(255, 255, 255, 0.08)',
         overflow: 'hidden',
       }}
     >
       <T
         size={10.4}
         weight="semibold"
-        color={listening ? '#8bbcff' : value ? appleColors.text : appleColors.textTertiary}
+        color={listening ? colors.accentSoft : value ? appleColors.text : appleColors.textTertiary}
       >
         {listening ? 'Nhấn một phím…' : value ? keyCodeLabel(value) : placeholder}
       </T>
@@ -656,6 +654,7 @@ function ActionPicker({
   value: HostShortcutAction;
   onChange: (action: HostShortcutAction) => void;
 }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: s(4) }}>
@@ -673,9 +672,9 @@ function ActionPicker({
               paddingHorizontal: s(10),
               paddingVertical: s(6),
               borderRadius: s(8),
-              backgroundColor: active ? 'rgba(31, 111, 235, 0.28)' : 'rgba(255, 255, 255, 0.07)',
+              backgroundColor: active ? alpha(colors.primary, 0.28) : 'rgba(255, 255, 255, 0.07)',
               borderWidth: 1,
-              borderColor: active ? 'rgba(102, 168, 255, 0.45)' : 'rgba(255, 255, 255, 0.12)',
+              borderColor: active ? alpha(colors.accent, 0.45) : 'rgba(255, 255, 255, 0.12)',
             }}
           >
             <T
@@ -693,6 +692,7 @@ function ActionPicker({
 }
 
 export function KeyboardPage({ input, notify }: { input: InputSettingsState; notify: Notify }) {
+  const { settings: appleColors, colors } = useTheme();
   const { s } = useUi();
   const { settings, update } = input;
   const { devices } = useInputDevices();
@@ -755,7 +755,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
             marginBottom: s(8),
             padding: s(12),
             borderRadius: s(12),
-            backgroundColor: 'rgba(16, 23, 34, 0.65)',
+            backgroundColor: alpha(colors.card, 0.65),
             borderWidth: 1,
             borderColor: 'rgba(255, 255, 255, 0.12)',
           }}
@@ -776,7 +776,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
                 pressScale={0.995}
                 style={rowStyle(s, {
                   minHeight: s(48),
-                  backgroundColor: open ? 'rgba(9, 14, 22, 0.82)' : 'transparent',
+                  backgroundColor: open ? alpha(colors.bg, 0.82) : 'transparent',
                 })}
               >
                 <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(5) }}>
@@ -797,7 +797,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
                     paddingBottom: s(12),
                     paddingTop: s(4),
                     gap: s(8),
-                    backgroundColor: 'rgba(9, 14, 22, 0.82)',
+                    backgroundColor: alpha(colors.bg, 0.82),
                     borderTopWidth: StyleSheet.hairlineWidth,
                     borderTopColor: 'rgba(255, 255, 255, 0.08)',
                   }}
@@ -842,7 +842,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
               paddingHorizontal: s(14),
               paddingVertical: s(12),
               gap: s(8),
-              backgroundColor: 'rgba(9, 14, 22, 0.82)',
+              backgroundColor: alpha(colors.bg, 0.82),
               borderTopWidth: StyleSheet.hairlineWidth,
               borderTopColor: 'rgba(255, 255, 255, 0.08)',
             }}
@@ -957,6 +957,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
 // ---------------------------------------------------------------- âm thanh
 
 export function AudioPage({ input }: { input: InputSettingsState }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   const uiSounds = useUiSounds();
   const { settings, update } = input;

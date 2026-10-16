@@ -7,7 +7,7 @@ import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { openExternal } from '@/lib/open-external';
-import { colors, glass } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { GlassBackdrop } from './GlassMaterial';
 import { Press } from './Press';
 import { useUi } from './scale';
@@ -32,6 +32,8 @@ export function SidePanel({
   headerExtension?: ReactNode;
   children: ReactNode;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width: screenWidth, insets } = useUi();
   const { reduceMotion } = useMotion();
   const [enter] = useState(() => new Animated.Value(0));
@@ -136,6 +138,7 @@ export function SidePanel({
 
 /** Icon + câu thông báo ở giữa cho trạng thái rỗng / lỗi trong panel. */
 export function PanelMessage({ icon: Icon, message, hint }: { icon: LucideIcon; message: string; hint?: string }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   return (
     <View style={{ minHeight: s(200), alignItems: 'center', justifyContent: 'center', paddingHorizontal: s(20) }}>
@@ -161,6 +164,8 @@ export function PanelMessage({ icon: Icon, message, hint }: { icon: LucideIcon; 
 
 /** Nút viên thuốc mở một trang bên ngoài (Steam) phong cách Liquid Glass. */
 export function SteamLink({ href, children, style }: { href: string; children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   return (
     <Press
@@ -173,7 +178,7 @@ export function SteamLink({ href, children, style }: { href: string; children: R
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ glass }) => ({
   scrim: { backgroundColor: 'transparent' },
   panel: {
     position: 'absolute',
@@ -224,4 +229,4 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-});
+}));

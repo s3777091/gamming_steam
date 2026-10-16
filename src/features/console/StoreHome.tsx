@@ -7,8 +7,8 @@ import Svg, { Path } from 'react-native-svg';
 
 import { formatStorePrice } from '@/features/library/format';
 import type { SteamPromotion, SteamStoreItem, StoreResponse } from '@/features/library/types';
-import { colors } from '@/theme';
 import { nearbyBackdropUrls } from '@/lib/backdrop-preloader';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useBackdropPreload } from '@/ui/useBackdropPreload';
 import { useMotion } from '@/ui/motion';
@@ -44,16 +44,17 @@ function NotchFillet({ bottom, right }: { bottom: number; right: number }) {
 }
 
 function DiscountBadge({ percent, size = 9 }: { percent: number; size?: number }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   return (
     <View
       style={{
-        backgroundColor: 'rgba(38, 120, 255, 0.42)',
+        backgroundColor: alpha(colors.primary, 0.42),
         borderRadius: s(8),
         paddingHorizontal: s(7),
         paddingVertical: s(2.5),
         borderWidth: 1,
-        borderColor: 'rgba(140, 195, 255, 0.7)',
+        borderColor: alpha(colors.accentSoft, 0.7),
         shadowColor: colors.accent,
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.35,
@@ -67,6 +68,7 @@ function DiscountBadge({ percent, size = 9 }: { percent: number; size?: number }
 }
 
 const StorePreview = memo(function StorePreview({ item }: { item: SteamStoreItem }) {
+  const { colors } = useTheme();
   const { s, width } = useUi();
   const { reduceMotion } = useMotion();
   const [failedLogo, setFailedLogo] = useState<string | null>(null);
@@ -90,7 +92,7 @@ const StorePreview = memo(function StorePreview({ item }: { item: SteamStoreItem
         transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
       }}
     >
-      <T size={9.3} weight="semibold" color="#9ac5ff">Nổi bật trên Steam</T>
+      <T size={9.3} weight="semibold" color={colors.accentGlow}>Nổi bật trên Steam</T>
       {logo ? (
         <Img
           source={{ uri: logo.url }}
@@ -120,6 +122,8 @@ const ShelfCard = memo(function ShelfCard({ item, previewing, onPreview, onOpen 
   onPreview: (item: SteamStoreItem) => void;
   onOpen: (item: SteamStoreItem) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const preview = useCallback(() => onPreview(item), [item, onPreview]);
   const open = useCallback(() => onOpen(item), [item, onOpen]);
@@ -196,7 +200,7 @@ const ShelfCard = memo(function ShelfCard({ item, previewing, onPreview, onOpen 
             </>
           ) : (
             <>
-              <LinearGradient colors={['rgba(6,16,29,0)', 'rgba(6,16,29,0.88)']} style={StyleSheet.absoluteFill} />
+              <LinearGradient colors={[alpha(colors.panelSolid, 0), alpha(colors.panelSolid, 0.88)]} style={StyleSheet.absoluteFill} />
               <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: s(8), flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: s(8) }}>
                 <T size={9.3} weight="semibold" color="rgba(255,255,255,0.92)" numberOfLines={1} style={{ flex: 1 }}>{item.name}</T>
                 {item.discounted ? <DiscountBadge percent={item.discountPercent} size={8.3} /> : null}
@@ -220,11 +224,13 @@ const ShelfCard = memo(function ShelfCard({ item, previewing, onPreview, onOpen 
 });
 
 const PromotionTile = memo(function PromotionTile({ promotion, onOpen }: { promotion: SteamPromotion; onOpen: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   return (
     <Press onPress={onOpen} pressScale={0.99} accessibilityLabel={`Xem khuyến mãi ${promotion.name}`} style={[styles.tile, { flex: 1.25, borderRadius: s(12) }]}>
       <Img source={{ uri: promotion.image }} style={StyleSheet.absoluteFill} contentFit="cover" />
-      <LinearGradient colors={['rgba(6,16,29,0.94)', 'rgba(6,16,29,0.48)', 'rgba(6,16,29,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={[alpha(colors.panelSolid, 0.94), alpha(colors.panelSolid, 0.48), alpha(colors.panelSolid, 0)]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
       <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, maxWidth: '72%', justifyContent: 'center', padding: s(10) }}>
         <T size={10.2} weight="semibold" leading={1.15} numberOfLines={2}>{promotion.name}</T>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(4), marginTop: s(4) }}>
@@ -237,6 +243,8 @@ const PromotionTile = memo(function PromotionTile({ promotion, onOpen }: { promo
 });
 
 const QuickDealTile = memo(function QuickDealTile({ item, previewing, onPreview }: { item: SteamStoreItem; previewing: boolean; onPreview: (item: SteamStoreItem) => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const preview = useCallback(() => onPreview(item), [item, onPreview]);
   return (
@@ -245,13 +253,13 @@ const QuickDealTile = memo(function QuickDealTile({ item, previewing, onPreview 
       onFocused={preview}
       pressScale={0.99}
       accessibilityLabel={`Chọn ${item.name}`}
-      style={[styles.tile, { flex: 1, borderRadius: s(12), borderColor: previewing ? '#9ac5ff' : 'rgba(255,255,255,0.12)' }]}
+      style={[styles.tile, { flex: 1, borderRadius: s(12), borderColor: previewing ? colors.accentGlow : 'rgba(255,255,255,0.12)' }]}
     >
       <Img source={{ uri: item.largeImage }} style={StyleSheet.absoluteFill} contentFit="cover" />
-      <LinearGradient colors={['rgba(6,16,29,0.84)', 'rgba(6,16,29,0.24)', 'rgba(6,16,29,0)']} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={[alpha(colors.panelSolid, 0.84), alpha(colors.panelSolid, 0.24), alpha(colors.panelSolid, 0)]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
       <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, maxWidth: '72%', justifyContent: 'center', padding: s(10) }}>
         <T size={9.3} weight="semibold" color="rgba(255,255,255,0.92)" numberOfLines={1}>{item.name}</T>
-        <T size={8.6} weight="semibold" color={item.discounted ? '#9ac5ff' : 'rgba(255,255,255,0.78)'} style={{ marginTop: s(4) }}>
+        <T size={8.6} weight="semibold" color={item.discounted ? colors.accentGlow : 'rgba(255,255,255,0.78)'} style={{ marginTop: s(4) }}>
           {item.discounted ? `Giảm ${item.discountPercent}%` : formatStorePrice(item)}
         </T>
       </View>
@@ -330,11 +338,11 @@ export const StoreHome = memo(function StoreHome({ data, featured, preview, onPr
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   card: {
     overflow: 'hidden',
     borderWidth: 1,
-    backgroundColor: 'rgba(17, 24, 33, 0.85)',
+    backgroundColor: alpha(colors.card, 0.85),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.38,
@@ -345,7 +353,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(17, 24, 33, 0.82)',
+    backgroundColor: alpha(colors.card, 0.82),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
@@ -368,9 +376,9 @@ const styles = StyleSheet.create({
   saleBadge: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(38, 120, 255, 0.48)',
+    backgroundColor: alpha(colors.primary, 0.48),
     borderWidth: 1,
-    borderColor: 'rgba(140, 195, 255, 0.75)',
+    borderColor: alpha(colors.accentSoft, 0.75),
     shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.45,
@@ -404,4 +412,4 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 8,
   },
-});
+}));

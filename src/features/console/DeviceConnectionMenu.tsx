@@ -7,7 +7,7 @@ import { KIND_ICONS } from '@/features/devices/kindIcons';
 import { DEVICE_KIND_ORDER, KIND_LABEL, type LocalDevice } from '@/features/devices/useInputDevices';
 import { FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
-import { colors, glass } from '@/theme';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -24,8 +24,10 @@ export type DeviceConnectionMenuProps = {
 
 /** Thanh pin nhỏ: vỏ + phần ruột tô theo % và màu theo mức pin. */
 function BatteryGauge({ percent }: { percent: number }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
-  const color = batteryColor(percent);
+  const color = batteryColor(percent, colors);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(3) }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -52,6 +54,8 @@ function DeviceTile({
   autoFocus: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const Icon = KIND_ICONS[device.kind];
   const percent = device.kind === 'controller' && device.battery !== null ? batteryPercent(device.battery) : null;
@@ -71,8 +75,8 @@ function DeviceTile({
           height,
           borderRadius: s(13),
           gap: s(4),
-          backgroundColor: device.kind === 'controller' ? 'rgba(102, 168, 255, 0.14)' : 'rgba(255, 255, 255, 0.08)',
-          borderColor: device.kind === 'controller' ? 'rgba(102, 168, 255, 0.32)' : 'rgba(255, 255, 255, 0.16)',
+          backgroundColor: device.kind === 'controller' ? alpha(colors.accent, 0.14) : 'rgba(255, 255, 255, 0.08)',
+          borderColor: device.kind === 'controller' ? alpha(colors.accent, 0.32) : 'rgba(255, 255, 255, 0.16)',
         },
       ]}
     >
@@ -115,6 +119,8 @@ function getMenuDimensions(count: number, s: (v: number) => number) {
  * - Mỗi thiết bị là một icon; tay cầm kèm thanh pin + % hiện tại.
  */
 export function DeviceConnectionMenu({ open, anchorRef, devices, onClose, onOpenSettings }: DeviceConnectionMenuProps) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width: screenWidth, insets } = useUi();
   const [anim] = useState(() => new Animated.Value(0));
   const closingRef = useRef(false);
@@ -273,7 +279,7 @@ export function DeviceConnectionMenu({ open, anchorRef, devices, onClose, onOpen
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ glass }) => ({
   glassCard: {
     position: 'absolute',
     overflow: 'hidden',
@@ -324,4 +330,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-});
+}));

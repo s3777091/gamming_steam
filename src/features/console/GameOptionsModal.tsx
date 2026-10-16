@@ -8,7 +8,7 @@ import { isSteamAppId } from '@/features/library/format';
 import type { LibraryPanel, PcGame } from '@/features/library/types';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { openExternal } from '@/lib/open-external';
-import { colors, glass } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
@@ -40,6 +40,7 @@ function ActionItem({
   disabled?: boolean;
   autoFocus?: boolean;
 }) {
+  const { glass } = useTheme();
   const { s } = useUi();
   const tint = danger ? '#f87171' : iconColor || 'rgba(255,255,255,0.92)';
 
@@ -116,6 +117,8 @@ export function GameOptionsModal({
   onOpenPanel,
   onUninstall,
 }: GameOptionsModalProps) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width, height, insets } = useUi();
   const [enter] = useState(() => new Animated.Value(0));
   const closingRef = useRef(false);
@@ -253,7 +256,7 @@ export function GameOptionsModal({
             {game.steamAppId ? (
               <ActionItem
                 icon={Newspaper}
-                iconColor="#60a5fa"
+                iconColor={colors.accent}
                 label="Cập nhật & bản sửa lỗi"
                 onPress={() => choose('news')}
               />
@@ -296,7 +299,7 @@ export function GameOptionsModal({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ glass }) => ({
   layer: {
     zIndex: 70,
     elevation: 70,
@@ -342,4 +345,4 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
     backgroundColor: glass.border,
   },
-});
+}));

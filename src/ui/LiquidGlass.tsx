@@ -10,7 +10,7 @@ import {
 import { BlurView, type BlurViewProps } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { glass } from '@/theme';
+import { alpha, useTheme } from '@/theme';
 
 export interface LiquidGlassProps extends ViewProps {
   children?: ReactNode;
@@ -50,7 +50,7 @@ export const LiquidGlass = forwardRef<View, LiquidGlassProps>(function LiquidGla
     tint = 'dark',
     radius = 16,
     specular = true,
-    glassBg = glass.surface,
+    glassBg,
     sheen = true,
     accentRim = false,
     elevated = true,
@@ -59,6 +59,7 @@ export const LiquidGlass = forwardRef<View, LiquidGlassProps>(function LiquidGla
   },
   ref,
 ) {
+  const { glass, colors } = useTheme();
   const specularAlpha = typeof specular === 'number' ? specular : specular ? 1 : 0;
 
   return (
@@ -69,8 +70,8 @@ export const LiquidGlass = forwardRef<View, LiquidGlassProps>(function LiquidGla
         styles.container,
         {
           borderRadius: radius,
-          backgroundColor: glassBg,
-          borderColor: accentRim ? 'rgba(102, 168, 255, 0.38)' : glass.borderSubtle,
+          backgroundColor: glassBg ?? glass.surface,
+          borderColor: accentRim ? alpha(colors.accent, 0.38) : glass.borderSubtle,
         },
         elevated && styles.elevated,
         style,
@@ -139,13 +140,14 @@ export function LiquidAmbientAurora({
   active?: boolean;
   opacity?: number;
 }) {
+  const { colors } = useTheme();
   if (!active) return null;
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {/* Orb 1: Electric Azure Glow (Góc trên trái) */}
       <LinearGradient
-        colors={['rgba(31, 111, 235, 0.42)', 'rgba(31, 111, 235, 0.1)', 'transparent']}
+        colors={[alpha(colors.primary, 0.42), alpha(colors.primary, 0.1), 'transparent']}
         start={{ x: 0, y: 0 }}
         end={{ x: 0.6, y: 0.6 }}
         style={[

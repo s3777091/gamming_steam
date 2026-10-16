@@ -11,7 +11,7 @@ import { useBack } from '@/features/gamepad/hooks';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { openExternal } from '@/lib/open-external';
 import { type GameDownload, formatBytes, formatEta, formatSpeed } from '@/lib/steam-downloads';
-import { colors } from '@/theme';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -22,7 +22,7 @@ export function downloadInProgress(download: GameDownload | null): boolean {
 }
 
 /** Vòng tiến trình vẽ quanh nút tròn; percent null = chưa biết (vòng mờ). */
-export function ProgressRing({ size, percent, color = colors.white }: { size: number; percent: number | null; color?: string }) {
+export function ProgressRing({ size, percent, color = '#ffffff' }: { size: number; percent: number | null; color?: string }) {
   const stroke = Math.max(2, size * 0.07);
   const radius = (size - stroke) / 2;
   const length = 2 * Math.PI * radius;
@@ -53,6 +53,8 @@ export function DownloadStatusLine({ download, canControl, onOpenEula }: {
   canControl: boolean;
   onOpenEula: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const failed = download.status === 'failed' || download.status === 'cancelled' || download.status === 'manual';
   const parts = [download.label];
@@ -102,13 +104,15 @@ export function EulaSheet({ download, onAnswer, onClose }: {
   onAnswer: (accept: boolean) => void;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width } = useUi();
   useBack(() => { onClose(); });
   const eulas = download.eulas ?? [];
   return (
     <FocusLayer>
       <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', zIndex: 70, elevation: 70 }]}>
-        <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.74)' }]} onPress={() => { playUiSound('back'); onClose(); }} />
+        <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: alpha(colors.bgDeep, 0.74) }]} onPress={() => { playUiSound('back'); onClose(); }} />
         <View style={[styles.card, { width: Math.min(s(440), width - s(48)), borderRadius: s(22), padding: s(22) }]}>
           <Press onPress={onClose} sound="back" accessibilityLabel="Đóng" style={[styles.close, { top: s(10), right: s(10), width: s(30), height: s(30), borderRadius: s(15) }]}>
             <X size={s(14)} color={colors.text3} />
@@ -139,7 +143,7 @@ export function EulaSheet({ download, onAnswer, onClose }: {
               <T size={11.6} weight="semibold" color={colors.text2}>Huỷ cài đặt</T>
             </Press>
             <Press onPress={() => onAnswer(true)} sound="confirm" autoFocus style={[styles.primary, { height: s(38), paddingHorizontal: s(18), borderRadius: s(19) }]}>
-              <T size={11.6} weight="semibold" color="#0a111c">Đồng ý & tải</T>
+              <T size={11.6} weight="semibold" color={colors.panelSolid}>Đồng ý & tải</T>
             </Press>
           </View>
         </View>
@@ -148,12 +152,12 @@ export function EulaSheet({ download, onAnswer, onClose }: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   track: { width: '100%', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.14)' },
-  card: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', backgroundColor: '#0d1520' },
+  card: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)', backgroundColor: colors.panel },
   close: { position: 'absolute', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.07)' },
   eulaRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.line, backgroundColor: colors.fillSoft },
   eulaButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.accent },
   secondary: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong },
   primary: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.white },
-});
+}));

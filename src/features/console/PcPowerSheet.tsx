@@ -12,7 +12,7 @@ import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { useDeviceStatus } from '@/features/devices/useDeviceStatus';
 import { apiFetch } from '@/lib/api';
 import { friendlyMessage } from '@/lib/friendly';
-import { colors, glass } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -24,6 +24,8 @@ const WAKE_TIMEOUT_MS = 10 * 60_000;
 type Phase = 'idle' | 'sending' | 'waiting' | 'ready' | 'failed';
 
 export function PcPowerSheet({ onClose, onReady }: { onClose: () => void; onReady: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width } = useUi();
   const status = useDeviceStatus();
   const [phase, setPhase] = useState<Phase>('idle');
@@ -114,7 +116,7 @@ export function PcPowerSheet({ onClose, onReady }: { onClose: () => void; onRead
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, glass }) => ({
   card: {
     overflow: 'hidden',
     borderWidth: 1,
@@ -156,4 +158,4 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 2 },
   },
-});
+}));

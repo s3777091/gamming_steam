@@ -10,7 +10,7 @@ import { FocusLayer, FocusScroll } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { type GameDownload, type InstallFolder, formatBytes } from '@/lib/steam-downloads';
-import { colors, glass } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
@@ -24,6 +24,8 @@ function fits(folder: InstallFolder, requiredBytes: number): boolean {
 }
 
 function Checkbox({ checked, label, onChange }: { checked: boolean; label: string; onChange: (value: boolean) => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   return (
     <Press
@@ -49,6 +51,8 @@ function FolderRow({ folder, requiredBytes, selected, locked, onSelect }: {
   locked: boolean;
   onSelect: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const enough = fits(folder, requiredBytes);
   return (
@@ -90,6 +94,8 @@ export function InstallConfigSheet({ download, imageUrl, notice, onAnswer, onClo
   onAnswer: (answer: ConfigAnswer) => void;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width, height } = useUi();
   useBack(() => { onClose(); });
   const config = download.config;
@@ -156,7 +162,7 @@ export function InstallConfigSheet({ download, imageUrl, notice, onAnswer, onClo
               sound="confirm"
               style={[styles.primary, { height: s(38), paddingHorizontal: s(22), borderRadius: s(19) }, !canInstall && { opacity: 0.45 }]}
             >
-              <T size={11.6} weight="semibold" color="#0a111c">Cài đặt</T>
+              <T size={11.6} weight="semibold" color={colors.panelSolid}>Cài đặt</T>
             </Press>
           </View>
         </View>
@@ -165,7 +171,7 @@ export function InstallConfigSheet({ download, imageUrl, notice, onAnswer, onClo
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, glass }) => ({
   card: {
     overflow: 'hidden',
     borderWidth: 1,
@@ -213,7 +219,7 @@ const styles = StyleSheet.create({
   folderOn: {
     borderColor: 'rgba(255, 255, 255, 0.45)',
     backgroundColor: colors.accent,
-    shadowColor: '#66a8ff',
+    shadowColor: colors.accent,
     shadowOpacity: 0.35,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
@@ -236,4 +242,4 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 2 },
   },
-});
+}));

@@ -19,14 +19,13 @@ import { openExternal } from '@/lib/open-external';
 import {
   type PurchaseOffer, type PurchasePhase, type PurchaseState, type PurchaseTarget, purchaseKind, purchaseSavings, steamWebUrl,
 } from '@/lib/steam-purchase';
-import { colors, glass } from '@/theme';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
-const CARD_BG = '#0d1520';
 const STEPS = ['Mở Steam trên máy tính', 'Thanh toán trên Steam', 'Tải về máy'] as const;
 
 function money(offer: PurchaseOffer, amount: number | null): string {
@@ -58,6 +57,8 @@ function stepIndex(state: PurchaseState): number {
 }
 
 function Stepper({ state }: { state: PurchaseState }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const current = stepIndex(state);
   const waiting = state.phase === 'opening' || state.phase === 'checkout';
@@ -100,6 +101,7 @@ function Stepper({ state }: { state: PurchaseState }) {
 }
 
 function PriceBlock({ offer }: { offer: PurchaseOffer }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const kind = purchaseKind(offer);
   const saved = purchaseSavings(offer);
@@ -126,7 +128,7 @@ function PriceBlock({ offer }: { offer: PurchaseOffer }) {
               paddingVertical: s(2),
               borderWidth: StyleSheet.hairlineWidth,
               borderColor: 'rgba(255,255,255,0.4)',
-              shadowColor: '#66a8ff',
+              shadowColor: colors.accent,
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.5,
               shadowRadius: 6,
@@ -173,11 +175,13 @@ function Button({
   errorGlowAnim?: Animated.Value;
   scaleAnim?: Animated.Value;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const isPrimary = variant === 'primary';
   const isSuccess = variant === 'success';
 
-  const textColor = isSuccess ? '#ffffff' : isPrimary ? '#0a111c' : colors.text;
+  const textColor = isSuccess ? '#ffffff' : isPrimary ? colors.panelSolid : colors.text;
 
   const content = (
     <Press
@@ -226,7 +230,7 @@ function Button({
         />
       ) : null}
       {busy ? (
-        <ActivityIndicator size="small" color={isSuccess ? '#ffffff' : isPrimary ? '#0a111c' : colors.text2} />
+        <ActivityIndicator size="small" color={isSuccess ? '#ffffff' : isPrimary ? colors.panelSolid : colors.text2} />
       ) : (
         icon
       )}
@@ -261,12 +265,13 @@ function Button({
 
 /** Ô trạng thái giữa bảng: đang chờ, lỗi, đã mua. */
 function StatusPanel({ tone, icon, title, body }: { tone: 'wait' | 'error' | 'success'; icon: ReactNode; title: string; body: string }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const palette = tone === 'error'
     ? { border: 'rgba(248,113,113,0.28)', bg: 'rgba(127,29,29,0.28)' }
     : tone === 'success'
       ? { border: 'rgba(74,222,128,0.26)', bg: 'rgba(20,83,45,0.3)' }
-      : { border: 'rgba(102,168,255,0.26)', bg: 'rgba(31,111,235,0.12)' };
+      : { border: alpha(colors.accent, 0.26), bg: alpha(colors.primary, 0.12) };
   return (
     <View style={{ flexDirection: 'row', gap: s(12), padding: s(12), borderRadius: s(14), borderWidth: 1, borderColor: palette.border, backgroundColor: palette.bg }}>
       <View style={{ width: s(28), alignItems: 'center', paddingTop: s(1) }}>{icon}</View>
@@ -279,6 +284,7 @@ function StatusPanel({ tone, icon, title, body }: { tone: 'wait' | 'error' | 'su
 }
 
 function SuccessMark() {
+  const { colors } = useTheme();
   const { s } = useUi();
   const pop = useState(() => new Animated.Value(0))[0];
   useEffect(() => {
@@ -292,6 +298,7 @@ function SuccessMark() {
 }
 
 function WaitingMark() {
+  const { colors } = useTheme();
   const { s } = useUi();
   const pulse = usePulse(true);
   return (
@@ -317,6 +324,8 @@ export function PurchaseSheet({
   onBack: () => void;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width, height } = useUi();
   const { offer, phase } = state;
   const kind = purchaseKind(offer);
@@ -462,7 +471,7 @@ export function PurchaseSheet({
             autoFocus
             sound="confirm"
             label={phase === 'opening' ? 'Đang mở Steam…' : kind === 'unavailable' ? 'Chưa mở bán' : checkoutLabel}
-            icon={<Lock size={s(14)} color="#0a111c" strokeWidth={2.4} />}
+            icon={<Lock size={s(14)} color={colors.panelSolid} strokeWidth={2.4} />}
             busy={phase === 'opening'}
             disabled={kind === 'unavailable'}
             onPress={() => onCheckout('store')}
@@ -484,7 +493,7 @@ export function PurchaseSheet({
       actions = (
         <>
           <Button flex={1} variant="secondary" label="Ẩn" onPress={onClose} sound="back" />
-          <Button flex={1.4} variant="primary" autoFocus label="Mở màn hình máy tính" icon={<MonitorPlay size={s(15)} color="#0a111c" strokeWidth={2.2} />} onPress={onOpenStream} />
+          <Button flex={1.4} variant="primary" autoFocus label="Mở màn hình máy tính" icon={<MonitorPlay size={s(15)} color={colors.panelSolid} strokeWidth={2.2} />} onPress={onOpenStream} />
         </>
       );
       break;
@@ -501,7 +510,7 @@ export function PurchaseSheet({
         <>
           <Button flex={1} variant="secondary" label="Quay lại" onPress={onBack} sound="back" />
           <Button flex={1.3} variant="secondary" label="Màn hình máy tính" icon={<MonitorPlay size={s(15)} color={colors.text2} strokeWidth={2} />} onPress={onOpenStream} />
-          <Button flex={1.2} variant="primary" autoFocus label="Kiểm tra lại" icon={<RefreshCw size={s(14)} color="#0a111c" strokeWidth={2.4} />} onPress={onRecheck} />
+          <Button flex={1.2} variant="primary" autoFocus label="Kiểm tra lại" icon={<RefreshCw size={s(14)} color={colors.panelSolid} strokeWidth={2.4} />} onPress={onRecheck} />
         </>
       );
       break;
@@ -531,7 +540,7 @@ export function PurchaseSheet({
             errorGlowAnim={errorGlowAnim}
             label={retrying ? 'Đang thử lại…' : 'Thử lại'}
             busy={retrying}
-            icon={retrying ? undefined : <RefreshCw size={s(14)} color="#0a111c" strokeWidth={2.4} />}
+            icon={retrying ? undefined : <RefreshCw size={s(14)} color={colors.panelSolid} strokeWidth={2.4} />}
             onPress={handleRetry}
           />
         </>
@@ -615,8 +624,8 @@ export function PurchaseSheet({
                   }}
                 />
               ) : null}
-              <LinearGradient colors={['rgba(13,21,32,0)', 'rgba(13,21,32,0.15)', CARD_BG]} locations={[0, 0.6, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-              <LinearGradient colors={['rgba(13,21,32,0)', 'rgba(13,21,32,0.85)']} locations={[0.55, 1]} style={StyleSheet.absoluteFill} />
+              <LinearGradient colors={[alpha(colors.panel, 0), alpha(colors.panel, 0.15), colors.panel]} locations={[0, 0.6, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+              <LinearGradient colors={[alpha(colors.panel, 0), alpha(colors.panel, 0.85)]} locations={[0.55, 1]} style={StyleSheet.absoluteFill} />
               <View style={[styles.steamTag, { left: s(12), bottom: s(12), paddingHorizontal: s(8), paddingVertical: s(4), borderRadius: s(8), gap: s(5) }]}>
                 <ShieldCheck size={s(11)} color={colors.text2} strokeWidth={2.2} />
                 <T size={8.8} weight="semibold" color={colors.text2} tracking={0.04}>STEAM</T>
@@ -647,7 +656,7 @@ export function PurchaseSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, glass }) => ({
   card: {
     flexDirection: 'row',
     overflow: 'hidden',
@@ -667,8 +676,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: glass.controlBorder,
   },
-  dot: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, backgroundColor: CARD_BG },
-  steamTag: { position: 'absolute', flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(5,8,13,0.62)', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
+  dot: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, backgroundColor: colors.panel },
+  steamTag: { position: 'absolute', flexDirection: 'row', alignItems: 'center', backgroundColor: alpha(colors.bgDeep, 0.62), borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
   buttonBase: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -699,4 +708,4 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-});
+}));

@@ -1,6 +1,6 @@
 // Hiển thị pin tay cầm: header kệ game và menu thiết bị dùng chung một cách làm tròn + màu.
 
-import { colors } from '@/theme';
+import type { Palette } from '@/theme';
 
 import type { LocalDevice } from './useInputDevices';
 
@@ -10,7 +10,7 @@ export function batteryPercent(value: number): number {
 }
 
 /** Màu theo mức pin: đỏ khi sắp hết, vàng khi thấp, trắng khi còn nhiều. */
-export function batteryColor(percent: number): string {
+export function batteryColor(percent: number, colors: Pick<Palette, 'danger' | 'warning' | 'text'>): string {
   if (percent <= 15) return colors.danger;
   if (percent <= 35) return colors.warning;
   return colors.text;

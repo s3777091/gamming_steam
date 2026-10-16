@@ -2,11 +2,11 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { Animated, Easing } from 'react-native';
 import { RefreshCw } from 'lucide-react-native';
 
+import { useTheme } from '@/theme';
 import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 
-import { appleColors } from './controls';
 import type { Notify } from './useStreamSettingsDraft';
 
 type RestoreOptions = {
@@ -48,6 +48,7 @@ export function useSettingsRestore(
 }
 
 export function SettingsRestoreButton({ action, notify }: { action: SettingsRestoreAction; notify: Notify }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   const { reduceMotion } = useMotion();
   const [enter] = useState(() => new Animated.Value(reduceMotion ? 1 : 0));

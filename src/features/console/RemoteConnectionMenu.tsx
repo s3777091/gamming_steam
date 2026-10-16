@@ -5,7 +5,7 @@ import { Moon, Play, Power, RotateCw } from 'lucide-react-native';
 import { FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
-import { colors, glass } from '@/theme';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -44,6 +44,8 @@ export function RemoteConnectionMenu({
   onSleep,
   onWake,
 }: RemoteConnectionMenuProps) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width: screenWidth, insets } = useUi();
   const [anim] = useState(() => new Animated.Value(0));
   const closingRef = useRef(false);
@@ -256,8 +258,8 @@ export function RemoteConnectionMenu({
                 {
                   height: s(36),
                   borderRadius: s(11),
-                  backgroundColor: 'rgba(102, 168, 255, 0.16)',
-                  borderColor: 'rgba(102, 168, 255, 0.35)',
+                  backgroundColor: alpha(colors.accent, 0.16),
+                  borderColor: alpha(colors.accent, 0.35),
                 },
               ]}
               accessibilityLabel="Stream phát PC"
@@ -339,7 +341,7 @@ export function RemoteConnectionMenu({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ glass }) => ({
   glassCard: {
     position: 'absolute',
     overflow: 'hidden',
@@ -382,4 +384,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
-});
+}));

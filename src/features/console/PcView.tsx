@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Monitor, Play } from 'lucide-react-native';
 
 import { FocusScroll } from '@/features/gamepad/focus';
-import { colors, glass } from '@/theme';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -23,6 +23,8 @@ export const PcView = memo(function PcView({ reachable, refreshing, error, onCon
   error: string | null;
   onConnect: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width } = useUi();
   const [enter] = useState(() => new Animated.Value(0));
   useEffect(() => {
@@ -81,14 +83,14 @@ export const PcView = memo(function PcView({ reachable, refreshing, error, onCon
         <Press onPress={onConnect} focusRadius={s(20)} focusVariant="glassCard" pressScale={0.98} accessibilityLabel="Jetson PC">
           <View style={[styles.card, { width: s(CARD.w), height: s(CARD.h), borderRadius: s(20) }]}>
             <LinearGradient
-              colors={['#0a4fb8', '#06265f', '#020b24']}
+              colors={[colors.primaryDeep, colors.primaryDark, colors.primaryNight]}
               start={{ x: 1, y: 0 }}
               end={{ x: 0, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
             {/* Lớp phản quang khúc xạ ánh sáng đa góc Liquid Glass */}
             <LinearGradient
-              colors={['rgba(255,255,255,0.22)', 'rgba(7,16,28,0)', 'rgba(7,16,28,0.6)']}
+              colors={['rgba(255,255,255,0.22)', alpha(colors.panelSolid, 0), alpha(colors.panelSolid, 0.6)]}
               locations={[0, 0.35, 1]}
               style={StyleSheet.absoluteFill}
             />
@@ -112,14 +114,14 @@ export const PcView = memo(function PcView({ reachable, refreshing, error, onCon
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ glass, colors }) => ({
   play: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1a6ae8',
+    backgroundColor: colors.primary,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.48)',
-    shadowColor: '#2b7fff',
+    shadowColor: colors.primaryHover,
     shadowOpacity: 0.55,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 8 },
@@ -129,8 +131,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: glass.cardBorderActive,
-    backgroundColor: 'rgba(17, 24, 33, 0.85)',
-    shadowColor: '#0a4fb8',
+    backgroundColor: alpha(colors.card, 0.85),
+    shadowColor: colors.primaryDeep,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.45,
     shadowRadius: 20,
@@ -148,7 +150,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.25)',
-    backgroundColor: 'rgba(10,17,28,0.65)',
+    backgroundColor: alpha(colors.panelSolid, 0.65),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -165,4 +167,4 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-});
+}));

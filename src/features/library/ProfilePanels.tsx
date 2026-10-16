@@ -4,7 +4,7 @@ import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import { Clock3, Gamepad2, LockKeyhole, Play, Trophy, Users, X, ArrowUpRight } from 'lucide-react-native';
 
 import { openExternal } from '@/lib/open-external';
-import { colors } from '@/theme';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
@@ -26,6 +26,8 @@ const COUNTRY_NAMES: Record<string, string> = {
 };
 
 function ProfileIdentity({ profile }: { profile: SteamUserDetails }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const status = profile.gameExtraInfo
     ? `Đang chơi ${profile.gameExtraInfo}`
@@ -65,6 +67,8 @@ function ProfileIdentity({ profile }: { profile: SteamUserDetails }) {
 }
 
 function AchievementCard({ achievement }: { achievement: ProfileAchievement }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   return (
     <View style={[styles.activityCard, { width: s(172), padding: s(10), gap: s(10), borderRadius: s(16) }]}>
@@ -84,6 +88,8 @@ function AchievementCard({ achievement }: { achievement: ProfileAchievement }) {
 }
 
 function RecentActivity({ profile, state }: { profile: SteamUserDetails; state: SteamProfileState }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const { achievements, achievementsLoading, achievementsError } = state;
   const playing = profile.gameExtraInfo;
@@ -136,6 +142,8 @@ function RecentActivity({ profile, state }: { profile: SteamUserDetails; state: 
 }
 
 function ProfileStats({ profile }: { profile: SteamUserDetails }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const stats = [
     { label: 'Số game', value: profile.ownedGames !== null ? formatNumber(profile.ownedGames) : null, icon: Gamepad2 },
@@ -170,6 +178,7 @@ export function SteamProfilePanel({
   fallbackProfile?: SteamProfile | null;
   onClose: () => void;
 }) {
+  const styles = useStyles();
   const { s } = useUi();
   const profile = state.details;
   const displayProfile: SteamUserDetails | null = profile ?? (fallbackProfile ? {
@@ -238,6 +247,8 @@ export function SteamProfilePanel({
 // ---------------------------------------------------------------- khuyến mãi
 
 function DiscountedGameRow({ item, onOpen }: { item: SteamStoreItem; onOpen: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   return (
     <Press onPress={onOpen} pressScale={0.99} style={[styles.activityCard, { flex: 1, padding: s(8), gap: s(10), borderRadius: s(12) }]}>
@@ -266,6 +277,8 @@ export function PromotionPanel({ promotion, specials, onOpenGame, onClose }: {
   onOpenGame: (item: SteamStoreItem) => void;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width, height, insets } = useUi();
   useBack(() => { onClose(); });
   const [enter] = useState(() => new Animated.Value(0));
@@ -284,7 +297,7 @@ export function PromotionPanel({ promotion, specials, onOpenGame, onClose }: {
   return (
     <FocusLayer>
     <View style={[StyleSheet.absoluteFill, { zIndex: 50, elevation: 50 }]}>
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,12,18,0.76)', opacity: enter }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: alpha(colors.bg, 0.76), opacity: enter }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={() => { playUiSound('back'); onClose(); }} accessibilityLabel="Đóng" />
       </Animated.View>
       <Animated.View
@@ -300,7 +313,7 @@ export function PromotionPanel({ promotion, specials, onOpenGame, onClose }: {
       >
         <View style={{ height: Math.max(s(120), height * 0.33), backgroundColor: colors.card }}>
           <Img source={{ uri: promotion.image }} style={StyleSheet.absoluteFill} contentFit="cover" />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(7,16,28,0.5)' }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: alpha(colors.panelSolid, 0.5) }]} />
           <View style={{ position: 'absolute', left: s(16), right: s(56), bottom: s(14) }}>
             <T size={9.5} weight="semibold" color="#8bbdff">Khuyến mãi Steam</T>
             <T size={22} weight="semibold" tracking={-0.035} leading={1.1} numberOfLines={2} style={{ marginTop: s(4) }}>{promotion.name}</T>
@@ -338,7 +351,7 @@ export function PromotionPanel({ promotion, specials, onOpenGame, onClose }: {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   avatar: {
     flex: 1,
     alignItems: 'center',
@@ -355,7 +368,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.4)',
-    shadowColor: '#66a8ff',
+    shadowColor: colors.accent,
     shadowOpacity: 0.35,
     shadowRadius: 6,
     elevation: 3,
@@ -371,9 +384,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(102,168,255,0.35)',
-    backgroundColor: 'rgba(102,168,255,0.12)',
-    shadowColor: '#66a8ff',
+    borderColor: alpha(colors.accent, 0.35),
+    backgroundColor: alpha(colors.accent, 0.12),
+    shadowColor: colors.accent,
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 2,
@@ -410,7 +423,7 @@ const styles = StyleSheet.create({
     top: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(10,18,30,0.92)',
+    backgroundColor: alpha(colors.panelSolid, 0.92),
     borderLeftWidth: 1,
     borderLeftColor: 'rgba(255,255,255,0.14)',
   },
@@ -429,4 +442,4 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.16)',
     backgroundColor: 'rgba(255,255,255,0.08)',
   },
-});
+}));

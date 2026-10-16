@@ -13,7 +13,7 @@ import {
   formatSpeed,
   isDownloadActive,
 } from '@/lib/steam-downloads';
-import { colors } from '@/theme';
+import { alpha, makeStyles, useTheme, type Palette } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -23,12 +23,12 @@ export type DownloadItem = { download: GameDownload; imageUrl: string | null };
 
 const BAD = new Set(['failed', 'cancelled', 'manual']);
 
-function tone(download: GameDownload): { text: string; bar: string; badge: string } {
+function tone(download: GameDownload, colors: Palette): { text: string; bar: string; badge: string } {
   if (download.status === 'installed') return { text: colors.success, bar: colors.success, badge: 'rgba(74,222,128,0.16)' };
   if (BAD.has(download.status)) return { text: '#fecaca', bar: colors.danger, badge: 'rgba(248,113,113,0.16)' };
   if (download.status === 'config' || download.status === 'eula') return { text: colors.warning, bar: colors.warning, badge: 'rgba(251,191,36,0.16)' };
   if (download.status === 'paused') return { text: colors.text3, bar: colors.text3, badge: 'rgba(255,255,255,0.08)' };
-  return { text: colors.accent, bar: colors.accent, badge: 'rgba(102,168,255,0.16)' };
+  return { text: colors.accent, bar: colors.accent, badge: alpha(colors.accent, 0.16) };
 }
 
 function meta(download: GameDownload): string {
@@ -52,10 +52,12 @@ export function DownloadNotificationCard({ item, canControl, onPause, onResume, 
   onResume: (appid: number) => void;
   onOpenPrompt: (appid: number) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   const { s } = useUi();
   const { download, imageUrl } = item;
-  const colorsFor = tone(download);
+  const colorsFor = tone(download, colors);
   const asking = download.status === 'config' || download.status === 'eula';
   const running = download.status === 'downloading';
   const StatusIcon = download.status === 'installed' ? CircleCheck
@@ -137,13 +139,13 @@ export function DownloadNotificationCard({ item, canControl, onPause, onResume, 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   card: {
     overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(102,168,255,0.3)',
+    borderColor: alpha(colors.accent, 0.3),
     backgroundColor: 'rgba(10,20,35,0.7)',
     shadowColor: '#000',
     shadowOpacity: 0.25,
@@ -176,9 +178,9 @@ const styles = StyleSheet.create({
   actionPrimary: {
     borderColor: 'rgba(255,255,255,0.4)',
     backgroundColor: colors.accent,
-    shadowColor: '#66a8ff',
+    shadowColor: colors.accent,
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 3,
   },
-});
+}));

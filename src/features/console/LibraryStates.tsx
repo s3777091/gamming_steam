@@ -3,8 +3,8 @@ import { Animated, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Gamepad2, Monitor, RefreshCw, WifiOff } from 'lucide-react-native';
 
-import { colors } from '@/theme';
 import { failBackdrop, finishBackdrop, requestBackdrop } from '@/lib/backdrop-state';
+import { alpha, ThemeDecor, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useMotion } from '@/ui/motion';
 import { LiquidAmbientAurora } from '@/ui/LiquidGlass';
@@ -149,6 +149,7 @@ function BackdropImage({ url, fallbackUrl, store }: BackdropProps) {
 
 /** Ảnh nền toàn màn hình theo tab đang mở, kết hợp Aurora chất lỏng phát quang và lớp làm tối dịu mắt. */
 export const LibraryBackdrop = memo(function LibraryBackdrop({ url, fallbackUrl, store }: BackdropProps) {
+  const { colors, glass } = useTheme();
   const { reduceMotion } = useMotion();
   const [storeAnim] = useState(() => new Animated.Value(store ? 1 : 0));
 
@@ -182,13 +183,13 @@ export const LibraryBackdrop = memo(function LibraryBackdrop({ url, fallbackUrl,
         ]}
       >
         <LinearGradient
-          colors={['rgba(5,10,17,0.60)', 'rgba(5,10,17,0.25)', 'transparent', 'rgba(5,10,17,0.18)']}
+          colors={[alpha(colors.bg, 0.60), alpha(colors.bg, 0.25), 'transparent', alpha(colors.bg, 0.18)]}
           locations={[0, 0.38, 0.73, 1]}
           start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
           style={StyleSheet.absoluteFill}
         />
         <LinearGradient
-          colors={['rgba(5,10,17,0.25)', 'transparent', 'rgba(5,10,17,0.08)', 'rgba(5,10,17,0.70)']}
+          colors={[alpha(colors.bg, 0.25), 'transparent', alpha(colors.bg, 0.08), alpha(colors.bg, 0.70)]}
           locations={[0, 0.28, 0.48, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -206,17 +207,28 @@ export const LibraryBackdrop = memo(function LibraryBackdrop({ url, fallbackUrl,
         ]}
       >
         <LinearGradient
-          colors={['rgba(8,12,18,0.62)', 'rgba(8,12,18,0.28)', 'rgba(8,12,18,0.04)', 'rgba(8,12,18,0.22)']}
+          colors={[alpha(colors.bg, 0.62), alpha(colors.bg, 0.28), alpha(colors.bg, 0.04), alpha(colors.bg, 0.22)]}
           locations={[0, 0.47, 0.76, 1]}
           start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
           style={StyleSheet.absoluteFill}
         />
         <LinearGradient
-          colors={['rgba(8,12,18,0.32)', 'rgba(8,12,18,0.02)', 'rgba(8,12,18,0.60)']}
+          colors={[alpha(colors.bg, 0.32), alpha(colors.bg, 0.02), alpha(colors.bg, 0.60)]}
           locations={[0, 0.33, 1]}
           style={StyleSheet.absoluteFill}
         />
       </Animated.View>
+
+      {/* 3. Ánh màu của theme phủ lên ảnh nền (trong suốt ở theme Console) */}
+      <LinearGradient
+        colors={[glass.backdropTint, 'transparent']}
+        start={{ x: 0, y: 1 }}
+        end={{ x: 0.85, y: 0.1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* 4. Không khí và hạt trôi của theme, nằm sau toàn bộ giao diện */}
+      <ThemeDecor />
     </View>
   );
 });
@@ -226,6 +238,7 @@ export const LibraryBackdrop = memo(function LibraryBackdrop({ url, fallbackUrl,
  * Phủ kín trên ảnh game và mờ dần vào/ra khi đổi tab.
  */
 export const PcWallpaper = memo(function PcWallpaper({ visible }: { visible: boolean }) {
+  const { colors } = useTheme();
   const { width, height } = useUi();
   const { reduceMotion } = useMotion();
   const [anim] = useState(() => new Animated.Value(visible ? 1 : 0));
@@ -264,15 +277,15 @@ export const PcWallpaper = memo(function PcWallpaper({ visible }: { visible: boo
   return (
     <Animated.View style={[StyleSheet.absoluteFill, { opacity: anim }]} pointerEvents="none">
       <LinearGradient
-        colors={['#020b24', '#06265f', '#0a4fb8']}
+        colors={[colors.primaryNight, colors.primaryDark, colors.primaryDeep]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      {petal(width * 0.62, width * 0.44, -height * 0.18, '-24deg', ['rgba(0,120,255,0.85)', 'rgba(0,70,190,0.15)'])}
-      {petal(width * 0.5, width * 0.6, height * 0.12, '38deg', ['rgba(120,200,255,0.9)', 'rgba(20,110,235,0.2)'])}
-      {petal(width * 0.46, width * 0.3, height * 0.34, '-52deg', ['rgba(0,90,230,0.8)', 'rgba(0,40,130,0.1)'])}
-      {petal(width * 0.34, width * 0.7, height * 0.5, '12deg', ['rgba(170,225,255,0.75)', 'rgba(40,130,240,0.1)'])}
+      {petal(width * 0.62, width * 0.44, -height * 0.18, '-24deg', [alpha(colors.primary, 0.85), alpha(colors.primaryDeep, 0.15)])}
+      {petal(width * 0.5, width * 0.6, height * 0.12, '38deg', [alpha(colors.accentGlow, 0.9), alpha(colors.primary, 0.2)])}
+      {petal(width * 0.46, width * 0.3, height * 0.34, '-52deg', [alpha(colors.primary, 0.8), alpha(colors.primaryDark, 0.1)])}
+      {petal(width * 0.34, width * 0.7, height * 0.5, '12deg', [alpha(colors.accentGlow, 0.75), alpha(colors.primary, 0.1)])}
       <LinearGradient
         colors={['rgba(2,8,22,0.86)', 'rgba(2,8,22,0.4)', 'rgba(2,8,22,0.08)', 'rgba(2,8,22,0.32)']}
         locations={[0, 0.4, 0.74, 1]}
@@ -342,6 +355,7 @@ function RoundIcon({ children }: { children: React.ReactNode }) {
 }
 
 export function StoreError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -350,8 +364,8 @@ export function StoreError({ message, onRetry }: { message: string; onRetry: () 
         <T size={18} weight="semibold" tracking={-0.02} style={{ marginTop: s(14) }}>Không tải được Steam Store</T>
         <T size={12} color={colors.text3} leading={1.6} style={{ marginTop: s(6), textAlign: 'center' }}>{message}</T>
         <Press onPress={onRetry} style={[styles.whiteButton, { marginTop: s(14), height: s(40), paddingHorizontal: s(18), borderRadius: s(20), gap: s(8) }]}>
-          <RefreshCw size={s(14)} color="#0a111c" strokeWidth={2.2} />
-          <T size={12} weight="bold" color="#0a111c">Thử lại</T>
+          <RefreshCw size={s(14)} color={colors.panelSolid} strokeWidth={2.2} />
+          <T size={12} weight="bold" color={colors.panelSolid}>Thử lại</T>
         </Press>
       </View>
     </View>
@@ -365,6 +379,7 @@ export function LibraryEmpty({ error, warning, refreshing, onOpenPc, onRetry }: 
   onOpenPc: () => void;
   onRetry: () => void;
 }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -380,8 +395,8 @@ export function LibraryEmpty({ error, warning, refreshing, onOpenPc, onRetry }: 
         </T>
         <View style={{ flexDirection: 'row', gap: s(12), marginTop: s(16) }}>
           <Press onPress={onOpenPc} style={[styles.whiteButton, { height: s(40), paddingHorizontal: s(18), borderRadius: s(20), gap: s(8) }]}>
-            <Monitor size={s(14)} color="#0a111c" strokeWidth={2.2} />
-            <T size={12} weight="bold" color="#0a111c">Mở máy tính</T>
+            <Monitor size={s(14)} color={colors.panelSolid} strokeWidth={2.2} />
+            <T size={12} weight="bold" color={colors.panelSolid}>Mở máy tính</T>
           </Press>
           <Press
             onPress={onRetry}

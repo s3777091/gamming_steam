@@ -16,6 +16,7 @@ import {
   Monitor,
   MonitorPlay,
   Mouse,
+  Palette,
   RefreshCw,
   Sparkles,
   Volume2,
@@ -25,13 +26,15 @@ import {
 } from 'lucide-react-native';
 
 import { useBack } from '@/features/gamepad/hooks';
+import { alpha, type SettingsTokens, ThemeDecor, useTheme } from '@/theme';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
-import { appleColors, PillButton } from './controls';
+import { AppearancePage } from './AppearancePage';
+import { PillButton } from './controls';
 import { AudioPage, ControllerPage, DevicesPage, KeyboardPage, MousePage } from './DevicePages';
 import { LatencyPage, NetworkPage, QualityPage, VideoPage } from './StreamPages';
 import { useInputSettings } from './useInputSettings';
@@ -47,31 +50,42 @@ export type SettingsCategory =
   | 'controller'
   | 'mouse'
   | 'keyboard'
-  | 'audio';
+  | 'audio'
+  | 'appearance';
+
+type SettingsSection = 'streaming' | 'devices' | 'app';
 
 type Tone = 'error' | 'success' | 'info';
 type Notice = { id: number; tone: Tone; title: string; detail?: string };
+
+const SECTIONS: { id: SettingsSection; label: string }[] = [
+  { id: 'streaming', label: 'STREAMING' },
+  { id: 'devices', label: 'THIẾT BỊ' },
+  { id: 'app', label: 'ỨNG DỤNG' },
+];
 
 const CATEGORIES: {
   id: SettingsCategory;
   label: string;
   detail: string;
   icon: LucideIcon;
-  stream: boolean;
-  color: string;
+  section: SettingsSection;
+  color: keyof SettingsTokens;
 }[] = [
-  { id: 'quality', label: 'Chất lượng stream', detail: 'Chọn profile hợp với cách bạn chơi', icon: Sparkles, stream: true, color: appleColors.purple },
-  { id: 'video', label: 'Hình ảnh', detail: 'Độ phân giải, FPS, codec, bitrate và lớp phủ', icon: MonitorPlay, stream: true, color: appleColors.blue },
-  { id: 'latency', label: 'Độ trễ & độ mượt', detail: 'Bộ đệm, frame pacing và V-Sync', icon: Gauge, stream: true, color: appleColors.orange },
-  { id: 'network', label: 'Mạng', detail: 'Khu vực và kiểm tra đường truyền', icon: Wifi, stream: true, color: appleColors.blue },
-  { id: 'devices', label: 'Thiết bị', detail: 'Thiết bị đang nối với máy này', icon: Monitor, stream: false, color: appleColors.gray },
-  { id: 'controller', label: 'Tay cầm', detail: 'Bố cục nút, rung và vùng chết', icon: Gamepad2, stream: false, color: appleColors.red },
-  { id: 'mouse', label: 'Chuột', detail: 'Tốc độ con trỏ và cuộn', icon: Mouse, stream: false, color: appleColors.teal },
-  { id: 'keyboard', label: 'Bàn phím', detail: 'Phím tắt và đổi phím', icon: Keyboard, stream: false, color: appleColors.indigo },
-  { id: 'audio', label: 'Âm thanh', detail: 'Đầu ra và âm lượng stream', icon: Volume2, stream: false, color: appleColors.pink },
+  { id: 'quality', label: 'Chất lượng stream', detail: 'Chọn profile hợp với cách bạn chơi', icon: Sparkles, section: 'streaming', color: 'purple' },
+  { id: 'video', label: 'Hình ảnh', detail: 'Độ phân giải, FPS, codec, bitrate và lớp phủ', icon: MonitorPlay, section: 'streaming', color: 'blue' },
+  { id: 'latency', label: 'Độ trễ & độ mượt', detail: 'Bộ đệm, frame pacing và V-Sync', icon: Gauge, section: 'streaming', color: 'orange' },
+  { id: 'network', label: 'Mạng', detail: 'Khu vực và kiểm tra đường truyền', icon: Wifi, section: 'streaming', color: 'blue' },
+  { id: 'devices', label: 'Thiết bị', detail: 'Thiết bị đang nối với máy này', icon: Monitor, section: 'devices', color: 'gray' },
+  { id: 'controller', label: 'Tay cầm', detail: 'Bố cục nút, rung và vùng chết', icon: Gamepad2, section: 'devices', color: 'red' },
+  { id: 'mouse', label: 'Chuột', detail: 'Tốc độ con trỏ và cuộn', icon: Mouse, section: 'devices', color: 'teal' },
+  { id: 'keyboard', label: 'Bàn phím', detail: 'Phím tắt và đổi phím', icon: Keyboard, section: 'devices', color: 'indigo' },
+  { id: 'audio', label: 'Âm thanh', detail: 'Đầu ra và âm lượng stream', icon: Volume2, section: 'devices', color: 'pink' },
+  { id: 'appearance', label: 'Giao diện', detail: 'Theme màu cho toàn bộ ứng dụng', icon: Palette, section: 'app', color: 'accent' },
 ];
 
 function SaveStatus({ saving, saved, failed }: { saving: boolean; saved: boolean; failed: boolean }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   if (!saving && !saved && !failed) return null;
   return (
@@ -124,6 +138,7 @@ function NavItem({
   active: boolean;
   onPress: () => void;
 }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   const Icon = entry.icon;
   return (
@@ -168,7 +183,7 @@ function NavItem({
           borderRadius: s(8),
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: entry.color,
+          backgroundColor: appleColors[entry.color],
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: 'rgba(255, 255, 255, 0.40)',
           overflow: 'hidden',
@@ -205,6 +220,7 @@ export default function ConsoleSettings({
   backdropUrl?: string | null;
   onClose: () => void;
 }) {
+  const { settings: appleColors, colors, glass } = useTheme();
   const { s, width, insets } = useUi();
   const [category, setCategory] = useState<SettingsCategory>(initialCategory);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -248,9 +264,11 @@ export default function ConsoleSettings({
   const settings = draft.settings;
 
   let page: ReactNode;
-  if (!meta.stream) {
+  if (meta.section !== 'streaming') {
     page =
-      category === 'devices' ? (
+      category === 'appearance' ? (
+        <AppearancePage />
+      ) : category === 'devices' ? (
         <DevicesPage notify={notify} />
       ) : category === 'controller' ? (
         <ControllerPage input={input} />
@@ -305,9 +323,6 @@ export default function ConsoleSettings({
   const saved = !saving && !failed && (draft.saveState === 'saved' || input.dirty);
   const navWidth = Math.min(s(280), Math.max(s(210), width * 0.28));
 
-  const streamCategories = CATEGORIES.filter((c) => c.stream);
-  const deviceCategories = CATEGORIES.filter((c) => !c.stream);
-
   return (
     <FocusLayer>
       <Animated.View
@@ -340,13 +355,13 @@ export default function ConsoleSettings({
         {/* 2. Ánh sáng môi trường xanh console mát dịu (Console Ambient Blue Glow) */}
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <LinearGradient
-            colors={['rgba(31, 111, 235, 0.12)', 'rgba(31, 111, 235, 0.02)', 'transparent']}
+            colors={[glass.ambient, alpha(colors.primary, 0.02), 'transparent']}
             start={{ x: 0, y: 0 }}
             end={{ x: 0.75, y: 0.8 }}
             style={StyleSheet.absoluteFill}
           />
           <LinearGradient
-            colors={['transparent', 'rgba(102, 168, 255, 0.05)', 'transparent']}
+            colors={['transparent', glass.ambientAccent, 'transparent']}
             start={{ x: 0.3, y: 0 }}
             end={{ x: 1, y: 0.55 }}
             style={StyleSheet.absoluteFill}
@@ -355,9 +370,19 @@ export default function ConsoleSettings({
 
         {/* 3. Scrim kính tối đồng bộ hoàn toàn với SidePanel */}
         <View
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(7, 10, 16, 0.85)' }]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: alpha(colors.shade, 0.85) }]}
           pointerEvents="none"
         />
+
+        {/* Ánh màu của theme trên lớp scrim (trong suốt ở theme Console) */}
+        <LinearGradient
+          colors={[glass.backdropTint, 'transparent']}
+          start={{ x: 0, y: 1 }}
+          end={{ x: 0.9, y: 0 }}
+          pointerEvents="none"
+          style={StyleSheet.absoluteFill}
+        />
+        <ThemeDecor />
 
         {/* 4. Bố cục hai cột Master - Detail Liquid Glass */}
         <View
@@ -441,46 +466,32 @@ export default function ConsoleSettings({
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: s(10), paddingVertical: s(10) }}
             >
-              <T
-                size={9.6}
-                weight="semibold"
-                color={appleColors.textSecondary}
-                tracking={0.08}
-                style={{ paddingHorizontal: s(10), marginBottom: s(4) }}
-              >
-                STREAMING
-              </T>
-              {streamCategories.map((entry) => (
-                <NavItem
-                  key={entry.id}
-                  entry={entry}
-                  active={entry.id === category}
-                  onPress={() => select(entry.id)}
-                />
-              ))}
-
-              <T
-                size={9.6}
-                weight="semibold"
-                color={appleColors.textSecondary}
-                tracking={0.08}
-                style={{ paddingHorizontal: s(10), marginTop: s(14), marginBottom: s(4) }}
-              >
-                THIẾT BỊ
-              </T>
-              {deviceCategories.map((entry) => (
-                <NavItem
-                  key={entry.id}
-                  entry={entry}
-                  active={entry.id === category}
-                  onPress={() => select(entry.id)}
-                />
+              {SECTIONS.map((section, index) => (
+                <View key={section.id}>
+                  <T
+                    size={9.6}
+                    weight="semibold"
+                    color={appleColors.textSecondary}
+                    tracking={0.08}
+                    style={{ paddingHorizontal: s(10), marginTop: index > 0 ? s(14) : 0, marginBottom: s(4) }}
+                  >
+                    {section.label}
+                  </T>
+                  {CATEGORIES.filter((entry) => entry.section === section.id).map((entry) => (
+                    <NavItem
+                      key={entry.id}
+                      entry={entry}
+                      active={entry.id === category}
+                      onPress={() => select(entry.id)}
+                    />
+                  ))}
+                </View>
               ))}
             </FocusScroll>
           </View>
 
           {/* CỘT PHẢI (DETAIL): Liquid Glass Background & Panels */}
-          <View style={{ flex: 1, backgroundColor: 'rgba(8, 12, 18, 0.40)', overflow: 'hidden' }}>
+          <View style={{ flex: 1, backgroundColor: alpha(colors.bg, 0.40), overflow: 'hidden' }}>
 
             {/* Top Bar của Detail */}
             <View
@@ -590,7 +601,7 @@ export default function ConsoleSettings({
                 borderRadius: s(14),
                 gap: s(10),
                 borderColor: notice.tone === 'error' ? 'rgba(248, 113, 113, 0.50)' : 'rgba(255, 255, 255, 0.18)',
-                backgroundColor: 'rgba(13, 21, 32, 0.92)',
+                backgroundColor: alpha(colors.panel, 0.92),
                 overflow: 'hidden',
               },
             ]}

@@ -4,6 +4,7 @@
 // components/StoreGameDetail.tsx + components/store-detail/*.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { alpha, glassShadow, glassShadowSubtle, makeStyles, useTheme } from '@/theme';
 import { useMotion } from '@/ui/motion';
 import { Animated, Easing, Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, ScrollView } from 'react-native';
 import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
@@ -19,7 +20,6 @@ import type { DetailSheet, DetailView, SteamStoreGameDetail, StoreDetailItem } f
 import { formatCompact, formatNumber, formatRelative } from '@/features/library/format';
 import { openExternal } from '@/lib/open-external';
 import { BlurView } from 'expo-blur';
-import { colors, glass, glassShadow, glassShadowSubtle } from '@/theme';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
@@ -53,6 +53,7 @@ function SectionHeading({ title, onOpen }: { title: string; onOpen?: () => void 
 
 /** Đoạn văn cắt theo số dòng; chỉ hiện "thêm" khi chữ thật sự bị cắt. */
 function ClampText({ text, lines, onMore }: { text: string; lines: number; onMore: () => void }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const [clamped, setClamped] = useState(false);
   return (
@@ -69,7 +70,7 @@ function ClampText({ text, lines, onMore }: { text: string; lines: number; onMor
       {clamped ? (
         <Press onPress={onMore} style={{ position: 'absolute', right: 0, bottom: 0, paddingLeft: s(28) }}>
           <LinearGradient
-            colors={['rgba(11,18,27,0)', PAGE_BG]} locations={[0, 0.4]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+            colors={[alpha(colors.panelSolid, 0), PAGE_BG]} locations={[0, 0.4]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={StyleSheet.absoluteFill}
           />
           <T size={11.8} weight="semibold" color={colors.accent} leading={1.6}>thêm</T>
@@ -154,6 +155,7 @@ function LatestNews({ view }: { view: DetailView }) {
 }
 
 function Screenshots({ view }: { view: DetailView }) {
+  const { colors } = useTheme();
   const { s, width } = useUi();
   const { detail, controllerSupport, openSheet } = view;
   if (!detail.screenshots.length) return null;
@@ -195,6 +197,7 @@ function Screenshots({ view }: { view: DetailView }) {
 }
 
 function About({ view }: { view: DetailView }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const { detail, openSheet } = view;
   const description = detail.about || detail.shortDescription || null;
@@ -219,6 +222,7 @@ function About({ view }: { view: DetailView }) {
 }
 
 function ReviewVerdict({ recommended }: { recommended: boolean }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const Icon = recommended ? ThumbsUp : ThumbsDown;
   return (
@@ -234,6 +238,7 @@ function reviewMeta(review: SteamStoreGameDetail['reviews'][number]): string {
 }
 
 function Reviews({ view, onLayout }: { view: DetailView; onLayout: (y: number) => void }) {
+  const { colors } = useTheme();
   const { s, width } = useUi();
   const { detail, summary, positivePercent, openSheet } = view;
   if (!summary && !detail.reviews.length) return null;
@@ -310,6 +315,7 @@ function InfoRow({ label, value, onOpen }: { label: string; value: string; onOpe
 }
 
 function Info({ view }: { view: DetailView }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const { detail, genres, controllerSupport, languages, hasVietnamese, openSheet } = view;
   const platforms = platformNames(detail.platforms);
@@ -358,6 +364,7 @@ function Info({ view }: { view: DetailView }) {
 function DetailModal({ title, subtitle, onClose, onBack, wide, children }: {
   title: string; subtitle?: string | null; onClose: () => void; onBack?: () => void; wide?: boolean; children: ReactNode;
 }) {
+  const { glass, colors } = useTheme();
   const { s, width, height } = useUi();
   useBack(() => { if (onBack) onBack(); else onClose(); });
   return (
@@ -405,6 +412,7 @@ function ScreenshotModal({
   onIndex: (index: number) => void;
   onClose: () => void;
 }) {
+  const { glass, colors } = useTheme();
   const { s, width, height } = useUi();
   const [fitMode, setFitMode] = useState<'cover' | 'contain'>('cover');
   const shots = view.detail.screenshots;
@@ -440,7 +448,7 @@ function ScreenshotModal({
           }}
         >
           <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,8,14,0.72)' }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: alpha(colors.bgDeep, 0.72) }]} />
         </Pressable>
         <View
           style={{
@@ -450,7 +458,7 @@ function ScreenshotModal({
             overflow: 'hidden',
             borderWidth: 1,
             borderColor: glass.borderSpecular,
-            backgroundColor: '#05080d',
+            backgroundColor: colors.bgDeep,
             ...glassShadow,
           }}
           onTouchStart={(e) => {
@@ -778,6 +786,7 @@ export type StoreBuyAction = {
 const BUY_ICONS = { buy: ShoppingCart, free: Gift, download: Download, play: Play, wait: Loader, owned: Check } as const;
 
 function BuyButton({ action, compact }: { action: StoreBuyAction; compact?: boolean }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const Icon = BUY_ICONS[action.icon];
   const filled = action.icon === 'play';
@@ -841,6 +850,8 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyA
   buyAction?: StoreBuyAction;
   onClose: () => void;
 }) {
+  const { colors, glass } = useTheme();
+  const styles = useStyles();
   const { s, insets } = useUi();
   const [sheet, setSheet] = useState<DetailSheet | null>(null);
   const [compact, setCompact] = useState(false);
@@ -903,7 +914,7 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyA
             style={{ position: 'absolute', left: 0, right: 0, top: 0, height: s(272), opacity: 0.45 }}
             contentFit="cover"
           />
-          <LinearGradient colors={['rgba(11,18,27,0)', PAGE_BG]} locations={[0.1, 1]} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: s(272) }} />
+          <LinearGradient colors={[alpha(colors.panelSolid, 0), PAGE_BG]} locations={[0.1, 1]} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: s(272) }} />
 
           <View style={{ maxWidth: s(832), width: '100%', alignSelf: 'center', paddingBottom: s(40) + insets.bottom }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: s(16), paddingHorizontal: s(20) + insets.left, paddingTop: s(64) }}>
@@ -1007,7 +1018,7 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyA
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ glass }) => ({
   navButton: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1016,4 +1027,4 @@ const styles = StyleSheet.create({
     backgroundColor: glass.surfaceRaised,
     ...glassShadowSubtle,
   },
-});
+}));

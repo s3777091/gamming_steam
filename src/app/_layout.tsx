@@ -6,7 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { Stack, usePathname } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { setImmersive } from 'jetsona-input';
 
@@ -17,7 +17,7 @@ import { useHardwareBack } from '@/features/gamepad/hooks';
 import { useTemporarySystemBars } from '@/features/gamepad/useTemporarySystemBars';
 import LoginScreen from '@/features/login/LoginScreen';
 import { playUiSound, UiSoundProvider } from '@/features/sound/UiSoundProvider';
-import { colors } from '@/theme';
+import { makeStyles, ThemeProvider, useTheme } from '@/theme';
 import { UiProvider } from '@/ui/scale';
 import { MotionProvider } from '@/ui/motion';
 import { T } from '@/ui/Text';
@@ -25,6 +25,8 @@ import { T } from '@/ui/Text';
 void SplashScreen.preventAutoHideAsync();
 
 function Gate() {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const auth = useAuth();
   const pathname = usePathname();
   const previousPathname = useRef(pathname);
@@ -79,19 +81,21 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <UiProvider>
         <MotionProvider>
-          <UiSoundProvider>
-            <AuthProvider>
-              <StatusBar hidden />
-              <Gate />
-            </AuthProvider>
-          </UiSoundProvider>
+          <ThemeProvider>
+            <UiSoundProvider>
+              <AuthProvider>
+                <StatusBar hidden />
+                <Gate />
+              </AuthProvider>
+            </UiSoundProvider>
+          </ThemeProvider>
         </MotionProvider>
       </UiProvider>
     </SafeAreaProvider>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   fill: { flex: 1, backgroundColor: colors.bg },
   center: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
-});
+}));

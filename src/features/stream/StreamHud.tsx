@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { streamQuality } from '@/lib/stream-stats';
 import { useStreamStats } from './useStreamTelemetry';
-import { colors, glass, glassShadowSubtle } from '@/theme';
+import { glassShadowSubtle, useTheme } from '@/theme';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
@@ -27,6 +27,7 @@ type Stats = {
 const EMPTY: Stats = { rttMs: null, jitterMs: null, lossPercent: null, fps: null, bitrateMbps: null, dropped: null, route: null, width: null, height: null };
 
 function Cell({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   return (
     <View style={{ alignItems: 'center', minWidth: s(46) }}>
@@ -41,6 +42,7 @@ export function StreamHud({ enabled, ...position }: { enabled: boolean; top: num
 }
 
 const HudContent = memo(function HudContent({ top, left }: { top: number; left: number }) {
+  const { glass } = useTheme();
   const { s } = useUi();
   const { stats: measured } = useStreamStats();
   const stats = measured ?? EMPTY;

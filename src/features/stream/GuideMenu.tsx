@@ -44,7 +44,7 @@ import { PC_ROUTES, pcFetch } from '@/lib/pc-api';
 import { rememberStreamGame } from '@/lib/stream-resume';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { glass, glassShadow, glassShadowSubtle } from '@/theme';
+import { alpha, glassShadow, glassShadowSubtle, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -124,6 +124,8 @@ export function GuideMenu({
   /** Toạ độ (trong cửa sổ) của nút Streaming lúc bấm — tâm của viền xanh. */
   onStreamOrigin?: (origin: StreamBorderOrigin) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, insets } = useUi();
   const fade = useMemo(() => new Animated.Value(0), []);
   const { devices } = useInputDevices();
@@ -461,7 +463,7 @@ export function GuideMenu({
 
       {/* Gradient chuyển bóng tinh tế */}
       <LinearGradient
-        colors={['rgba(5,7,12,0.82)', 'rgba(5,7,12,0.25)', 'rgba(5,7,12,0.88)']}
+        colors={[alpha(colors.bgDeep, 0.82), alpha(colors.bgDeep, 0.25), alpha(colors.bgDeep, 0.88)]}
         locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFill}
       />
@@ -687,9 +689,9 @@ export function GuideMenu({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ glass, colors }) => ({
   root: {
-    backgroundColor: 'rgba(4,6,10,0.82)',
+    backgroundColor: alpha(colors.bgDeep, 0.82),
     zIndex: 160,
     elevation: 160,
   },
@@ -784,7 +786,7 @@ const styles = StyleSheet.create({
   modalOverlay: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(4,6,10,0.75)',
+    backgroundColor: alpha(colors.bgDeep, 0.75),
     zIndex: 100,
     padding: 20,
   },
@@ -828,4 +830,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.25)',
   },
-});
+}));

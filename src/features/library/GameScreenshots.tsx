@@ -14,7 +14,7 @@ import {
   screenshotImageSource,
   type GameScreenshot,
 } from '@/lib/game-screenshots';
-import { colors } from '@/theme';
+import { useTheme } from '@/theme';
 import { Press } from '@/ui/Press';
 import { Skeleton } from '@/ui/Skeleton';
 import { useUi } from '@/ui/scale';
@@ -34,6 +34,7 @@ function shotTitle(name: string): string {
 }
 
 export function GameScreenshots() {
+  const { colors } = useTheme();
   const { s } = useUi();
   const [state, setState] = useState<{
     items: GameScreenshot[];

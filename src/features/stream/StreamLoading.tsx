@@ -13,7 +13,7 @@ import {
   reduceLoadingSequence,
 } from '@/lib/loading-sequence';
 import { useUiSounds } from '@/features/sound/UiSoundProvider';
-import { glass, glassShadowSubtle } from '@/theme';
+import { alpha, glassShadowSubtle, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -69,6 +69,8 @@ function StreamLoadingSequence({
   direct = false,
   onHidden,
 }: StreamLoadingProps & { onHidden: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width, insets } = useUi();
   const { active, reduceMotion } = useMotion();
   const sounds = useUiSounds();
@@ -267,10 +269,10 @@ function StreamLoadingSequence({
         ) : null}
         <LinearGradient
           colors={[
-            'rgba(5,7,13,0.5)',
-            'rgba(5,7,13,0.2)',
-            'rgba(5,7,13,0.35)',
-            'rgba(5,7,13,0.85)',
+            alpha(colors.bgDeep, 0.5),
+            alpha(colors.bgDeep, 0.2),
+            alpha(colors.bgDeep, 0.35),
+            alpha(colors.bgDeep, 0.85),
           ]}
           locations={[0, 0.35, 0.7, 1]}
           style={StyleSheet.absoluteFill}
@@ -411,6 +413,7 @@ function FailureMessage({
   width: number;
   scale: (value: number) => number;
 }) {
+  const styles = useStyles();
   return (
     <View style={{ marginTop: scale(14), alignItems: 'center' }}>
       <T
@@ -435,7 +438,7 @@ function FailureMessage({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ glass }) => ({
   root: {
     ...StyleSheet.absoluteFill,
     zIndex: 40,
@@ -526,4 +529,4 @@ const styles = StyleSheet.create({
     width: 90,
     backgroundColor: 'rgba(255,255,255,0.45)',
   },
-});
+}));

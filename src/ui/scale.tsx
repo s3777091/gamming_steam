@@ -2,7 +2,8 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DESIGN } from '@/theme';
+// Đi thẳng vào static để tránh vòng import: lớp trang trí của theme cũng dùng useUi.
+import { DESIGN } from '@/theme/static';
 
 type Ui = {
   width: number;

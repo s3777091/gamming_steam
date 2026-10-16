@@ -12,7 +12,7 @@ import type { SteamDownloads } from '@/features/library/useSteamDownloads';
 import { type GameDownload, type GameUninstall, downloadForApp, primaryDownload, uninstallForApp } from '@/lib/steam-downloads';
 import { shelfItemLayout } from '@/lib/game-shelf-layout';
 import { nearbyBackdropUrls } from '@/lib/backdrop-preloader';
-import { colors, glass } from '@/theme';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useBackdropPreload } from '@/ui/useBackdropPreload';
 import { useMotion } from '@/ui/motion';
@@ -76,6 +76,8 @@ function PrimaryAction({ library, download, uninstall, canControl, onPlay, onIns
   onDownloadPress: () => void;
   reachable: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const { active: appActive, reduceMotion } = useMotion();
   const sceneActive = useSceneActive();
@@ -132,6 +134,8 @@ function PrimaryAction({ library, download, uninstall, canControl, onPlay, onIns
 
 /** Nút (…) cạnh Play: mở bảng tùy chọn game phong cách Console. */
 function GameMoreButton({ active, onPress }: { active: boolean; onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const size = s(44);
   return (
@@ -145,7 +149,7 @@ function GameMoreButton({ active, onPress }: { active: boolean; onPress: () => v
           height: size,
           borderRadius: size / 2,
           borderColor: active ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.16)',
-          backgroundColor: active ? 'rgba(255,255,255,0.12)' : 'rgba(10,17,28,0.34)',
+          backgroundColor: active ? 'rgba(255,255,255,0.12)' : alpha(colors.panelSolid, 0.34),
         },
       ]}
     >
@@ -169,11 +173,12 @@ function renderFocusRail(props: ScrollViewProps) {
 const gameKey = (game: PcGame) => game.id;
 
 function ShelfDivider() {
+  const { colors } = useTheme();
   const { s } = useUi();
   return (
     <LinearGradient
       pointerEvents="none"
-      colors={['rgba(255,255,255,0)', 'rgba(102,168,255,0.65)', 'rgba(255,255,255,0)']}
+      colors={['rgba(255,255,255,0)', alpha(colors.accent, 0.65), 'rgba(255,255,255,0)']}
       style={{ width: s(DIVIDER.w), height: s(DIVIDER.h), marginBottom: s(8), borderRadius: s(DIVIDER.w) }}
     />
   );
@@ -187,6 +192,8 @@ const GameCard = memo(function GameCard({ game, active, achievements, onSelect, 
   /** Gắn vào thẻ đang chọn: điểm xuất phát của hiệu ứng thẻ bay vào thông báo. */
   cardRef: RefObject<View | null>;
 }) {
+  const { glass, colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const select = useCallback(() => onSelect(game.id), [game.id, onSelect]);
   const { reduceMotion } = useMotion();
@@ -234,7 +241,7 @@ const GameCard = memo(function GameCard({ game, active, achievements, onSelect, 
         {game.artworkUrl ? <Img source={{ uri: game.artworkUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
         {/* Lớp phản quang ánh sáng và khúc xạ đa chiều Liquid Glass */}
         <LinearGradient
-          colors={['rgba(255,255,255,0.18)', 'rgba(7,16,28,0)', 'rgba(7,16,28,0.72)']}
+          colors={['rgba(255,255,255,0.18)', alpha(colors.panelSolid, 0), alpha(colors.panelSolid, 0.72)]}
           locations={[0, 0.35, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -284,6 +291,8 @@ export const GamesView = memo(function GamesView({ library, downloads, reachable
   onInstallStart: (info: { imageUrl: string | null; from: FlightRect }) => void;
   onInstallResult: (ok: boolean) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const router = useRouter();
   const { s } = useUi();
   const activeCard = useRef<View>(null);
@@ -524,14 +533,14 @@ const GameShelf = memo(function GameShelf({ games, selectedId, selectedAchieveme
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, glass }) => ({
   play: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1a6ae8',
+    backgroundColor: colors.primary,
     borderWidth: 1.5,
     borderColor: 'rgba(255,255,255,0.48)',
-    shadowColor: '#2b7fff',
+    shadowColor: colors.primaryHover,
     shadowOpacity: 0.55,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 8 },
@@ -553,7 +562,7 @@ const styles = StyleSheet.create({
   card: {
     overflow: 'hidden',
     borderWidth: 1,
-    backgroundColor: 'rgba(17, 24, 33, 0.85)',
+    backgroundColor: alpha(colors.card, 0.85),
     // Android elevation renders a rectangular black backing behind translucent,
     // clipped cards. Keep the soft shadow only on iOS; the focus ring and glass
     // edge provide the selected state on Android without obscuring the artwork.
@@ -578,7 +587,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.24)',
-    backgroundColor: 'rgba(10,17,28,0.7)',
+    backgroundColor: alpha(colors.panelSolid, 0.7),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -597,7 +606,7 @@ const styles = StyleSheet.create({
   },
   remoteConfirmBanner: {
     borderWidth: 1,
-    borderColor: 'rgba(102,168,255,0.4)',
+    borderColor: alpha(colors.accent, 0.4),
     backgroundColor: 'rgba(10,20,38,0.78)',
     shadowColor: '#000',
     shadowOpacity: 0.35,
@@ -609,9 +618,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     backgroundColor: colors.accent,
-    shadowColor: '#66a8ff',
+    shadowColor: colors.accent,
     shadowOpacity: 0.45,
     shadowRadius: 6,
     elevation: 3,
   },
-});
+}));

@@ -2,6 +2,7 @@ import { useContext, useEffect, useMemo } from 'react';
 import { Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { alpha, useTheme } from '@/theme';
 import { UiContext } from './scale';
 import { useMotion } from './motion';
 
@@ -35,6 +36,7 @@ export function FocusRing({
   visible?: boolean;
   onHidden?: () => void;
 }) {
+  const { colors } = useTheme();
   const ui = useContext(UiContext);
   const { active, reduceMotion } = useMotion();
   const s = ui ? ui.s : (n: number) => n;
@@ -120,7 +122,7 @@ export function FocusRing({
             right: hInset - s(4),
             borderRadius: pillRadius + s(4),
             borderWidth: 1.5,
-            borderColor: isDanger ? 'rgba(239, 68, 68, 0.16)' : 'rgba(102, 168, 255, 0.16)',
+            borderColor: isDanger ? 'rgba(239, 68, 68, 0.16)' : alpha(colors.accent, 0.16),
             opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [0.75, 0.35] }),
           }}
         />
@@ -136,7 +138,7 @@ export function FocusRing({
             right: hInset - s(2),
             borderRadius: pillRadius + s(2),
             borderWidth: 1.25,
-            borderColor: isDanger ? 'rgba(248, 113, 113, 0.40)' : 'rgba(138, 192, 255, 0.38)',
+            borderColor: isDanger ? 'rgba(248, 113, 113, 0.40)' : alpha(colors.accentSoft, 0.38),
             opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 0.58] }),
           }}
         />
@@ -240,7 +242,7 @@ export function FocusRing({
         style={band(
           gap + bloomOffset,
           bloomWidth,
-          isDanger ? 'rgba(239, 68, 68, 0.18)' : 'rgba(102, 168, 255, 0.16)',
+          isDanger ? 'rgba(239, 68, 68, 0.18)' : alpha(colors.accent, 0.16),
           0.8,
           0.45,
         )}
@@ -252,7 +254,7 @@ export function FocusRing({
         style={band(
           gap,
           outerRingWidth,
-          isDanger ? 'rgba(248, 113, 113, 0.45)' : 'rgba(138, 192, 255, 0.38)',
+          isDanger ? 'rgba(248, 113, 113, 0.45)' : alpha(colors.accentSoft, 0.38),
           1,
           0.42,
         )}

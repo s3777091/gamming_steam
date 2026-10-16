@@ -11,7 +11,7 @@ import { BlurView } from 'expo-blur';
 import { supabaseConfigured } from '@/lib/config';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { createClient } from '@/lib/supabase';
-import { colors, fonts, glass, glassShadow, glassShadowSubtle } from '@/theme';
+import { fonts, glassShadow, glassShadowSubtle, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { LiquidAmbientAurora } from '@/ui/LiquidGlass';
 import { Press } from '@/ui/Press';
@@ -21,6 +21,8 @@ import { T } from '@/ui/Text';
 const LOGO = require('../../../assets/icon.png');
 
 export default function LoginScreen() {
+  const { glass, colors } = useTheme();
+  const styles = useStyles();
   const { s, insets, width } = useUi();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -169,7 +171,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, glass }) => ({
   root: { flex: 1 },
   card: {
     borderWidth: 1,
@@ -196,4 +198,4 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...glassShadowSubtle,
   },
-});
+}));

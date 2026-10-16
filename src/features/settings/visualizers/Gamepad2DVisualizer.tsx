@@ -15,8 +15,7 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 import type { NativeGamepadState } from 'jetsona-input';
-
-import { appleColors } from '@/features/settings/controls';
+import { useTheme } from '@/theme';
 
 export type ControllerLayoutKind = 'auto' | 'xbox' | 'playstation' | 'nintendo';
 
@@ -55,6 +54,7 @@ export function Gamepad2DVisualizer({
   showCallouts = true,
   onButtonPress,
 }: Gamepad2DVisualizerProps) {
+  const { settings: appleColors } = useTheme();
   const buttons = state?.buttons ?? 0;
   const lx = Math.max(-1, Math.min(1, state?.lx ?? 0));
   const ly = Math.max(-1, Math.min(1, state?.ly ?? 0));

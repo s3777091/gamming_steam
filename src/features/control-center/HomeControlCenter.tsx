@@ -16,6 +16,7 @@ import type { LocalDevice } from '@/features/devices/useInputDevices';
 import type { AppNotification } from '@/features/library/types';
 import { PC_ROUTES, pcPostJson } from '@/lib/pc-api';
 import { forgetStreamGame, type ResumableGame } from '@/lib/stream-resume';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
@@ -65,6 +66,8 @@ export function HomeControlCenter({
   onResume: (game: ResumableGame) => void;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, insets } = useUi();
   const { reduceMotion } = useMotion();
   const [mounted, setMounted] = useState(open);
@@ -161,7 +164,7 @@ export function HomeControlCenter({
       <FocusLayer>
         <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill} />
         <LinearGradient
-          colors={['rgba(5,7,12,0.82)', 'rgba(5,7,12,0.3)', 'rgba(5,7,12,0.9)']}
+          colors={[alpha(colors.bgDeep, 0.82), alpha(colors.bgDeep, 0.3), alpha(colors.bgDeep, 0.9)]}
           locations={[0, 0.45, 1]}
           style={StyleSheet.absoluteFill}
         />
@@ -188,7 +191,7 @@ export function HomeControlCenter({
             >
               {game.heroUrl ? <Img source={{ uri: game.heroUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
               <LinearGradient
-                colors={['rgba(9,11,18,0.15)', 'rgba(9,11,18,0.92)']}
+                colors={[alpha(colors.bg, 0.15), alpha(colors.bg, 0.92)]}
                 locations={[0.25, 1]}
                 style={StyleSheet.absoluteFill}
               />
@@ -320,8 +323,8 @@ export function HomeControlCenter({
   );
 }
 
-const styles = StyleSheet.create({
-  root: { zIndex: 300, elevation: 300, backgroundColor: 'rgba(4,6,10,0.6)' },
+const useStyles = makeStyles(({ colors }) => ({
+  root: { zIndex: 300, elevation: 300, backgroundColor: alpha(colors.bgDeep, 0.6) },
   topBar: { position: 'absolute', alignItems: 'flex-end', zIndex: 20 },
   closeBtn: {
     alignItems: 'center',
@@ -398,4 +401,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.14)',
   },
-});
+}));

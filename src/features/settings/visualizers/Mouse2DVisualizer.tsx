@@ -20,7 +20,7 @@ import {
   type NativeMouseEvent,
 } from 'jetsona-input';
 
-import { appleColors } from '@/features/settings/controls';
+import { useTheme } from '@/theme';
 import { T } from '@/ui/Text';
 
 export type Mouse2DVisualizerProps = {
@@ -28,6 +28,7 @@ export type Mouse2DVisualizerProps = {
 };
 
 export function Mouse2DVisualizer({ sensitivity = 1.0 }: Mouse2DVisualizerProps) {
+  const { settings: appleColors, colors } = useTheme();
   const [activeButtons, setActiveButtons] = useState<Set<number>>(new Set());
   const [scrollDirection, setScrollDirection] = useState<'up' | 'down' | null>(null);
 
@@ -125,8 +126,8 @@ export function Mouse2DVisualizer({ sensitivity = 1.0 }: Mouse2DVisualizerProps)
                 <Stop offset="100%" stopColor="#0F151F" />
               </LinearGradient>
               <LinearGradient id="activeGrad" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0%" stopColor="#007AFF" />
-                <Stop offset="100%" stopColor="#0051B3" />
+                <Stop offset="0%" stopColor={appleColors.blue} />
+                <Stop offset="100%" stopColor={colors.primaryDeep} />
               </LinearGradient>
             </Defs>
 

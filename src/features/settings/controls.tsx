@@ -9,49 +9,12 @@ import { Check, ChevronRight, Loader, type LucideIcon } from 'lucide-react-nativ
 
 import { useFocusable } from '@/features/gamepad/focus';
 import { playUiSound, type UiSound } from '@/features/sound/UiSoundProvider';
+import { alpha, useTheme } from '@/theme';
 import { FocusRing } from '@/ui/FocusRing';
 import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
-
-export const appleColors = {
-  // Nền & khung — Console Dark Liquid Glass (đồng bộ #080c12 và SidePanel)
-  bg: '#080c12',
-  sidebarBg: 'rgba(10, 16, 26, 0.82)',
-  card: 'rgba(255, 255, 255, 0.045)',
-  cardBorder: 'rgba(255, 255, 255, 0.09)',
-  cardBorderSpecular: 'rgba(255, 255, 255, 0.20)',
-  separator: 'rgba(255, 255, 255, 0.065)',
-  pressedBg: 'rgba(255, 255, 255, 0.08)',
-  cardRaised: 'rgba(18, 26, 38, 0.75)',
-  inset: 'rgba(6, 10, 16, 0.50)',
-
-  // Trạng thái "đã chọn": kính sáng trắng / xanh console đồng bộ với GamePanels
-  accent: '#1f6feb',
-  selectedBg: 'rgba(255, 255, 255, 0.12)',
-  selectedBorder: 'rgba(255, 255, 255, 0.20)',
-  selectedText: '#ffffff',
-
-  // Văn bản
-  text: 'rgba(255, 255, 255, 0.95)',
-  textSecondary: 'rgba(255, 255, 255, 0.60)',
-  textTertiary: 'rgba(255, 255, 255, 0.42)',
-  chevron: 'rgba(255, 255, 255, 0.32)',
-
-  // Màu hệ thống
-  blue: '#1f6feb',
-  green: '#34c759',
-  red: '#ff453a',
-  orange: '#ff9f0a',
-  yellow: '#ffd60a',
-  purple: '#bf5af2',
-  indigo: '#5e5ce6',
-  teal: '#40c8e0',
-  pink: '#ff375f',
-  gray: '#8e8e93',
-  switchOff: 'rgba(255, 255, 255, 0.16)',
-} as const;
 
 export function SettingsGroup({
   title,
@@ -62,6 +25,7 @@ export function SettingsGroup({
   footer?: string;
   children: ReactNode;
 }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   const rawItems = React.Children.toArray(children);
   const items = rawItems.filter(Boolean);
@@ -124,17 +88,18 @@ export function SettingsGroup({
 export function RowText({
   label,
   detail,
-  labelColor = appleColors.text,
+  labelColor,
 }: {
   label: ReactNode;
   detail?: ReactNode;
   labelColor?: string;
 }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   return (
     <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
       {typeof label === 'string' ? (
-        <T size={13.2} weight="regular" color={labelColor} numberOfLines={1}>
+        <T size={13.2} weight="regular" color={labelColor ?? appleColors.text} numberOfLines={1}>
           {label}
         </T>
       ) : (
@@ -175,6 +140,7 @@ export function rowStyle(s: (n: number) => number, extra?: object) {
  * - Nút tròn trắng tinh, đổ bóng chuẩn iOS.
  */
 export function Switch({ checked }: { checked: boolean }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   const { reduceMotion } = useMotion();
   const [slide] = useState(() => new Animated.Value(checked ? 1 : 0));
@@ -305,6 +271,7 @@ export function ChoiceRow<V extends string>({
   options: ChoiceOption<V>[];
   onChange: (value: V) => void;
 }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   const [open, setOpen] = useState(false);
   const selected = options.find((option) => option.value === value) ?? options[0];
@@ -417,6 +384,7 @@ export function SliderRow({
   format: (value: number) => string;
   onChange: (value: number) => void;
 }) {
+  const { settings: appleColors } = useTheme();
   const { s, width } = useUi();
   const [previousValue, setPreviousValue] = useState(value);
   const [local, setLocal] = useState(value);
@@ -523,6 +491,7 @@ export function ActionRow({
   iconColor?: string;
   sound?: UiSound | false;
 }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   const [spin] = useState(() => new Animated.Value(0));
 
@@ -623,6 +592,7 @@ export function InfoRow({
   detail?: string;
   value: ReactNode;
 }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   return (
     <View style={rowStyle(s)}>
@@ -664,6 +634,7 @@ export function ConfirmActionRow({
   iconBg?: string;
   iconColor?: string;
 }) {
+  const { settings: appleColors } = useTheme();
   const [armed, setArmed] = useState(false);
   return (
     <ActionRow
@@ -695,6 +666,7 @@ export function Keycap({
   children: ReactNode;
   accent?: boolean;
 }) {
+  const { colors, settings: appleColors } = useTheme();
   const { s } = useUi();
   return (
     <View
@@ -706,8 +678,8 @@ export function Keycap({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: accent ? 'rgba(102, 168, 255, 0.45)' : 'rgba(255, 255, 255, 0.18)',
-        backgroundColor: accent ? 'rgba(31, 111, 235, 0.22)' : 'rgba(255, 255, 255, 0.08)',
+        borderColor: accent ? alpha(colors.accent, 0.45) : 'rgba(255, 255, 255, 0.18)',
+        backgroundColor: accent ? alpha(colors.primary, 0.22) : 'rgba(255, 255, 255, 0.08)',
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.15,
@@ -726,7 +698,7 @@ export function Keycap({
       <T
         size={10.2}
         weight="semibold"
-        color={accent ? '#8bbcff' : appleColors.text}
+        color={accent ? colors.accentSoft : appleColors.text}
       >
         {children}
       </T>
@@ -747,18 +719,19 @@ export function PillButton({
   disabled?: boolean;
   label?: string;
 }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const bg =
     tone === 'danger'
       ? 'rgba(239, 68, 68, 0.18)'
       : tone === 'accent'
-        ? 'rgba(31, 111, 235, 0.28)'
+        ? alpha(colors.primary, 0.28)
         : 'rgba(255, 255, 255, 0.08)';
   const border =
     tone === 'danger'
       ? 'rgba(248, 113, 113, 0.40)'
       : tone === 'accent'
-        ? 'rgba(102, 168, 255, 0.45)'
+        ? alpha(colors.accent, 0.45)
         : 'rgba(255, 255, 255, 0.14)';
   const fg =
     tone === 'danger'

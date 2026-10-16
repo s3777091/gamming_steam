@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react-native';
 
-import { colors } from '@/theme';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { PanelMessage, SidePanel, SteamLink } from '@/ui/SidePanel';
@@ -46,6 +46,8 @@ function ArticleDetailView({
   item: SteamNewsItem;
   onBack: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const meta = newsMeta([gameTitle, item.feedLabel, item.author, formatShortDate(item.publishedAt)]);
 
@@ -97,6 +99,8 @@ function DiscountNotificationCard({
   onPress: () => void;
   onDismiss?: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const originalPriceFormatted = item.originalPrice && item.currency
     ? formatStorePrice({ finalPrice: item.originalPrice, currency: item.currency })
@@ -181,6 +185,8 @@ function UpdateNotificationCard({
   onPress: () => void;
   onDismiss?: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const timeAgo = formatRelative(item.publishedAt);
 
@@ -262,6 +268,8 @@ function UninstallNotificationCard({
   onPress?: () => void;
   onDismiss?: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const timeAgo = formatRelative(item.createdAt ? new Date(item.createdAt).toISOString() : null);
 
@@ -377,6 +385,8 @@ export function NotificationsPanel({
   onClearNotification?: (id: string) => void;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   // Có lượt tải đang chạy thì mở thẳng tab Tải xuống: đó là lý do người dùng bấm vào chuông.
   const [activeTab, setActiveTab] = useState<NotificationTab>(() => (downloads.length ? 'downloads' : 'all'));
@@ -469,8 +479,8 @@ export function NotificationsPanel({
                         height: s(28),
                         paddingHorizontal: s(10),
                         borderRadius: s(14),
-                        backgroundColor: on ? 'rgba(102,168,255,0.18)' : 'rgba(255,255,255,0.06)',
-                        borderColor: on ? 'rgba(102,168,255,0.35)' : 'rgba(255,255,255,0.1)',
+                        backgroundColor: on ? alpha(colors.accent, 0.18) : 'rgba(255,255,255,0.06)',
+                        borderColor: on ? alpha(colors.accent, 0.35) : 'rgba(255,255,255,0.1)',
                       },
                     ]}
                   >
@@ -550,7 +560,7 @@ export function NotificationsPanel({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors }) => ({
   card: {
     overflow: 'hidden',
     borderWidth: 1,
@@ -577,7 +587,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.4)',
-    shadowColor: '#66a8ff',
+    shadowColor: colors.accent,
     shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 3,
@@ -586,9 +596,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(102,168,255,0.14)',
+    backgroundColor: alpha(colors.accent, 0.14),
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(102,168,255,0.3)',
+    borderColor: alpha(colors.accent, 0.3),
   },
   pillBadgeNews: {
     flexDirection: 'row',
@@ -626,4 +636,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
   },
-});
+}));

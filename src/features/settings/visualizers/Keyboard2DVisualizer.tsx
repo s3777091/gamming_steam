@@ -3,14 +3,14 @@
 // Hiển thị mã phím, mã web, Virtual Key (VK), phím bổ trợ (Shift/Ctrl/Alt/Meta) và N-Key Rollover.
 
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import {
   addListener,
   setCaptureMode,
 } from 'jetsona-input';
 
-import { appleColors } from '@/features/settings/controls';
 import { webCodeForKeyCode } from '@/features/settings/keycodes';
+import { makeStyles } from '@/theme';
 import { Press } from '@/ui/Press';
 import { T } from '@/ui/Text';
 
@@ -122,6 +122,7 @@ const KEYBOARD_ROWS: KeyItem[][] = [
 ];
 
 export function Keyboard2DVisualizer() {
+  const styles = useStyles();
   const [activeCodes, setActiveCodes] = useState<Set<string>>(new Set());
   const timerMap = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
@@ -215,7 +216,7 @@ export function Keyboard2DVisualizer() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ settings: appleColors }) => ({
   container: {
     backgroundColor: '#0A0E14',
     borderRadius: 12,
@@ -263,4 +264,4 @@ const styles = StyleSheet.create({
     top: 1.5,
     left: 3,
   },
-});
+}));

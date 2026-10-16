@@ -26,7 +26,7 @@ import {
 import { useGamepadTabs } from '@/features/gamepad/hooks';
 import { PC_ROUTES, pcFetchJson } from '@/lib/pc-api';
 import { TimedCache } from '@/lib/timed-cache';
-import { colors, glass } from '@/theme';
+import { alpha, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { PanelMessage, SidePanel, SteamLink } from '@/ui/SidePanel';
@@ -71,6 +71,7 @@ function AppleTabItem({
   active: boolean;
   onPress: () => void;
 }) {
+  const { glass, colors } = useTheme();
   const { s } = useUi();
   const [activeAnim] = useState(() => new Animated.Value(active ? 1 : 0));
   const Icon = tab.icon;
@@ -186,6 +187,7 @@ function AppleTabBar({
   activeTab: GameDetailTab;
   onSelectTab: (tab: GameDetailTab) => void;
 }) {
+  const { glass } = useTheme();
   const { s } = useUi();
   return (
     <View
@@ -320,6 +322,7 @@ function InsetSpecRow({
 }
 
 function GameInfoView({ game }: { game: PcGame }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const [descExpanded, setDescExpanded] = useState(false);
 
@@ -335,8 +338,8 @@ function GameInfoView({ game }: { game: PcGame }) {
   const specs = [
     game.developer && {
       icon: Code2,
-      iconColor: '#60a5fa',
-      iconBg: 'rgba(59,130,246,0.16)',
+      iconColor: colors.accent,
+      iconBg: alpha(colors.primary, 0.16),
       label: 'Nhà phát triển',
       value: game.developer,
     },
@@ -453,9 +456,9 @@ function GameInfoView({ game }: { game: PcGame }) {
                 paddingHorizontal: s(8),
                 paddingVertical: s(3),
                 borderRadius: s(10),
-                backgroundColor: isInstalled ? 'rgba(52,199,89,0.12)' : 'rgba(0,122,255,0.12)',
+                backgroundColor: isInstalled ? 'rgba(52,199,89,0.12)' : alpha(colors.primary, 0.12),
                 borderWidth: StyleSheet.hairlineWidth,
-                borderColor: isInstalled ? 'rgba(52,199,89,0.28)' : 'rgba(0,122,255,0.28)',
+                borderColor: isInstalled ? 'rgba(52,199,89,0.28)' : alpha(colors.primary, 0.28),
               }}
             >
               <View
@@ -463,10 +466,10 @@ function GameInfoView({ game }: { game: PcGame }) {
                   width: s(5),
                   height: s(5),
                   borderRadius: s(2.5),
-                  backgroundColor: isInstalled ? '#34c759' : '#0a84ff',
+                  backgroundColor: isInstalled ? '#34c759' : colors.accent,
                 }}
               />
-              <T size={10} weight="semibold" color={isInstalled ? '#34c759' : '#0a84ff'}>
+              <T size={10} weight="semibold" color={isInstalled ? '#34c759' : colors.accent}>
                 {isInstalled ? 'Đã cài trên PC' : 'Chưa cài'}
               </T>
             </View>
@@ -557,13 +560,13 @@ function GameInfoView({ game }: { game: PcGame }) {
                 onPress={() => setDescExpanded(!descExpanded)}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: s(3) }}
               >
-                <T size={11} weight="medium" color="#60a5fa">
+                <T size={11} weight="medium" color={colors.accent}>
                   {descExpanded ? 'Thu gọn' : 'Xem thêm'}
                 </T>
                 {descExpanded ? (
-                  <ChevronUp size={s(13)} color="#60a5fa" strokeWidth={2} />
+                  <ChevronUp size={s(13)} color={colors.accent} strokeWidth={2} />
                 ) : (
-                  <ChevronDown size={s(13)} color="#60a5fa" strokeWidth={2} />
+                  <ChevronDown size={s(13)} color={colors.accent} strokeWidth={2} />
                 )}
               </Press>
             ) : null}
@@ -595,6 +598,7 @@ function GameInfoView({ game }: { game: PcGame }) {
 // ============================================================================
 
 function NewsArticleView({ item, onBack }: { item: SteamNewsItem; onBack: () => void }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const title = cleanSteamText(item.title) || item.title || 'Cập nhật';
   const summary = cleanSteamText(item.summary) || 'Bài cập nhật này chưa có nội dung tóm tắt.';
@@ -654,12 +658,12 @@ function NewsArticleView({ item, onBack }: { item: SteamNewsItem; onBack: () => 
                 paddingHorizontal: s(8),
                 paddingVertical: s(3),
                 borderRadius: s(8),
-                backgroundColor: 'rgba(96,165,250,0.14)',
+                backgroundColor: alpha(colors.accent, 0.14),
                 borderWidth: StyleSheet.hairlineWidth,
-                borderColor: 'rgba(96,165,250,0.25)',
+                borderColor: alpha(colors.accent, 0.25),
               }}
             >
-              <T size={9.5} weight="bold" color="#60a5fa">
+              <T size={9.5} weight="bold" color={colors.accent}>
                 {cleanSteamText(item.feedLabel).toUpperCase() || 'BẢN CẬP NHẬT'}
               </T>
             </View>
@@ -697,6 +701,7 @@ function NewsArticleView({ item, onBack }: { item: SteamNewsItem; onBack: () => 
 }
 
 function NewsCardItem({ item, onOpen }: { item: SteamNewsItem; onOpen: () => void }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const title = cleanSteamText(item.title) || item.title || 'Cập nhật';
   const summary = cleanSteamText(item.summary);
@@ -724,12 +729,12 @@ function NewsCardItem({ item, onOpen }: { item: SteamNewsItem; onOpen: () => voi
               paddingHorizontal: s(6),
               paddingVertical: s(2),
               borderRadius: s(6),
-              backgroundColor: 'rgba(96,165,250,0.12)',
+              backgroundColor: alpha(colors.accent, 0.12),
               borderWidth: StyleSheet.hairlineWidth,
-              borderColor: 'rgba(96,165,250,0.22)',
+              borderColor: alpha(colors.accent, 0.22),
             }}
           >
-            <T size={9} weight="bold" color="#60a5fa" numberOfLines={1}>
+            <T size={9} weight="bold" color={colors.accent} numberOfLines={1}>
               {cleanSteamText(item.feedLabel).toUpperCase() || 'BẢN VÁ'}
             </T>
           </View>
@@ -832,6 +837,7 @@ function GameNewsView({ appId }: { appId: number }) {
 // ============================================================================
 
 function AchievementRowItem({ achievement }: { achievement: SteamAchievement }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const unlockedAt = formatShortDate(achievement.unlockTime);
   const isUnlocked = Boolean(achievement.unlocked);
@@ -844,9 +850,9 @@ function AchievementRowItem({ achievement }: { achievement: SteamAchievement }) 
         padding: s(10),
         borderRadius: s(12),
         gap: s(12),
-        backgroundColor: isUnlocked ? 'rgba(59,130,246,0.08)' : 'rgba(255,255,255,0.035)',
+        backgroundColor: isUnlocked ? alpha(colors.primary, 0.08) : 'rgba(255,255,255,0.035)',
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: isUnlocked ? 'rgba(96,165,250,0.24)' : 'rgba(255,255,255,0.07)',
+        borderColor: isUnlocked ? alpha(colors.accent, 0.24) : 'rgba(255,255,255,0.07)',
       }}
     >
       <View
@@ -855,11 +861,11 @@ function AchievementRowItem({ achievement }: { achievement: SteamAchievement }) 
           height: s(44),
           borderRadius: s(10),
           overflow: 'hidden',
-          backgroundColor: isUnlocked ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.06)',
+          backgroundColor: isUnlocked ? alpha(colors.primary, 0.18) : 'rgba(255,255,255,0.06)',
           alignItems: 'center',
           justifyContent: 'center',
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: isUnlocked ? 'rgba(96,165,250,0.3)' : 'rgba(255,255,255,0.1)',
+          borderColor: isUnlocked ? alpha(colors.accent, 0.3) : 'rgba(255,255,255,0.1)',
         }}
       >
         {achievement.iconUrl ? (
@@ -869,7 +875,7 @@ function AchievementRowItem({ achievement }: { achievement: SteamAchievement }) 
             contentFit="cover"
           />
         ) : isUnlocked ? (
-          <Trophy size={s(20)} color="#60a5fa" />
+          <Trophy size={s(20)} color={colors.accent} />
         ) : (
           <LockKeyhole size={s(16)} color="rgba(255,255,255,0.3)" />
         )}
@@ -892,7 +898,7 @@ function AchievementRowItem({ achievement }: { achievement: SteamAchievement }) 
                 paddingHorizontal: s(6),
                 paddingVertical: s(1.5),
                 borderRadius: s(6),
-                backgroundColor: 'rgba(59,130,246,0.18)',
+                backgroundColor: alpha(colors.primary, 0.18),
               }}
             >
               <T size={9} weight="medium" color="#93c5fd" tabular>
@@ -925,6 +931,7 @@ function GameAchievementsView({
   loading: boolean;
   error: string | null;
 }) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const [filter, setFilter] = useState<'all' | 'unlocked' | 'locked'>('all');
 
@@ -992,7 +999,7 @@ function GameAchievementsView({
             </View>
           </View>
 
-          <T size={16} weight="bold" color="#60a5fa" tabular>
+          <T size={16} weight="bold" color={colors.accent} tabular>
             {percent}%
           </T>
         </View>
@@ -1011,7 +1018,7 @@ function GameAchievementsView({
               height: '100%',
               width: `${percent}%`,
               borderRadius: s(3),
-              backgroundColor: '#3b82f6',
+              backgroundColor: colors.primary,
             }}
           />
         </View>

@@ -7,7 +7,7 @@ import { useBack } from '@/features/gamepad/hooks';
 import type { PcGame } from '@/features/library/types';
 import type { UninstallResult } from '@/features/library/usePcLibrary';
 import type { GameUninstall } from '@/lib/steam-downloads';
-import { colors, glass } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -21,6 +21,8 @@ export function UninstallSheet({ game, operation, requesting, notice, onConfirm,
   onConfirm: () => Promise<UninstallResult>;
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s, width } = useUi();
   const [started, setStarted] = useState(Boolean(operation));
   const [requestError, setRequestError] = useState<string | null>(null);
@@ -116,7 +118,7 @@ export function UninstallSheet({ game, operation, requesting, notice, onConfirm,
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, glass }) => ({
   layer: {
     zIndex: 72,
     elevation: 72,
@@ -186,4 +188,4 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
   },
-});
+}));

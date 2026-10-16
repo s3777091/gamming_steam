@@ -1,6 +1,6 @@
 import { Text, type TextProps, type TextStyle } from 'react-native';
 
-import { colors, fonts } from '@/theme';
+import { fonts, useTheme } from '@/theme';
 import { useUi } from './scale';
 
 type Weight = keyof typeof fonts;
@@ -17,13 +17,14 @@ export type TProps = TextProps & {
 
 /** Chữ Inter đã co giãn theo màn hình; mọi chữ trong app đi qua đây. */
 export function T({
-  size = 12, weight = 'medium', color = colors.text, tracking, leading, tabular, style, ...rest
+  size = 12, weight = 'medium', color, tracking, leading, tabular, style, ...rest
 }: TProps) {
+  const { colors } = useTheme();
   const { s } = useUi();
   const base: TextStyle = {
     fontFamily: fonts[weight],
     fontSize: s(size),
-    color,
+    color: color ?? colors.text,
     ...(tracking != null ? { letterSpacing: s(size) * tracking } : null),
     ...(leading != null ? { lineHeight: s(size) * leading } : null),
     ...(tabular ? { fontVariant: ['tabular-nums'] } : null),

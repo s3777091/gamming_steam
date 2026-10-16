@@ -18,28 +18,21 @@ import {
   streamSettingsCopy,
   type NetworkResult,
 } from '@/lib/stream-settings-ui';
+import { useTheme } from '@/theme';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 import { MultipathSection } from './MultipathSection';
 
-import {
-  ActionRow,
-  appleColors,
-  ChoiceRow,
-  InfoRow,
-  rowStyle,
-  SettingsGroup,
-  SliderRow,
-  ToggleRow,
-} from './controls';
+import { ActionRow, ChoiceRow, InfoRow, rowStyle, SettingsGroup, SliderRow, ToggleRow } from './controls';
 import type { Notify, StreamSettingsDraft } from './useStreamSettingsDraft';
 import { useSettingsRestore } from './SettingsRestore';
 
 type PageProps = { draft: StreamSettingsDraft; settings: StreamSettings };
 
 function DeviceStreamRecommendation({ draft, settings }: PageProps) {
+  const { settings: appleColors } = useTheme();
   const [panel] = useState(() => {
     const display = clientDisplayGeometry();
     const native = getDisplayInfo();
@@ -71,6 +64,7 @@ function DeviceStreamRecommendation({ draft, settings }: PageProps) {
 }
 
 export function QualityPage({ draft, settings }: PageProps) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   const copy = streamSettingsCopy(draft.deviceClass);
   useSettingsRestore(draft.restoreDefaults, {
@@ -277,6 +271,7 @@ export function LatencyPage({ draft, settings }: PageProps) {
 }
 
 function MetricCard({ label, value, unit }: { label: string; value: string; unit: string }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   return (
     <View
@@ -308,6 +303,7 @@ function MetricCard({ label, value, unit }: { label: string; value: string; unit
 }
 
 export function NetworkPage({ draft, settings, notify }: PageProps & { notify: Notify }) {
+  const { settings: appleColors } = useTheme();
   const { s } = useUi();
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<NetworkResult | null>(null);

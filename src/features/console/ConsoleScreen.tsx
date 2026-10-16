@@ -41,6 +41,7 @@ import {
 } from '@/lib/stream-resume';
 import { type GameDownload, allDownloads, downloadForApp, isDownloadActive, uninstallForApp } from '@/lib/steam-downloads';
 import { type PurchaseOffer, type PurchaseTarget, purchaseKind } from '@/lib/steam-purchase';
+import { makeStyles } from '@/theme';
 import { useUi } from '@/ui/scale';
 import { GlassBackdrop, GlassBlurProvider } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
@@ -148,6 +149,7 @@ function ToastNotification({
 }
 
 export default function ConsoleScreen() {
+  const styles = useStyles();
   const { s, insets } = useUi();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<StoreTab>('games');
@@ -897,8 +899,8 @@ export default function ConsoleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, overflow: 'hidden', backgroundColor: '#080c12' },
+const useStyles = makeStyles(({ colors }) => ({
+  root: { flex: 1, overflow: 'hidden', backgroundColor: colors.bg },
   contentFrame: { flex: 1 },
   headerFrame: { position: 'absolute', zIndex: 30, elevation: 30 },
-});
+}));

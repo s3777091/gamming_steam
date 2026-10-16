@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, StyleSheet, View } from 'react-native';
 
 import type { ExitingGame } from './GuideMenu';
+import { alpha, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useMotion } from '@/ui/motion';
 import { useUi } from '@/ui/scale';
@@ -24,6 +25,7 @@ export function ExitGameOverlay({
   done: boolean;
   onFinished: () => void;
 }) {
+  const { colors } = useTheme();
   const { s, width } = useUi();
   const { reduceMotion } = useMotion();
   const [enter] = useState(() => new Animated.Value(0));
@@ -77,7 +79,7 @@ export function ExitGameOverlay({
         {game.heroUrl ? <Img source={{ uri: game.heroUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
         <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
         <LinearGradient
-          colors={['rgba(5,7,13,0.55)', 'rgba(5,7,13,0.35)', 'rgba(5,7,13,0.9)']}
+          colors={[alpha(colors.bgDeep, 0.55), alpha(colors.bgDeep, 0.35), alpha(colors.bgDeep, 0.9)]}
           locations={[0, 0.5, 1]}
           style={StyleSheet.absoluteFill}
         />
