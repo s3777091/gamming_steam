@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Gamepad2, Monitor, RefreshCw, WifiOff } from 'lucide-react-native';
 
 import { failBackdrop, finishBackdrop, requestBackdrop } from '@/lib/backdrop-state';
-import { alpha, ThemeDecor, useTheme } from '@/theme';
+import { alpha, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useMotion } from '@/ui/motion';
 import { LiquidAmbientAurora } from '@/ui/LiquidGlass';
@@ -227,8 +227,6 @@ export const LibraryBackdrop = memo(function LibraryBackdrop({ url, fallbackUrl,
         style={StyleSheet.absoluteFill}
       />
 
-      {/* 4. Không khí và hạt trôi của theme, nằm sau toàn bộ giao diện */}
-      <ThemeDecor />
     </View>
   );
 });
@@ -238,10 +236,11 @@ export const LibraryBackdrop = memo(function LibraryBackdrop({ url, fallbackUrl,
  * Phủ kín trên ảnh game và mờ dần vào/ra khi đổi tab.
  */
 export const PcWallpaper = memo(function PcWallpaper({ visible }: { visible: boolean }) {
-  const { colors } = useTheme();
+  const { colors, id } = useTheme();
   const { width, height } = useUi();
   const { reduceMotion } = useMotion();
   const [anim] = useState(() => new Animated.Value(visible ? 1 : 0));
+  const shade = id === 'console' ? '#020816' : colors.bgDeep;
 
   useEffect(() => {
     const animation = Animated.timing(anim, {
@@ -287,13 +286,13 @@ export const PcWallpaper = memo(function PcWallpaper({ visible }: { visible: boo
       {petal(width * 0.46, width * 0.3, height * 0.34, '-52deg', [alpha(colors.primary, 0.8), alpha(colors.primaryDark, 0.1)])}
       {petal(width * 0.34, width * 0.7, height * 0.5, '12deg', [alpha(colors.accentGlow, 0.75), alpha(colors.primary, 0.1)])}
       <LinearGradient
-        colors={['rgba(2,8,22,0.86)', 'rgba(2,8,22,0.4)', 'rgba(2,8,22,0.08)', 'rgba(2,8,22,0.32)']}
+        colors={[alpha(shade, 0.86), alpha(shade, 0.4), alpha(shade, 0.08), alpha(shade, 0.32)]}
         locations={[0, 0.4, 0.74, 1]}
         start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
         style={StyleSheet.absoluteFill}
       />
       <LinearGradient
-        colors={['rgba(2,8,22,0.4)', 'rgba(2,8,22,0)', 'rgba(2,8,22,0.78)']}
+        colors={[alpha(shade, 0.4), alpha(shade, 0), alpha(shade, 0.78)]}
         locations={[0, 0.3, 1]}
         style={StyleSheet.absoluteFill}
       />

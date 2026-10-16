@@ -4,6 +4,7 @@ import { createTheme } from '../createTheme';
 export const noelTheme = createTheme({
   id: 'noel',
   label: 'Noel',
+  material: 'frost',
   detail: 'Đỏ Giáng sinh trên nền xanh thông',
   decor: {
     particles: 'snow',

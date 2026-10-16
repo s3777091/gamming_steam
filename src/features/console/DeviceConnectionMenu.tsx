@@ -7,7 +7,7 @@ import { KIND_ICONS } from '@/features/devices/kindIcons';
 import { DEVICE_KIND_ORDER, KIND_LABEL, type LocalDevice } from '@/features/devices/useInputDevices';
 import { FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
-import { alpha, makeStyles, useTheme } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -54,7 +54,7 @@ function DeviceTile({
   autoFocus: boolean;
   onPress: () => void;
 }) {
-  const { colors } = useTheme();
+  const { glass, colors } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const Icon = KIND_ICONS[device.kind];
@@ -75,8 +75,8 @@ function DeviceTile({
           height,
           borderRadius: s(13),
           gap: s(4),
-          backgroundColor: device.kind === 'controller' ? alpha(colors.accent, 0.14) : 'rgba(255, 255, 255, 0.08)',
-          borderColor: device.kind === 'controller' ? alpha(colors.accent, 0.32) : 'rgba(255, 255, 255, 0.16)',
+          backgroundColor: device.kind === 'controller' ? glass.surfaceHighlight : glass.control,
+          borderColor: device.kind === 'controller' ? glass.borderAccent : glass.controlBorder,
         },
       ]}
     >
@@ -301,9 +301,9 @@ const useStyles = makeStyles(({ glass }) => ({
   closeBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: glass.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: glass.border,
   },
   tileRow: {
     flexDirection: 'row',
@@ -319,15 +319,15 @@ const useStyles = makeStyles(({ glass }) => ({
   },
   gaugeShell: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.45)',
+    borderColor: glass.controlBorderActive,
     justifyContent: 'center',
   },
   empty: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: glass.surfaceThin,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: glass.borderSubtle,
   },
 }));

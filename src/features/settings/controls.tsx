@@ -9,7 +9,7 @@ import { Check, ChevronRight, Loader, type LucideIcon } from 'lucide-react-nativ
 
 import { useFocusable } from '@/features/gamepad/focus';
 import { playUiSound, type UiSound } from '@/features/sound/UiSoundProvider';
-import { alpha, useTheme } from '@/theme';
+import { alpha, MaterialTexture, useTheme } from '@/theme';
 import { FocusRing } from '@/ui/FocusRing';
 import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
@@ -55,6 +55,7 @@ export function SettingsGroup({
           overflow: 'hidden',
         }}
       >
+        <MaterialTexture />
         {items.map((child, index) => (
           <View key={index}>
             {index > 0 ? (

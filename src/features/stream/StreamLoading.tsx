@@ -13,7 +13,7 @@ import {
   reduceLoadingSequence,
 } from '@/lib/loading-sequence';
 import { useUiSounds } from '@/features/sound/UiSoundProvider';
-import { alpha, glassShadowSubtle, makeStyles, SeasonGreeting, ThemeDecor, useSeason, useTheme } from '@/theme';
+import { alpha, glassShadowSubtle, LoadingSeasonScenery, makeStyles, SeasonGreeting, ThemeDecor, useSeason, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -46,11 +46,16 @@ export type StreamLoadingProps = {
    * tàu hay giới thiệu lại game.
    */
   direct?: boolean;
+  /** Xem thử trong Giao diện, không tạo phiên PC. */
+  preview?: boolean;
+  /** Gọi khi màn chờ đã tan hoàn toàn. */
+  onFinished?: () => void;
 };
 
 export function StreamLoading(props: StreamLoadingProps) {
   const [mounted, setMounted] = useState(props.visible);
-  const hide = useCallback(() => setMounted(false), []);
+  const onFinished = props.onFinished;
+  const hide = useCallback(() => { setMounted(false); onFinished?.(); }, [onFinished]);
   if (props.visible && !mounted) setMounted(true);
   if (!mounted) return null;
   return <StreamLoadingSequence {...props} onHidden={hide} />;
@@ -67,6 +72,7 @@ function StreamLoadingSequence({
   onExit,
   onReveal,
   direct = false,
+  preview = false,
   onHidden,
 }: StreamLoadingProps & { onHidden: () => void }) {
   const { colors } = useTheme();
@@ -123,7 +129,7 @@ function StreamLoadingSequence({
     const animation = Animated.parallel([
       Animated.timing(videoOpacity, {
         toValue: 0,
-        duration: 520,
+        duration: 700,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
@@ -211,7 +217,7 @@ function StreamLoadingSequence({
     return () => anim.stop();
   }, [active, ambientZoom, artworkVisible, reduceMotion]);
 
-  const heroUri = launch?.heroUrl || DEFAULT_PC_BACKDROP;
+  const heroUri = preview ? null : launch?.heroUrl || DEFAULT_PC_BACKDROP;
   const title = launch?.title ? launch.title.toUpperCase() : 'PC STREAMING';
 
   const progressPercentWidth = useMemo(
@@ -291,6 +297,7 @@ function StreamLoadingSequence({
       {/* Không khí và hạt của theme mùa trên video chờ; tan cùng video khi vào game. */}
       {stage !== 'finished' && !failure ? (
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: videoOpacity }]} pointerEvents="none">
+          <LoadingSeasonScenery />
           <ThemeDecor />
         </Animated.View>
       ) : null}
@@ -331,12 +338,12 @@ function StreamLoadingSequence({
       <View style={styles.topBar}>
         <Press
           onPress={onExit}
-          accessibilityLabel="Thoát phiên"
+          accessibilityLabel={preview ? 'Đóng xem thử màn chờ' : 'Thoát phiên'}
           sound="back"
           style={styles.exitPill}
         >
           <X size={s(14)} color="rgba(255,255,255,0.75)" />
-          <T size={11} weight="medium" color="rgba(255,255,255,0.85)">Thoát</T>
+          <T size={11} weight="medium" color="rgba(255,255,255,0.85)">{preview ? 'Đóng xem thử' : 'Thoát'}</T>
         </Press>
       </View>
 

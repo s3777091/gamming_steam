@@ -1,6 +1,30 @@
 /** Mỗi theme có một id cố định; id này được lưu trên máy để mở app lần sau dùng lại. */
 export type ThemeId = 'console' | 'noel' | 'halloween' | 'tet' | 'legend';
 
+export type MaterialKind = 'glass' | 'frost' | 'haunted' | 'lacquer' | 'gilded';
+
+/** Chất liệu thuộc theme; họa tiết mùa có thể tắt độc lập với chất liệu và màu. */
+export type SurfaceTokens = {
+  kind: MaterialKind;
+  label: string;
+  controlBlur: number;
+  panelBlur: number;
+  controlSheen: readonly [string, string, string];
+  panelSheen: readonly [string, string, string];
+  panelEdge: readonly [string, string, string];
+  sheen: readonly [string, string, string];
+  activeSheen: readonly [string, string];
+  artworkShade: readonly [string, string, string, string];
+  rim: readonly [string, string, string];
+  frame: readonly [string, string, string];
+  focusInner: string;
+  textureColor: string;
+  textureOpacity: number;
+  actionFill: readonly [string, string, string];
+  actionRim: string;
+  actionInk: string;
+};
+
 /** Màu nền tảng của console: bề mặt, màu nhấn, chữ, đường kẻ và trạng thái. */
 export type Palette = {
   bg: string;
@@ -174,6 +198,7 @@ export type Theme = {
   /** Một dòng mô tả ngắn dưới tên theme. */
   detail: string;
   colors: Palette;
+  material: SurfaceTokens;
   glass: GlassTokens;
   settings: SettingsTokens;
   decor: ThemeDecorSpec;

@@ -4,8 +4,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Monitor, Play } from 'lucide-react-native';
 
 import { FocusScroll } from '@/features/gamepad/focus';
-import { alpha, makeStyles, useTheme } from '@/theme';
+import { alpha, CardSurface, makeStyles, useTheme } from '@/theme';
 import { Press } from '@/ui/Press';
+import { SeasonPlayButton } from '@/ui/SeasonPlayButton';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
@@ -50,19 +51,21 @@ export const PcView = memo(function PcView({ reachable, refreshing, error, onCon
               Jetson PC
             </T>
           </Animated.View>
-          <Press
+          <SeasonPlayButton
+            size={size}
+            seasonal={reachable}
             onPress={onConnect}
             sound="confirm"
             autoFocus
             accessibilityLabel={label}
             style={[styles.play, { width: size, height: size, borderRadius: size / 2 }]}
           >
-            {reachable ? (
-              <Play size={s(18)} color={colors.white} fill={colors.white} style={{ marginLeft: s(2) }} />
+            {(ink) => reachable ? (
+              <Play size={s(18)} color={ink} fill={ink} style={{ marginLeft: s(2) }} />
             ) : (
-              <Monitor size={s(18)} color={colors.white} />
+              <Monitor size={s(18)} color={ink} />
             )}
-          </Press>
+          </SeasonPlayButton>
         </View>
         {error && !reachable ? (
           <View style={[styles.error, { marginTop: s(10), maxWidth: s(480), borderRadius: s(12), paddingHorizontal: s(12), paddingVertical: s(6) }]}>
@@ -88,20 +91,7 @@ export const PcView = memo(function PcView({ reachable, refreshing, error, onCon
               end={{ x: 0, y: 1 }}
               style={StyleSheet.absoluteFill}
             />
-            {/* Lớp phản quang khúc xạ ánh sáng đa góc Liquid Glass */}
-            <LinearGradient
-              colors={['rgba(255,255,255,0.22)', alpha(colors.panelSolid, 0), alpha(colors.panelSolid, 0.6)]}
-              locations={[0, 0.35, 1]}
-              style={StyleSheet.absoluteFill}
-            />
-            <LinearGradient
-              colors={['rgba(255,255,255,0.4)', 'transparent']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0.8, y: 0.8 }}
-              pointerEvents="none"
-              style={StyleSheet.absoluteFill}
-            />
-            <View pointerEvents="none" style={[styles.glassEdge, { borderRadius: s(19) }]} />
+            <CardSurface selected radius={s(20)} />
             <Monitor size={s(36)} color="rgba(255,255,255,0.92)" strokeWidth={1.5} style={styles.cardIcon} />
             <View style={[styles.chip, { right: s(10), bottom: s(10), borderRadius: s(12), paddingHorizontal: s(10), paddingVertical: s(6), gap: s(8) }]}>
               <View style={{ width: s(7), height: s(7), borderRadius: s(3.5), backgroundColor: reachable ? colors.success : colors.text4 }} />
@@ -120,7 +110,7 @@ const useStyles = makeStyles(({ glass, colors }) => ({
     justifyContent: 'center',
     backgroundColor: colors.primary,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.48)',
+    borderColor: glass.controlBorderActive,
     shadowColor: colors.primaryHover,
     shadowOpacity: 0.55,
     shadowRadius: 20,
@@ -138,19 +128,14 @@ const useStyles = makeStyles(({ glass, colors }) => ({
     shadowRadius: 20,
     elevation: 10,
   },
-  glassEdge: {
-    ...StyleSheet.absoluteFill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: glass.cardInnerEdge,
-  },
   cardIcon: { position: 'absolute', left: 16, top: 16 },
   chip: {
     position: 'absolute',
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-    backgroundColor: alpha(colors.panelSolid, 0.65),
+    borderColor: glass.controlBorder,
+    backgroundColor: glass.panel,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,

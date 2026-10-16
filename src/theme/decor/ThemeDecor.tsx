@@ -10,19 +10,23 @@ import { useMotion } from '@/ui/motion';
 import { useDecorEnabled, useTheme } from '../ThemeProvider';
 import { ThemeAmbience } from './ambience';
 import { ThemeParticles } from './particles';
+import { SeasonScenery } from './SeasonScenery';
 
-export function ThemeDecor() {
+export function ThemeDecor({ scenery = false, paused = false }: { scenery?: boolean; paused?: boolean }) {
   const theme = useTheme();
   const enabled = useDecorEnabled();
   const { active, reduceMotion } = useMotion();
   const { particles, ambience } = theme.decor;
-  if (!enabled || (!particles && !ambience)) return null;
+  if (!enabled || paused || (!particles && !ambience && !(scenery && theme.decor.season))) return null;
 
   const running = active && !reduceMotion;
   return (
     <View key={theme.id} pointerEvents="none" style={StyleSheet.absoluteFill}>
-      {ambience ? <ThemeAmbience kind={ambience} running={running} /> : null}
-      {particles && !reduceMotion ? <ThemeParticles kind={particles} running={running} /> : null}
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: scenery ? 0.72 : 1 }]}>
+        {ambience ? <ThemeAmbience kind={ambience} running={running} /> : null}
+        {particles && !reduceMotion ? <ThemeParticles kind={particles} running={running} /> : null}
+      </View>
+      {scenery ? <SeasonScenery /> : null}
     </View>
   );
 }

@@ -3,8 +3,12 @@
 
 export { alpha, mix } from './color';
 export { createTheme, type ThemeSeed, type ThemeSpec } from './createTheme';
-export { AvatarFrame, HeaderAccent, SeasonalIcon, SeasonGlyphIcon, SeasonGreeting, useSeason } from './decor/season';
+export { SeasonGlyphIcon } from './decor/glyph';
+export { AvatarFrame, HeaderAccent, SeasonalIcon, SeasonGreeting, useSeason } from './decor/season';
 export { ThemeDecor } from './decor/ThemeDecor';
+export { MaterialTexture } from './decor/MaterialTexture';
+export { SeasonScenery } from './decor/SeasonScenery';
+export { CardSurface, LoadingSeasonScenery, SeasonalCorners, SurfaceSheen } from './decor/surfaces';
 export { DEFAULT_THEME_ID, getTheme, isThemeId, THEMES } from './registry';
 export { DESIGN, fonts, glassShadow, glassShadowSubtle } from './static';
 export { makeStyles, ThemeProvider, useDecorEnabled, useTheme, useThemeControl, type ThemeChangeOptions } from './ThemeProvider';
@@ -13,11 +17,13 @@ export type {
   AmbienceKind,
   DecorAsset,
   GlassTokens,
+  MaterialKind,
   Palette,
   ParticleKind,
   SeasonGlyph,
   SeasonSpec,
   SettingsTokens,
+  SurfaceTokens,
   Theme,
   ThemeDecorSpec,
   ThemeId,

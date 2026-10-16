@@ -139,7 +139,7 @@ function AppleTabItem({
             paddingHorizontal: s(5),
             paddingVertical: s(1),
             borderRadius: s(6),
-            backgroundColor: active ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.08)',
+            backgroundColor: active ? glass.controlActive : glass.control,
           }}
         >
           <T size={9.5} weight="bold" color={active ? colors.white : colors.text3} tabular>
@@ -231,6 +231,7 @@ function AppleTabBar({
 // ============================================================================
 
 function InfoGlanceCard({ label, value, caption }: { label: string; value: string; caption?: string }) {
+  const { glass } = useTheme();
   const { s } = useUi();
   return (
     <View
@@ -242,9 +243,9 @@ function InfoGlanceCard({ label, value, caption }: { label: string; value: strin
         paddingVertical: s(10),
         paddingHorizontal: s(6),
         borderRadius: s(12),
-        backgroundColor: 'rgba(255,255,255,0.04)',
+        backgroundColor: glass.surfaceUltraThin,
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: 'rgba(255,255,255,0.07)',
+        borderColor: glass.borderSubtle,
       }}
     >
       <T size={8.5} weight="bold" color="rgba(255,255,255,0.42)" tracking={0.06} numberOfLines={1}>
@@ -277,6 +278,7 @@ function InsetSpecRow({
   value: string;
   isLast?: boolean;
 }) {
+  const { glass } = useTheme();
   const { s } = useUi();
   return (
     <View
@@ -287,7 +289,7 @@ function InsetSpecRow({
         paddingVertical: s(10),
         paddingHorizontal: s(14),
         borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth,
-        borderBottomColor: 'rgba(255,255,255,0.06)',
+        borderBottomColor: glass.borderSubtle,
         gap: s(12),
       }}
     >
@@ -322,7 +324,7 @@ function InsetSpecRow({
 }
 
 function GameInfoView({ game }: { game: PcGame }) {
-  const { colors } = useTheme();
+  const { glass, colors } = useTheme();
   const { s } = useUi();
   const [descExpanded, setDescExpanded] = useState(false);
 
@@ -345,43 +347,43 @@ function GameInfoView({ game }: { game: PcGame }) {
     },
     game.publisher && {
       icon: Building2,
-      iconColor: '#c084fc',
-      iconBg: 'rgba(168,85,247,0.16)',
+      iconColor: colors.accentSoft,
+      iconBg: glass.surfaceHighlight,
       label: 'Nhà phát hành',
       value: game.publisher,
     },
     game.genres?.length && {
       icon: Layers,
-      iconColor: '#fbbf24',
-      iconBg: 'rgba(245,158,11,0.16)',
+      iconColor: colors.accentSoft,
+      iconBg: glass.surfaceHighlight,
       label: 'Thể loại',
       value: game.genres.join(', '),
     },
     game.releaseDate && {
       icon: Calendar,
-      iconColor: '#2dd4bf',
-      iconBg: 'rgba(20,184,166,0.16)',
+      iconColor: colors.accentSoft,
+      iconBg: glass.surfaceHighlight,
       label: 'Ngày phát hành',
       value: game.releaseDate,
     },
     game.sizeBytes && {
       icon: HardDrive,
-      iconColor: '#fb7185',
-      iconBg: 'rgba(244,63,94,0.16)',
+      iconColor: colors.accentSoft,
+      iconBg: glass.surfaceHighlight,
       label: 'Dung lượng ổ đĩa',
       value: sizeText,
     },
     {
       icon: Monitor,
-      iconColor: '#38bdf8',
-      iconBg: 'rgba(6,182,212,0.16)',
+      iconColor: colors.accentSoft,
+      iconBg: glass.surfaceHighlight,
       label: 'Nền tảng',
       value: 'Windows PC',
     },
     game.steamAppId && {
       icon: Hash,
-      iconColor: '#cbd5e1',
-      iconBg: 'rgba(148,163,184,0.16)',
+      iconColor: colors.accentSoft,
+      iconBg: glass.surfaceHighlight,
       label: 'Steam App ID',
       value: `#${game.steamAppId}`,
     },
@@ -410,9 +412,9 @@ function GameInfoView({ game }: { game: PcGame }) {
           gap: s(14),
           padding: s(14),
           borderRadius: s(16),
-          backgroundColor: 'rgba(255,255,255,0.035)',
+          backgroundColor: glass.surfaceUltraThin,
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: 'rgba(255,255,255,0.08)',
+          borderColor: glass.borderSubtle,
         }}
       >
         <View
@@ -421,9 +423,9 @@ function GameInfoView({ game }: { game: PcGame }) {
             height: s(64),
             borderRadius: s(16),
             overflow: 'hidden',
-            backgroundColor: 'rgba(255,255,255,0.06)',
+            backgroundColor: glass.surfaceThin,
             borderWidth: StyleSheet.hairlineWidth,
-            borderColor: 'rgba(255,255,255,0.14)',
+            borderColor: glass.border,
           }}
         >
           {game.artworkUrl || game.heroUrl ? (
@@ -479,9 +481,9 @@ function GameInfoView({ game }: { game: PcGame }) {
                 paddingHorizontal: s(7),
                 paddingVertical: s(3),
                 borderRadius: s(10),
-                backgroundColor: 'rgba(255,255,255,0.06)',
+                backgroundColor: glass.surfaceThin,
                 borderWidth: StyleSheet.hairlineWidth,
-                borderColor: 'rgba(255,255,255,0.08)',
+                borderColor: glass.borderSubtle,
               }}
             >
               <T size={9.5} weight="medium" color="rgba(255,255,255,0.6)">
@@ -508,9 +510,9 @@ function GameInfoView({ game }: { game: PcGame }) {
       <View
         style={{
           borderRadius: s(16),
-          backgroundColor: 'rgba(255,255,255,0.035)',
+          backgroundColor: glass.surfaceUltraThin,
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: 'rgba(255,255,255,0.08)',
+          borderColor: glass.borderSubtle,
           overflow: 'hidden',
         }}
       >
@@ -520,7 +522,7 @@ function GameInfoView({ game }: { game: PcGame }) {
             paddingTop: s(12),
             paddingBottom: s(6),
             borderBottomWidth: StyleSheet.hairlineWidth,
-            borderBottomColor: 'rgba(255,255,255,0.05)',
+            borderBottomColor: glass.borderSubtle,
           }}
         >
           <T size={11} weight="semibold" color="rgba(255,255,255,0.4)" tracking={0.04}>
@@ -545,9 +547,9 @@ function GameInfoView({ game }: { game: PcGame }) {
         <View
           style={{
             borderRadius: s(16),
-            backgroundColor: 'rgba(255,255,255,0.035)',
+            backgroundColor: glass.surfaceUltraThin,
             borderWidth: StyleSheet.hairlineWidth,
-            borderColor: 'rgba(255,255,255,0.08)',
+            borderColor: glass.borderSubtle,
             padding: s(14),
           }}
         >
@@ -598,7 +600,7 @@ function GameInfoView({ game }: { game: PcGame }) {
 // ============================================================================
 
 function NewsArticleView({ item, onBack }: { item: SteamNewsItem; onBack: () => void }) {
-  const { colors } = useTheme();
+  const { glass, colors } = useTheme();
   const { s } = useUi();
   const title = cleanSteamText(item.title) || item.title || 'Cập nhật';
   const summary = cleanSteamText(item.summary) || 'Bài cập nhật này chưa có nội dung tóm tắt.';
@@ -632,9 +634,9 @@ function NewsArticleView({ item, onBack }: { item: SteamNewsItem; onBack: () => 
             height: s(160),
             borderRadius: s(16),
             overflow: 'hidden',
-            backgroundColor: 'rgba(255,255,255,0.06)',
+            backgroundColor: glass.surfaceThin,
             borderWidth: StyleSheet.hairlineWidth,
-            borderColor: 'rgba(255,255,255,0.12)',
+            borderColor: glass.border,
           }}
         >
           <Img source={{ uri: previewImage }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
@@ -645,9 +647,9 @@ function NewsArticleView({ item, onBack }: { item: SteamNewsItem; onBack: () => 
         style={{
           padding: s(16),
           borderRadius: s(16),
-          backgroundColor: 'rgba(255,255,255,0.035)',
+          backgroundColor: glass.surfaceUltraThin,
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: 'rgba(255,255,255,0.08)',
+          borderColor: glass.borderSubtle,
           gap: s(10),
         }}
       >
@@ -684,7 +686,7 @@ function NewsArticleView({ item, onBack }: { item: SteamNewsItem; onBack: () => 
           {title}
         </T>
 
-        <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: s(4) }} />
+        <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: glass.surface, marginVertical: s(4) }} />
 
         <T size={12} color="rgba(255,255,255,0.8)" leading={1.7}>
           {summary}
@@ -701,7 +703,7 @@ function NewsArticleView({ item, onBack }: { item: SteamNewsItem; onBack: () => 
 }
 
 function NewsCardItem({ item, onOpen }: { item: SteamNewsItem; onOpen: () => void }) {
-  const { colors } = useTheme();
+  const { glass, colors } = useTheme();
   const { s } = useUi();
   const title = cleanSteamText(item.title) || item.title || 'Cập nhật';
   const summary = cleanSteamText(item.summary);
@@ -716,9 +718,9 @@ function NewsCardItem({ item, onOpen }: { item: SteamNewsItem; onOpen: () => voi
       style={{
         padding: s(13),
         borderRadius: s(14),
-        backgroundColor: 'rgba(255,255,255,0.035)',
+        backgroundColor: glass.surfaceUltraThin,
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: 'rgba(255,255,255,0.08)',
+        borderColor: glass.borderSubtle,
         gap: s(8),
       }}
     >
@@ -756,9 +758,9 @@ function NewsCardItem({ item, onOpen }: { item: SteamNewsItem; onOpen: () => voi
               height: s(52),
               borderRadius: s(10),
               overflow: 'hidden',
-              backgroundColor: 'rgba(255,255,255,0.06)',
+              backgroundColor: glass.surfaceThin,
               borderWidth: StyleSheet.hairlineWidth,
-              borderColor: 'rgba(255,255,255,0.1)',
+              borderColor: glass.borderSubtle,
               flexShrink: 0,
             }}
           >
@@ -837,7 +839,7 @@ function GameNewsView({ appId }: { appId: number }) {
 // ============================================================================
 
 function AchievementRowItem({ achievement }: { achievement: SteamAchievement }) {
-  const { colors } = useTheme();
+  const { colors, glass } = useTheme();
   const { s } = useUi();
   const unlockedAt = formatShortDate(achievement.unlockTime);
   const isUnlocked = Boolean(achievement.unlocked);
@@ -850,9 +852,9 @@ function AchievementRowItem({ achievement }: { achievement: SteamAchievement }) 
         padding: s(10),
         borderRadius: s(12),
         gap: s(12),
-        backgroundColor: isUnlocked ? alpha(colors.primary, 0.08) : 'rgba(255,255,255,0.035)',
+        backgroundColor: isUnlocked ? alpha(colors.primary, 0.08) : glass.surfaceUltraThin,
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: isUnlocked ? alpha(colors.accent, 0.24) : 'rgba(255,255,255,0.07)',
+        borderColor: isUnlocked ? alpha(colors.accent, 0.24) : glass.borderSubtle,
       }}
     >
       <View
@@ -861,11 +863,11 @@ function AchievementRowItem({ achievement }: { achievement: SteamAchievement }) 
           height: s(44),
           borderRadius: s(10),
           overflow: 'hidden',
-          backgroundColor: isUnlocked ? alpha(colors.primary, 0.18) : 'rgba(255,255,255,0.06)',
+          backgroundColor: isUnlocked ? alpha(colors.primary, 0.18) : glass.surfaceThin,
           alignItems: 'center',
           justifyContent: 'center',
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: isUnlocked ? alpha(colors.accent, 0.3) : 'rgba(255,255,255,0.1)',
+          borderColor: isUnlocked ? alpha(colors.accent, 0.3) : glass.borderSubtle,
         }}
       >
         {achievement.iconUrl ? (
@@ -931,7 +933,7 @@ function GameAchievementsView({
   loading: boolean;
   error: string | null;
 }) {
-  const { colors } = useTheme();
+  const { glass, colors } = useTheme();
   const { s } = useUi();
   const [filter, setFilter] = useState<'all' | 'unlocked' | 'locked'>('all');
 
@@ -969,9 +971,9 @@ function GameAchievementsView({
         style={{
           padding: s(14),
           borderRadius: s(16),
-          backgroundColor: 'rgba(255,255,255,0.035)',
+          backgroundColor: glass.surfaceUltraThin,
           borderWidth: StyleSheet.hairlineWidth,
-          borderColor: 'rgba(255,255,255,0.08)',
+          borderColor: glass.borderSubtle,
           gap: s(10),
         }}
       >
@@ -982,12 +984,12 @@ function GameAchievementsView({
                 width: s(32),
                 height: s(32),
                 borderRadius: s(8),
-                backgroundColor: 'rgba(245,158,11,0.16)',
+                backgroundColor: glass.surfaceHighlight,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <Trophy size={s(17)} color="#fbbf24" />
+              <Trophy size={s(17)} color={colors.accentSoft} />
             </View>
             <View>
               <T size={12.5} weight="bold" color="#ffffff">
@@ -1009,7 +1011,7 @@ function GameAchievementsView({
           style={{
             height: s(6),
             borderRadius: s(3),
-            backgroundColor: 'rgba(255,255,255,0.08)',
+            backgroundColor: glass.surface,
             overflow: 'hidden',
           }}
         >
@@ -1042,9 +1044,9 @@ function GameAchievementsView({
                   paddingHorizontal: s(10),
                   paddingVertical: s(4),
                   borderRadius: s(8),
-                  backgroundColor: active ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.05)',
+                  backgroundColor: active ? glass.controlActive : glass.surfaceThin,
                   borderWidth: StyleSheet.hairlineWidth,
-                  borderColor: active ? 'rgba(255,255,255,0.2)' : 'transparent',
+                  borderColor: active ? glass.controlBorderActive : 'transparent',
                 }}
               >
                 <T size={10} weight={active ? 'semibold' : 'medium'} color={active ? '#ffffff' : 'rgba(255,255,255,0.45)'}>

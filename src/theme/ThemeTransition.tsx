@@ -7,7 +7,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { mix } from './color';
-import type { Theme } from './types';
+import { SeasonGlyphIcon } from './decor/glyph';
+import type { SeasonGlyph, Theme } from './types';
 
 export type ThemeTransitionOrigin = { x: number; y: number };
 
@@ -26,12 +27,13 @@ type Props = {
   origin: ThemeTransitionOrigin | null;
   /** Theme mới đã được áp dụng bên dưới lớp phủ: bắt đầu tan lớp phủ. */
   committed: boolean;
+  onStart?: () => void;
   onImpact?: () => void;
   onCovered: () => void;
   onDone: () => void;
 };
 
-export function ThemeTransition({ theme, origin, committed, onImpact, onCovered, onDone }: Props) {
+export function ThemeTransition({ theme, origin, committed, onStart, onImpact, onCovered, onDone }: Props) {
   const { width, height } = useWindowDimensions();
   const { colors } = theme;
   const at = origin ?? { x: width / 2, y: height / 2 };
@@ -42,9 +44,9 @@ export function ThemeTransition({ theme, origin, committed, onImpact, onCovered,
   const [waves] = useState(() => [0, 1, 2].map(() => new Animated.Value(0)));
   const [reveal] = useState(() => new Animated.Value(1));
 
-  const callbacks = useRef({ onImpact, onCovered, onDone });
+  const callbacks = useRef({ onStart, onImpact, onCovered, onDone });
   useEffect(() => {
-    callbacks.current = { onImpact, onCovered, onDone };
+    callbacks.current = { onStart, onImpact, onCovered, onDone };
   });
 
   // Vòng phủ phải chạm tới góc xa nhất của màn hình.
@@ -59,6 +61,7 @@ export function ThemeTransition({ theme, origin, committed, onImpact, onCovered,
       useNativeDriver: true,
     });
     let impactAnim: Animated.CompositeAnimation | null = null;
+    callbacks.current.onStart?.();
     fallAnim.start(({ finished }) => {
       if (!finished) return;
       callbacks.current.onImpact?.();
@@ -220,7 +223,7 @@ export function ThemeTransition({ theme, origin, committed, onImpact, onCovered,
             ],
           }}
         >
-          <Teardrop size={DROP} color={colors.accent} outline={outline} />
+          <Teardrop size={DROP} color={colors.accent} outline={outline} glyph={theme.decor.season?.glyph} />
         </Animated.View>
       </Animated.View>
     </Animated.View>
@@ -228,7 +231,7 @@ export function ThemeTransition({ theme, origin, committed, onImpact, onCovered,
 }
 
 /** Giọt nước kiểu hoạt hình: hình vuông bo ba góc xoay 45° để góc nhọn chĩa lên, có viền và vệt sáng. */
-function Teardrop({ size, color, outline }: { size: number; color: string; outline: string }) {
+function Teardrop({ size, color, outline, glyph }: { size: number; color: string; outline: string; glyph?: SeasonGlyph }) {
   const side = size * 0.7;
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: size * 0.06 }}>
@@ -271,6 +274,12 @@ function Teardrop({ size, color, outline }: { size: number; color: string; outli
           }}
         />
       </View>
+      {/* Ký hiệu mùa giữa thân giọt: bông tuyết, ma, hoa mai, vương miện. */}
+      {glyph ? (
+        <View style={{ position: 'absolute', bottom: size * 0.06 + side * 0.24, alignSelf: 'center' }}>
+          <SeasonGlyphIcon glyph={glyph} size={side * 0.48} color="rgba(255, 255, 255, 0.92)" />
+        </View>
+      ) : null}
     </View>
   );
 }

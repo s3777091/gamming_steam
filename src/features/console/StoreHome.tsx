@@ -8,7 +8,7 @@ import Svg, { Path } from 'react-native-svg';
 import { formatStorePrice } from '@/features/library/format';
 import type { SteamPromotion, SteamStoreItem, StoreResponse } from '@/features/library/types';
 import { nearbyBackdropUrls } from '@/lib/backdrop-preloader';
-import { alpha, makeStyles, useTheme } from '@/theme';
+import { alpha, CardSurface, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useBackdropPreload } from '@/ui/useBackdropPreload';
 import { useMotion } from '@/ui/motion';
@@ -22,9 +22,9 @@ const GAP = 10;
 const SHELF_DISC = 42;
 const SHELF_BLOCK = 52;
 const SHELF_FILLET = 18;
-const SHELF_SURFACE = '#060b13';
 
 function NotchFillet({ bottom, right }: { bottom: number; right: number }) {
+  const { colors, id } = useTheme();
   const { s } = useUi();
   const size = s(SHELF_FILLET);
   return (
@@ -37,7 +37,7 @@ function NotchFillet({ bottom, right }: { bottom: number; right: number }) {
     >
       <Path
         d={`M ${SHELF_FILLET} 0 L ${SHELF_FILLET} ${SHELF_FILLET} L 0 ${SHELF_FILLET} A ${SHELF_FILLET} ${SHELF_FILLET} 0 0 0 ${SHELF_FILLET} 0 Z`}
-        fill={SHELF_SURFACE}
+        fill={id === 'console' ? '#060b13' : colors.bgDeep}
       />
     </Svg>
   );
@@ -122,7 +122,7 @@ const ShelfCard = memo(function ShelfCard({ item, previewing, onPreview, onOpen 
   onPreview: (item: SteamStoreItem) => void;
   onOpen: (item: SteamStoreItem) => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, glass, id } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const preview = useCallback(() => onPreview(item), [item, onPreview]);
@@ -158,7 +158,7 @@ const ShelfCard = memo(function ShelfCard({ item, previewing, onPreview, onOpen 
               width: s(previewing ? PREVIEW.w : IDLE.w),
               height: s(previewing ? PREVIEW.h : IDLE.h),
               marginBottom: previewing ? 0 : s(4),
-              borderColor: previewing ? 'rgba(255,255,255,0)' : 'rgba(255,255,255,0.14)',
+              borderColor: previewing ? glass.cardBorderActive : glass.cardBorder,
               opacity: selection.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }),
               transform: [
                 { scale: selection.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1] }) },
@@ -168,6 +168,7 @@ const ShelfCard = memo(function ShelfCard({ item, previewing, onPreview, onOpen 
           ]}
         >
           <Img source={{ uri: item.largeImage }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <CardSurface selected={previewing} radius={s(previewing ? 20 : 12)} />
           {previewing ? (
             <>
               <View pointerEvents="none" style={styles.selectedWash} />
@@ -192,7 +193,7 @@ const ShelfCard = memo(function ShelfCard({ item, previewing, onPreview, onOpen 
                   width: s(SHELF_BLOCK),
                   height: s(SHELF_BLOCK),
                   borderTopLeftRadius: s(SHELF_BLOCK - SHELF_DISC / 2),
-                  backgroundColor: SHELF_SURFACE,
+                  backgroundColor: id === 'console' ? '#060b13' : colors.bgDeep,
                 }}
               />
               <NotchFillet bottom={SHELF_BLOCK} right={0} />
@@ -200,7 +201,6 @@ const ShelfCard = memo(function ShelfCard({ item, previewing, onPreview, onOpen 
             </>
           ) : (
             <>
-              <LinearGradient colors={[alpha(colors.panelSolid, 0), alpha(colors.panelSolid, 0.88)]} style={StyleSheet.absoluteFill} />
               <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: s(8), flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: s(8) }}>
                 <T size={9.3} weight="semibold" color="rgba(255,255,255,0.92)" numberOfLines={1} style={{ flex: 1 }}>{item.name}</T>
                 {item.discounted ? <DiscountBadge percent={item.discountPercent} size={8.3} /> : null}
@@ -243,7 +243,7 @@ const PromotionTile = memo(function PromotionTile({ promotion, onOpen }: { promo
 });
 
 const QuickDealTile = memo(function QuickDealTile({ item, previewing, onPreview }: { item: SteamStoreItem; previewing: boolean; onPreview: (item: SteamStoreItem) => void }) {
-  const { colors } = useTheme();
+  const { colors, glass } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const preview = useCallback(() => onPreview(item), [item, onPreview]);
@@ -253,7 +253,7 @@ const QuickDealTile = memo(function QuickDealTile({ item, previewing, onPreview 
       onFocused={preview}
       pressScale={0.99}
       accessibilityLabel={`Chọn ${item.name}`}
-      style={[styles.tile, { flex: 1, borderRadius: s(12), borderColor: previewing ? colors.accentGlow : 'rgba(255,255,255,0.12)' }]}
+      style={[styles.tile, { flex: 1, borderRadius: s(12), borderColor: previewing ? glass.cardBorderActive : glass.cardBorder }]}
     >
       <Img source={{ uri: item.largeImage }} style={StyleSheet.absoluteFill} contentFit="cover" />
       <LinearGradient colors={[alpha(colors.panelSolid, 0.84), alpha(colors.panelSolid, 0.24), alpha(colors.panelSolid, 0)]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
@@ -338,7 +338,7 @@ export const StoreHome = memo(function StoreHome({ data, featured, preview, onPr
   );
 });
 
-const useStyles = makeStyles(({ colors }) => ({
+const useStyles = makeStyles(({ colors, glass }) => ({
   card: {
     overflow: 'hidden',
     borderWidth: 1,
@@ -352,7 +352,7 @@ const useStyles = makeStyles(({ colors }) => ({
   tile: {
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: glass.cardBorder,
     backgroundColor: alpha(colors.card, 0.82),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -366,7 +366,7 @@ const useStyles = makeStyles(({ colors }) => ({
     right: 0,
     bottom: 0,
     left: 0,
-    backgroundColor: 'rgba(4,8,13,0.12)',
+    backgroundColor: alpha(colors.bgDeep, 0.12),
   },
   badgeSlot: {
     position: 'absolute',
@@ -389,8 +389,8 @@ const useStyles = makeStyles(({ colors }) => ({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.36)',
-    backgroundColor: 'rgba(16, 26, 42, 0.78)',
+    borderColor: glass.controlBorder,
+    backgroundColor: glass.panel,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.28,
@@ -403,10 +403,10 @@ const useStyles = makeStyles(({ colors }) => ({
     bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(32, 33, 36, 0.92)',
+    backgroundColor: glass.floatingBar,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-    shadowColor: '#020812',
+    borderColor: glass.controlBorder,
+    shadowColor: colors.bgDeep,
     shadowOpacity: 0.45,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },

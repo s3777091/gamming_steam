@@ -12,11 +12,12 @@ import type { SteamDownloads } from '@/features/library/useSteamDownloads';
 import { type GameDownload, type GameUninstall, downloadForApp, primaryDownload, uninstallForApp } from '@/lib/steam-downloads';
 import { shelfItemLayout } from '@/lib/game-shelf-layout';
 import { nearbyBackdropUrls } from '@/lib/backdrop-preloader';
-import { alpha, makeStyles, useTheme } from '@/theme';
+import { alpha, CardSurface, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useBackdropPreload } from '@/ui/useBackdropPreload';
 import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
+import { SeasonPlayButton } from '@/ui/SeasonPlayButton';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
@@ -76,7 +77,6 @@ function PrimaryAction({ library, download, uninstall, canControl, onPlay, onIns
   onDownloadPress: () => void;
   reachable: boolean;
 }) {
-  const { colors } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const { active: appActive, reduceMotion } = useMotion();
@@ -103,7 +103,9 @@ function PrimaryAction({ library, download, uninstall, canControl, onPlay, onIns
 
   const size = s(44);
   return (
-    <Press
+    <SeasonPlayButton
+      size={size}
+      seasonal={reachable && installed && !tracking && !uninstalling}
       onPress={tracking ? onDownloadPress : !reachable || installed ? onPlay : onInstall}
       sound="confirm"
       disabled={tracking ? false : busy}
@@ -111,30 +113,34 @@ function PrimaryAction({ library, download, uninstall, canControl, onPlay, onIns
       accessibilityLabel={label}
       style={[styles.play, { width: size, height: size, borderRadius: size / 2 }]}
     >
-      {uninstalling ? <ProgressRing size={size} percent={uninstalling.progress} /> : tracking ? <ProgressRing size={size} percent={tracking.percent} /> : null}
-      <Animated.View style={{ opacity: pulse }}>
-        {uninstalling ? (
-          <Trash2 size={s(16)} color={colors.white} />
-        ) : tracking ? (
-          tracking.status === 'eula' ? <FileText size={s(17)} color={colors.white} />
-            : tracking.status === 'config' ? <HardDrive size={s(17)} color={colors.white} />
-            : tracking.status === 'downloading' && canControl ? <Pause size={s(16)} color={colors.white} fill={colors.white} />
-              : <Download size={s(16)} color={colors.white} />
-        ) : !reachable ? (
-          <Monitor size={s(18)} color={colors.white} />
-        ) : installed ? (
-          <Play size={s(18)} color={colors.white} fill={colors.white} style={{ marginLeft: s(2) }} />
-        ) : (
-          <Download size={s(18)} color={colors.white} />
-        )}
-      </Animated.View>
-    </Press>
+      {(ink) => (
+        <>
+          {uninstalling ? <ProgressRing size={size} percent={uninstalling.progress} /> : tracking ? <ProgressRing size={size} percent={tracking.percent} /> : null}
+          <Animated.View style={{ opacity: pulse }}>
+            {uninstalling ? (
+              <Trash2 size={s(16)} color={ink} />
+            ) : tracking ? (
+              tracking.status === 'eula' ? <FileText size={s(17)} color={ink} />
+                : tracking.status === 'config' ? <HardDrive size={s(17)} color={ink} />
+                : tracking.status === 'downloading' && canControl ? <Pause size={s(16)} color={ink} fill={ink} />
+                  : <Download size={s(16)} color={ink} />
+            ) : !reachable ? (
+              <Monitor size={s(18)} color={ink} />
+            ) : installed ? (
+              <Play size={s(18)} color={ink} fill={ink} style={{ marginLeft: s(2) }} />
+            ) : (
+              <Download size={s(18)} color={ink} />
+            )}
+          </Animated.View>
+        </>
+      )}
+    </SeasonPlayButton>
   );
 }
 
 /** Nút (…) cạnh Play: mở bảng tùy chọn game phong cách Console. */
 function GameMoreButton({ active, onPress }: { active: boolean; onPress: () => void }) {
-  const { colors } = useTheme();
+  const { glass } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const size = s(44);
@@ -148,8 +154,8 @@ function GameMoreButton({ active, onPress }: { active: boolean; onPress: () => v
           width: size,
           height: size,
           borderRadius: size / 2,
-          borderColor: active ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.16)',
-          backgroundColor: active ? 'rgba(255,255,255,0.12)' : alpha(colors.panelSolid, 0.34),
+          borderColor: active ? glass.controlBorderActive : glass.controlBorder,
+          backgroundColor: active ? glass.controlActive : glass.control,
         },
       ]}
     >
@@ -192,7 +198,7 @@ const GameCard = memo(function GameCard({ game, active, achievements, onSelect, 
   /** Gắn vào thẻ đang chọn: điểm xuất phát của hiệu ứng thẻ bay vào thông báo. */
   cardRef: RefObject<View | null>;
 }) {
-  const { glass, colors } = useTheme();
+  const { glass } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const select = useCallback(() => onSelect(game.id), [game.id, onSelect]);
@@ -239,28 +245,7 @@ const GameCard = memo(function GameCard({ game, active, achievements, onSelect, 
         ]}
       >
         {game.artworkUrl ? <Img source={{ uri: game.artworkUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
-        {/* Lớp phản quang ánh sáng và khúc xạ đa chiều Liquid Glass */}
-        <LinearGradient
-          colors={['rgba(255,255,255,0.18)', alpha(colors.panelSolid, 0), alpha(colors.panelSolid, 0.72)]}
-          locations={[0, 0.35, 1]}
-          style={StyleSheet.absoluteFill}
-        />
-        {active ? (
-          <LinearGradient
-            colors={['rgba(255,255,255,0.35)', 'transparent']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0.8, y: 0.8 }}
-            pointerEvents="none"
-            style={StyleSheet.absoluteFill}
-          />
-        ) : null}
-        <View
-          pointerEvents="none"
-          style={[
-            styles.glassEdge,
-            { borderRadius: s(active ? 19 : 15) },
-          ]}
-        />
+        <CardSurface selected={active} radius={s(active ? 20 : 16)} />
         {active && data?.supported ? (
           <View style={[styles.trophy, { right: s(10), bottom: s(10), borderRadius: s(12), paddingHorizontal: s(10), paddingVertical: s(6), gap: s(8) }]}>
             <T size={10.9} weight="bold" color="#ffffff" tabular>{percent}%</T>
@@ -539,7 +524,7 @@ const useStyles = makeStyles(({ colors, glass }) => ({
     justifyContent: 'center',
     backgroundColor: colors.primary,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.48)',
+    borderColor: glass.controlBorderActive,
     shadowColor: colors.primaryHover,
     shadowOpacity: 0.55,
     shadowRadius: 20,
@@ -550,15 +535,15 @@ const useStyles = makeStyles(({ colors, glass }) => ({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: glass.controlBorder,
+    backgroundColor: glass.surface,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
-  uninstallTrack: { width: '100%', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.14)' },
+  uninstallTrack: { width: '100%', overflow: 'hidden', backgroundColor: glass.controlActive },
   card: {
     overflow: 'hidden',
     borderWidth: 1,
@@ -576,17 +561,12 @@ const useStyles = makeStyles(({ colors, glass }) => ({
       default: {},
     }),
   },
-  glassEdge: {
-    ...StyleSheet.absoluteFill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: glass.cardInnerEdge,
-  },
   trophy: {
     position: 'absolute',
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.24)',
+    borderColor: glass.controlBorder,
     backgroundColor: alpha(colors.panelSolid, 0.7),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -607,7 +587,7 @@ const useStyles = makeStyles(({ colors, glass }) => ({
   remoteConfirmBanner: {
     borderWidth: 1,
     borderColor: alpha(colors.accent, 0.4),
-    backgroundColor: 'rgba(10,20,38,0.78)',
+    backgroundColor: glass.panel,
     shadowColor: '#000',
     shadowOpacity: 0.35,
     shadowRadius: 10,

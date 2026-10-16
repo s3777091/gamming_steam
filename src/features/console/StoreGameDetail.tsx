@@ -238,7 +238,7 @@ function reviewMeta(review: SteamStoreGameDetail['reviews'][number]): string {
 }
 
 function Reviews({ view, onLayout }: { view: DetailView; onLayout: (y: number) => void }) {
-  const { colors } = useTheme();
+  const { glass, colors } = useTheme();
   const { s, width } = useUi();
   const { detail, summary, positivePercent, openSheet } = view;
   if (!summary && !detail.reviews.length) return null;
@@ -277,7 +277,7 @@ function Reviews({ view, onLayout }: { view: DetailView; onLayout: (y: number) =
           >
             {detail.reviews.map((review) => (
               <Press key={review.id} onPress={() => openSheet({ kind: 'review', id: review.id })} pressScale={0.99}
-                style={{ width: cardWidth, height: s(168), padding: s(16), borderRadius: s(16), borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', backgroundColor: 'rgba(255,255,255,0.045)' }}
+                style={{ width: cardWidth, height: s(168), padding: s(16), borderRadius: s(16), borderWidth: 1, borderColor: glass.borderSubtle, backgroundColor: glass.surfaceUltraThin }}
               >
                 <ReviewVerdict recommended={review.recommended} />
                 <T size={9.9} color="rgba(255,255,255,0.44)" numberOfLines={1} style={{ marginTop: s(4) }}>{reviewMeta(review)}</T>
@@ -291,7 +291,7 @@ function Reviews({ view, onLayout }: { view: DetailView; onLayout: (y: number) =
       <Press
         onPress={() => void openExternal(`${detail.storeUrl}#app_reviews_hash`)}
         pressScale={0.99}
-        style={{ marginHorizontal: s(20), marginTop: s(16), height: s(44), borderRadius: s(16), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: s(8), backgroundColor: 'rgba(255,255,255,0.08)' }}
+        style={{ marginHorizontal: s(20), marginTop: s(16), height: s(44), borderRadius: s(16), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: s(8), backgroundColor: glass.surface }}
       >
         <SquarePen size={s(16)} color="rgba(255,255,255,0.86)" strokeWidth={2} />
         <T size={11.8} weight="semibold" color="rgba(255,255,255,0.86)">Viết nhận xét trên Steam</T>
@@ -604,7 +604,7 @@ function ScreenshotModal({
                 borderRadius: s(13),
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'rgba(255,255,255,0.08)',
+                backgroundColor: glass.surface,
               }}
             >
               <ChevronLeft size={s(15)} color="#fff" />
@@ -624,7 +624,7 @@ function ScreenshotModal({
                 borderRadius: s(13),
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: 'rgba(255,255,255,0.08)',
+                backgroundColor: glass.surface,
               }}
             >
               <ChevronRight size={s(15)} color="#fff" />
@@ -637,6 +637,7 @@ function ScreenshotModal({
 }
 
 function SheetView({ sheet, view, onClose }: { sheet: DetailSheet; view: DetailView; onClose: () => void }) {
+  const { glass } = useTheme();
   const { s } = useUi();
   const { detail, name, languages, openSheet, summary, positivePercent } = view;
   switch (sheet.kind) {
@@ -645,7 +646,7 @@ function SheetView({ sheet, view, onClose }: { sheet: DetailSheet; view: DetailV
         <DetailModal title="Giới thiệu" subtitle={name} onClose={onClose}>
           {detail.shortDescription ? <Para strong>{detail.shortDescription}</Para> : null}
           {detail.about && detail.about !== detail.shortDescription ? <Para>{detail.about}</Para> : null}
-          {detail.contentNotice ? <View style={{ marginTop: s(16), padding: s(12), borderRadius: s(12), borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', backgroundColor: 'rgba(255,255,255,0.03)' }}><T size={10.4} color="rgba(255,255,255,0.5)" leading={1.5}>{detail.contentNotice}</T></View> : null}
+          {detail.contentNotice ? <View style={{ marginTop: s(16), padding: s(12), borderRadius: s(12), borderWidth: 1, borderColor: glass.borderSubtle, backgroundColor: 'rgba(255,255,255,0.03)' }}><T size={10.4} color="rgba(255,255,255,0.5)" leading={1.5}>{detail.contentNotice}</T></View> : null}
         </DetailModal>
       );
     case 'news': {
@@ -696,7 +697,7 @@ function SheetView({ sheet, view, onClose }: { sheet: DetailSheet; view: DetailV
           ) : null}
           <View style={{ gap: s(10) }}>
             {detail.reviews.map((review) => (
-              <View key={review.id} style={{ padding: s(14), borderRadius: s(16), borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', backgroundColor: 'rgba(255,255,255,0.035)' }}>
+              <View key={review.id} style={{ padding: s(14), borderRadius: s(16), borderWidth: 1, borderColor: glass.borderSubtle, backgroundColor: glass.surfaceUltraThin }}>
                 <ReviewVerdict recommended={review.recommended} />
                 <T size={9.9} color="rgba(255,255,255,0.44)" style={{ marginTop: s(4) }}>{reviewMeta(review)}</T>
                 <T size={11.5} color="rgba(255,255,255,0.72)" leading={1.6} style={{ marginTop: s(8) }}>{review.text}</T>
@@ -733,7 +734,7 @@ function SheetView({ sheet, view, onClose }: { sheet: DetailSheet; view: DetailV
             {languages.map((language) => (
               <View key={language.name} style={{ width: '47%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(8), paddingVertical: s(8), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' }}>
                 <T size={11.4} color="rgba(255,255,255,0.8)" numberOfLines={1} style={{ flex: 1 }}>{language.name}</T>
-                {language.fullAudio ? <View style={{ paddingHorizontal: s(6), paddingVertical: s(2), borderRadius: s(6), backgroundColor: 'rgba(255,255,255,0.08)' }}><T size={8.6} weight="semibold" color="rgba(255,255,255,0.56)">Lồng tiếng</T></View> : null}
+                {language.fullAudio ? <View style={{ paddingHorizontal: s(6), paddingVertical: s(2), borderRadius: s(6), backgroundColor: glass.surface }}><T size={8.6} weight="semibold" color="rgba(255,255,255,0.56)">Lồng tiếng</T></View> : null}
               </View>
             ))}
           </View>

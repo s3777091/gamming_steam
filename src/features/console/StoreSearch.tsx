@@ -8,7 +8,7 @@ import { Search, WifiOff, X, type LucideIcon } from 'lucide-react-native';
 import { formatStorePrice } from '@/features/library/format';
 import type { SteamStoreItem } from '@/features/library/types';
 import type { useStoreSearch } from '@/features/library/useSteamStore';
-import { alpha, fonts, makeStyles, useTheme } from '@/theme';
+import { alpha, CardSurface, fonts, makeStyles, useTheme } from '@/theme';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { useMotion } from '@/ui/motion';
@@ -197,7 +197,7 @@ function SearchMessage({ icon: Icon, title, detail, accent = false }: { icon: Lu
 }
 
 const SearchResultCard = memo(function SearchResultCard({ item, onOpen }: { item: SteamStoreItem; onOpen: (item: SteamStoreItem) => void }) {
-  const { colors } = useTheme();
+  const { glass, colors } = useTheme();
   const styles = useStyles();
   const { s, width } = useUi();
   const open = useCallback(() => onOpen(item), [item, onOpen]);
@@ -210,19 +210,7 @@ const SearchResultCard = memo(function SearchResultCard({ item, onOpen }: { item
         contentFit="cover"
         recyclingKey={String(item.appId)}
       />
-      {/* Liquid glass light refraction gradient */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.12)', alpha(colors.panelSolid, 0.08), alpha(colors.panelSolid, 0.5), alpha(colors.panelSolid, 0.97)]}
-        locations={[0, 0.35, 0.7, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      {/* Specular top rim highlight */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.28)', 'rgba(255,255,255,0.04)', 'transparent']}
-        locations={[0, 0.45, 1]}
-        style={[StyleSheet.absoluteFill, { height: '35%' }]}
-        pointerEvents="none"
-      />
+      <CardSurface shade decorated radius={s(14)} />
       {item.discounted ? (
         <View
           style={{
@@ -234,7 +222,7 @@ const SearchResultCard = memo(function SearchResultCard({ item, onOpen }: { item
             paddingHorizontal: s(6),
             paddingVertical: s(2),
             borderWidth: StyleSheet.hairlineWidth,
-            borderColor: 'rgba(255,255,255,0.4)',
+            borderColor: glass.controlBorderActive,
             shadowColor: colors.accent,
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.5,
@@ -402,7 +390,7 @@ export function StoreSearchPanel({ query, search, onOpenGame, onKey, onErase, on
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
+const useStyles = makeStyles(({ colors, glass }) => ({
   field: {
     overflow: 'hidden',
     borderWidth: 1,
@@ -424,7 +412,7 @@ const useStyles = makeStyles(({ colors }) => ({
     overflow: 'hidden',
     alignSelf: 'stretch',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: glass.border,
     backgroundColor: alpha(colors.panel, 0.8),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
@@ -441,7 +429,7 @@ const useStyles = makeStyles(({ colors }) => ({
   keyboard: {
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: glass.border,
     backgroundColor: alpha(colors.panelSolid, 0.82),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
@@ -452,7 +440,7 @@ const useStyles = makeStyles(({ colors }) => ({
   results: {
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: glass.border,
     backgroundColor: alpha(colors.panelSolid, 0.76),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },

@@ -11,6 +11,7 @@ import { alpha } from '../color';
 import { useTheme } from '../ThemeProvider';
 import type { AmbienceKind } from '../types';
 import { Glow } from './glow';
+import { Aurora, Fireworks, MoonBat, ShootingStar } from './moments';
 import { particleProgress, useLoop, useSwing } from './motion';
 
 /** Quầng bokeh: vị trí theo tỉ lệ màn hình, thở chậm (mờ – rõ) lệch nhịp nhau. */
@@ -44,7 +45,7 @@ function BokehField({ lights, running, drift = 0 }: { lights: Bokeh[]; running: 
   );
 }
 
-/** Noel: sương giá phủ nhẹ mép trên, đèn Giáng sinh nhoè ở xa. */
+/** Noel: sương giá phủ nhẹ mép trên, cực quang mờ, đèn Giáng sinh nhoè ở xa. */
 function Frost({ running }: { running: boolean }) {
   const { s, width } = useUi();
   const lights = useMemo<Bokeh[]>(
@@ -68,12 +69,13 @@ function Frost({ running }: { running: boolean }) {
       <View style={{ position: 'absolute', left: width - bloomW * 0.65, top: -bloomH * 0.45 }}>
         <Glow width={bloomW} height={bloomH} color="#e3efff" opacity={0.12} />
       </View>
+      <Aurora running={running} />
       <BokehField lights={lights} running={running} />
     </>
   );
 }
 
-/** Halloween: ánh trăng góc trên, hai dải sương tím trôi ngược chiều sát mép dưới. */
+/** Halloween: ánh trăng góc trên (thỉnh thoảng dơi bay qua), hai dải sương tím trôi sát mép dưới. */
 function Fog({ running }: { running: boolean }) {
   const { s, width, height } = useUi();
   const a = useSwing(26_000, running);
@@ -86,6 +88,7 @@ function Fog({ running }: { running: boolean }) {
       <View style={{ position: 'absolute', left: width - moon * 0.6, top: -moon * 0.45 }}>
         <Glow width={moon} color="#ffd9a0" opacity={0.1} />
       </View>
+      <MoonBat running={running} />
       {[
         { v: a, x: -width * 0.1, dir: 1, opacity: 0.16 },
         { v: b, x: width * 0.25, dir: -1, opacity: 0.12 },
@@ -107,7 +110,7 @@ function Fog({ running }: { running: boolean }) {
   );
 }
 
-/** Tết: bokeh đỏ – vàng ấm như đèn lồng ở xa, trôi nhẹ lên xuống. */
+/** Tết: bokeh đỏ – vàng ấm như đèn lồng ở xa, lác đác pháo hoa nở. */
 function LanternGlow({ running }: { running: boolean }) {
   const lights = useMemo<Bokeh[]>(
     () => [
@@ -120,10 +123,15 @@ function LanternGlow({ running }: { running: boolean }) {
     ],
     [],
   );
-  return <BokehField lights={lights} running={running} drift={6} />;
+  return (
+    <>
+      <BokehField lights={lights} running={running} drift={6} />
+      <Fireworks running={running} />
+    </>
+  );
 }
 
-/** Legend: viền sáng vàng rất nhạt, quầng tím hoàng gia, thỉnh thoảng một vệt sáng lướt chéo qua. */
+/** Legend: viền sáng vàng rất nhạt, quầng tím hoàng gia, vệt sáng lướt chéo và sao băng thỉnh thoảng. */
 function GoldSheen({ running }: { running: boolean }) {
   const { colors } = useTheme();
   const { s, width, height } = useUi();
@@ -159,6 +167,7 @@ function GoldSheen({ running }: { running: boolean }) {
           style={StyleSheet.absoluteFill}
         />
       </Animated.View>
+      <ShootingStar running={running} />
     </>
   );
 }

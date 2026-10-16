@@ -4,6 +4,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '@/theme';
+import { MaterialTexture } from '@/theme/decor/MaterialTexture';
 
 type GlassMaterial = 'control' | 'panel' | 'scrim';
 
@@ -38,11 +39,12 @@ export function GlassBackdrop({
   intensity?: number;
   radius?: number;
 }) {
-  const { glass } = useTheme();
+  const { glass, material: surface } = useTheme();
   const blurTarget = useContext(GlassBlurTargetContext);
   const isControl = material === 'control';
   const isScrim = material === 'scrim';
-  const resolvedIntensity = intensity ?? (isControl ? 42 : isScrim ? 18 : 34);
+  const resolvedIntensity = isScrim ? (intensity ?? 18)
+    : Math.min(100, (intensity ?? (isControl ? 42 : 34)) * (isControl ? surface.controlBlur / 42 : surface.panelBlur / 34));
   const overlay = isControl
     ? glass.controlOverlay
     : isScrim
@@ -51,26 +53,25 @@ export function GlassBackdrop({
 
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden' }]}>
-      <BlurView
+      {resolvedIntensity > 0 ? <BlurView
         blurTarget={blurTarget ?? undefined}
         blurMethod={Platform.OS === 'android' && blurTarget ? 'dimezisBlurViewSdk31Plus' : 'none'}
         blurReductionFactor={3}
         intensity={resolvedIntensity}
         tint={isControl ? 'systemUltraThinMaterialDark' : 'dark'}
         style={StyleSheet.absoluteFill}
-      />
+      /> : null}
       <View style={[StyleSheet.absoluteFill, { backgroundColor: overlay }]} />
       {!isScrim ? (
         <LinearGradient
-          colors={isControl
-            ? ['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.025)', 'transparent']
-            : ['rgba(255,255,255,0.075)', 'rgba(255,255,255,0.012)', 'transparent']}
+          colors={isControl ? surface.controlSheen : surface.panelSheen}
           locations={[0, 0.34, 1]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0.7, y: 0.9 }}
           style={StyleSheet.absoluteFill}
         />
       ) : null}
+      {material === 'panel' ? <MaterialTexture /> : null}
     </View>
   );
 }

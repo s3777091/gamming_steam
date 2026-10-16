@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowLeft,
   ChevronRight,
@@ -12,7 +11,7 @@ import {
   X,
 } from 'lucide-react-native';
 
-import { alpha, makeStyles, useTheme } from '@/theme';
+import { alpha, makeStyles, SurfaceSheen, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { PanelMessage, SidePanel, SteamLink } from '@/ui/SidePanel';
@@ -110,12 +109,7 @@ function DiscountNotificationCard({
   return (
     <View style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(16), gap: s(8) }]}>
       {/* Specular top rim */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.02)', 'transparent']}
-        locations={[0, 0.4, 1]}
-        style={[StyleSheet.absoluteFill, { height: '35%' }]}
-        pointerEvents="none"
-      />
+      <SurfaceSheen />
 
       <Press
         onPress={onPress}
@@ -193,12 +187,7 @@ function UpdateNotificationCard({
   return (
     <View style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(16), gap: s(8) }]}>
       {/* Specular top rim */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.02)', 'transparent']}
-        locations={[0, 0.4, 1]}
-        style={[StyleSheet.absoluteFill, { height: '35%' }]}
-        pointerEvents="none"
-      />
+      <SurfaceSheen />
 
       <Press
         onPress={onPress}
@@ -268,7 +257,7 @@ function UninstallNotificationCard({
   onPress?: () => void;
   onDismiss?: () => void;
 }) {
-  const { colors } = useTheme();
+  const { glass, colors } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const timeAgo = formatRelative(item.createdAt ? new Date(item.createdAt).toISOString() : null);
@@ -276,12 +265,7 @@ function UninstallNotificationCard({
   return (
     <View style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(16), gap: s(8) }]}>
       {/* Specular top rim */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.02)', 'transparent']}
-        locations={[0, 0.4, 1]}
-        style={[StyleSheet.absoluteFill, { height: '35%' }]}
-        pointerEvents="none"
-      />
+      <SurfaceSheen />
 
       <Press
         onPress={onPress}
@@ -293,7 +277,7 @@ function UninstallNotificationCard({
           {item.gameImageUrl ? (
             <Img source={{ uri: item.gameImageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
           ) : (
-            <View style={{ width: '100%', height: '100%', backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ width: '100%', height: '100%', backgroundColor: glass.surface, alignItems: 'center', justifyContent: 'center' }}>
               <Trash2 size={s(20)} color="rgba(255,255,255,0.4)" />
             </View>
           )}
@@ -560,12 +544,12 @@ export function NotificationsPanel({
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
+const useStyles = makeStyles(({ colors, glass }) => ({
   card: {
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.045)',
+    borderColor: glass.border,
+    backgroundColor: glass.surfaceUltraThin,
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -578,15 +562,15 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   imageBox: {
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: glass.surface,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: glass.border,
   },
   discountTag: {
     position: 'absolute',
     backgroundColor: colors.accent,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: glass.controlBorderActive,
     shadowColor: colors.accent,
     shadowOpacity: 0.4,
     shadowRadius: 6,
@@ -604,9 +588,9 @@ const useStyles = makeStyles(({ colors }) => ({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: glass.surface,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: glass.controlBorder,
   },
   pillBadgeUninstall: {
     flexDirection: 'row',
@@ -625,15 +609,15 @@ const useStyles = makeStyles(({ colors }) => ({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: glass.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: glass.border,
   },
   dismissBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: glass.surfaceThin,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: glass.border,
   },
 }));

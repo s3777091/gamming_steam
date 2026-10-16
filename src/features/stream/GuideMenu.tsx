@@ -42,11 +42,11 @@ import type { StreamSettings } from '@/lib/stream-settings';
 import { uploadGameScreenshot } from '@/lib/game-screenshots';
 import { PC_ROUTES, pcFetch } from '@/lib/pc-api';
 import { rememberStreamGame } from '@/lib/stream-resume';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { alpha, glassShadow, glassShadowSubtle, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
+import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
@@ -124,7 +124,7 @@ export function GuideMenu({
   /** Toạ độ (trong cửa sổ) của nút Streaming lúc bấm — tâm của viền xanh. */
   onStreamOrigin?: (origin: StreamBorderOrigin) => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, glass, material } = useTheme();
   const styles = useStyles();
   const { s, insets } = useUi();
   const fade = useMemo(() => new Animated.Value(0), []);
@@ -459,7 +459,7 @@ export function GuideMenu({
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.root, { opacity: fade }]} accessibilityViewIsModal>
       {/* Lớp kính mờ cao cấp PS5 */}
-      <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill} />
+      <GlassBackdrop material="scrim" />
 
       {/* Gradient chuyển bóng tinh tế */}
       <LinearGradient
@@ -486,7 +486,7 @@ export function GuideMenu({
         {/* Nhãn tooltip nổi bật hiển thị khi hover / chọn icon (không làm phình to thanh dock) */}
         {focusedAction ? (
           <View style={styles.dockTooltipWrap}>
-            <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+            <GlassBackdrop material="panel" />
             <T size={11} weight="semibold" color="#ffffff">
               {focusedAction.label}
               {focusedAction.badge ? ` (${focusedAction.badge})` : ''}
@@ -495,9 +495,9 @@ export function GuideMenu({
         ) : null}
 
         <View style={[styles.dockBar, { borderRadius: s(22), padding: s(5) }]}>
-          <BlurView intensity={65} tint="dark" style={StyleSheet.absoluteFill} />
+          <GlassBackdrop material="panel" />
           <LinearGradient
-            colors={['rgba(255,255,255,0.3)', 'rgba(255,255,255,0.04)']}
+            colors={material.controlSheen}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, zIndex: 3 }}
@@ -533,17 +533,17 @@ export function GuideMenu({
                         height: s(42),
                         borderRadius: s(14),
                         backgroundColor: lit
-                          ? (action.danger ? 'rgba(239,68,68,0.25)' : 'rgba(255,255,255,0.18)')
+                          ? (action.danger ? 'rgba(239,68,68,0.25)' : glass.controlActive)
                           : 'transparent',
                         borderWidth: isFocused ? 1.5 : 0,
-                        borderColor: action.danger ? 'rgba(248,113,113,0.8)' : '#ffffff',
+                        borderColor: action.danger ? 'rgba(248,113,113,0.8)' : glass.controlBorderActive,
                       },
                     ]}
                   >
                     {busy === action.id ? (
                       <ActivityIndicator size="small" color="#ffffff" />
                     ) : action.id === 'game' ? (
-                      <View style={[styles.dockGameTile, { width: s(30), height: s(30), borderRadius: s(9), borderColor: isFocused ? '#ffffff' : 'rgba(255,255,255,0.3)' }]}>
+                      <View style={[styles.dockGameTile, { width: s(30), height: s(30), borderRadius: s(9), borderColor: isFocused ? glass.controlBorderActive : glass.controlBorder }]}>
                         {gameArtwork ? (
                           <Img source={{ uri: gameArtwork }} style={StyleSheet.absoluteFill} contentFit="cover" />
                         ) : (
@@ -601,11 +601,10 @@ export function GuideMenu({
         anchor={popover?.anchor ?? null}
         title={popoverShown === 'devices' ? 'Thiết bị' : popoverShown === 'profile' ? 'Tài khoản' : 'Thông báo'}
         icon={popoverShown === 'devices' ? Gamepad2 : popoverShown === 'profile' ? UserRound : Bell}
-        accent={popoverShown === 'notifications' ? '#ff9f0a' : popoverShown === 'devices' ? '#34c759' : '#bf5af2'}
         width={popoverShown === 'notifications' ? 360 : 320}
         action={popoverShown === 'notifications' && unreadCount > 0 ? (
           <Press onPress={() => void markAllAsRead()} hitSlop={8}>
-            <T size={10} weight="semibold" color="#64a8ff">Đánh dấu đã đọc</T>
+            <T size={10} weight="semibold" color={colors.accentSoft}>Đánh dấu đã đọc</T>
           </Press>
         ) : null}
         onClose={closePopover}
@@ -627,7 +626,7 @@ export function GuideMenu({
       {/* Toast phản hồi hành động nhẹ nhàng, không tạo noise */}
       {toastMessage || status ? (
         <View pointerEvents="none" style={[styles.toastFloating, { bottom: s(86) + insets.bottom }]}>
-          <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
+          <GlassBackdrop material="panel" />
           <T size={11.5} weight="medium" color="rgba(255,255,255,0.88)">
             {toastMessage || status}
           </T>
@@ -637,7 +636,7 @@ export function GuideMenu({
       {/* MODAL XEM VÀ SAO CHÉP ẢNH CHỤP */}
       {shot ? (
         <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
-          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+          <GlassBackdrop material="panel" />
           <View style={[styles.modalCard, { maxWidth: s(600), borderRadius: s(22) }]}>
             <Img source={{ uri: `data:image/png;base64,${shot}` }} style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' }} contentFit="contain" />
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: s(14) }}>
@@ -662,7 +661,7 @@ export function GuideMenu({
       {/* MODAL XÁC NHẬN THOÁT GAME */}
       {confirmExit ? (
         <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
-          <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+          <GlassBackdrop material="panel" />
           <View style={[styles.modalCard, { maxWidth: s(380), alignItems: 'center', padding: s(22), borderRadius: s(22) }]}>
             <View style={[styles.dangerIconCircle, { width: s(48), height: s(48), borderRadius: s(24) }]}>
               <LogOut size={s(20)} color="#f87171" />
@@ -703,9 +702,9 @@ const useStyles = makeStyles(({ glass, colors }) => ({
   closeBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: glass.control,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: glass.controlBorder,
   },
   dockWrapper: {
     position: 'absolute',
@@ -719,9 +718,9 @@ const useStyles = makeStyles(({ glass, colors }) => ({
     paddingVertical: 3.5,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: 'rgba(15,19,28,0.85)',
+    backgroundColor: glass.panel,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: glass.controlBorder,
     ...glassShadowSubtle,
   },
   dockBar: {
@@ -729,8 +728,8 @@ const useStyles = makeStyles(({ glass, colors }) => ({
     alignItems: 'center',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    backgroundColor: 'rgba(12,15,24,0.78)',
+    borderColor: glass.controlBorder,
+    backgroundColor: glass.panel,
     ...glassShadow,
   },
   dockIconBtn: {
@@ -739,14 +738,14 @@ const useStyles = makeStyles(({ glass, colors }) => ({
   },
   dockDivider: {
     width: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: glass.controlActive,
   },
   dockGameTile: {
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: glass.control,
   },
   dockBadge: {
     position: 'absolute',
@@ -757,7 +756,7 @@ const useStyles = makeStyles(({ glass, colors }) => ({
     borderRadius: 8.5,
     backgroundColor: '#ef4444',
     borderWidth: 1.2,
-    borderColor: 'rgba(255,255,255,0.6)',
+    borderColor: glass.controlBorderActive,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
@@ -777,9 +776,9 @@ const useStyles = makeStyles(({ glass, colors }) => ({
     paddingVertical: 7,
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: 'rgba(15,20,30,0.88)',
+    backgroundColor: glass.panel,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: glass.controlBorder,
     ...glassShadowSubtle,
     zIndex: 40,
   },
@@ -795,24 +794,24 @@ const useStyles = makeStyles(({ glass, colors }) => ({
     overflow: 'hidden',
     backgroundColor: glass.modal,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: glass.controlBorder,
     ...glassShadow,
   },
   modalBtnSec: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: glass.control,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: glass.controlBorder,
   },
   modalBtnPri: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#6366f1',
+    backgroundColor: colors.primary,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: glass.controlBorder,
   },
   dangerIconCircle: {
     alignItems: 'center',
@@ -828,6 +827,6 @@ const useStyles = makeStyles(({ glass, colors }) => ({
     gap: 6,
     backgroundColor: 'rgba(239,68,68,0.88)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
+    borderColor: glass.controlBorder,
   },
 }));

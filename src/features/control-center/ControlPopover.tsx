@@ -4,14 +4,15 @@
 // iOS, thu lại nhanh hơn khi đóng. Chạm ra ngoài hoặc bấm B để đóng. Dùng chung
 // cho menu Guide trong stream và Control Center ở màn chính để hai nơi giống hệt.
 
-import { BlurView } from 'expo-blur';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { useMotion } from '@/ui/motion';
 import { useUi } from '@/ui/scale';
-import { T } from '@/ui/Text';
+import { makeStyles } from '@/theme';
+import { GlassBackdrop } from '@/ui/GlassMaterial';
+import { PanelHeader } from '@/ui/PanelHeader';
 
 /** Khung của nút neo, toạ độ trong cửa sổ (measureInWindow). */
 export type PopoverAnchor = { x: number; y: number; width: number; height: number };
@@ -21,7 +22,6 @@ export function ControlPopover({
   anchor,
   title,
   icon: Icon,
-  accent = 'rgba(255,255,255,0.7)',
   action,
   width = 340,
   onClose,
@@ -31,13 +31,13 @@ export function ControlPopover({
   anchor: PopoverAnchor | null;
   title: string;
   icon?: LucideIcon;
-  accent?: string;
   /** Nút phụ nhỏ ở góc phải tiêu đề (ví dụ "Đánh dấu đã đọc"). */
   action?: ReactNode;
   width?: number;
   onClose: () => void;
   children: ReactNode;
 }) {
+  const styles = useStyles();
   const { s, width: screenWidth, height: screenHeight, insets } = useUi();
   const { reduceMotion } = useMotion();
   const [mounted, setMounted] = useState(open);
@@ -102,20 +102,8 @@ export function ControlPopover({
           },
         ]}
       >
-        <View style={[StyleSheet.absoluteFill, styles.clip, { borderRadius: s(22) }]}>
-          <BlurView intensity={70} tint="dark" style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, styles.tint]} />
-        </View>
-
-        <View style={[styles.header, { paddingHorizontal: s(16), paddingTop: s(14), paddingBottom: s(10), gap: s(8) }]}>
-          {Icon ? (
-            <View style={[styles.headerIcon, { width: s(24), height: s(24), borderRadius: s(8) }]}>
-              <Icon size={s(13)} color={accent} strokeWidth={2.2} />
-            </View>
-          ) : null}
-          <T size={13} weight="semibold" color="#ffffff" style={{ flex: 1 }} numberOfLines={1}>{title}</T>
-          {action}
-        </View>
+        <GlassBackdrop material="panel" radius={s(22)} />
+        <PanelHeader title={title} icon={Icon} action={action} onClose={onClose} />
         <View style={{ paddingHorizontal: s(12), paddingBottom: s(12) }}>{children}</View>
 
         <View
@@ -136,33 +124,26 @@ export function ControlPopover({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ glass, colors }) => ({
   // Trên dock (zIndex 30) để popover và lớp chạm-ra-ngoài-để-đóng luôn nằm trên cùng.
   layer: { zIndex: 60, elevation: 60 },
   card: {
     position: 'absolute',
+    backgroundColor: glass.panel,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: glass.panelBorder,
     shadowColor: '#000',
     shadowOpacity: 0.45,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 18 },
     elevation: 24,
   },
-  clip: { overflow: 'hidden' },
-  tint: { backgroundColor: 'rgba(30,32,42,0.62)' },
-  header: { flexDirection: 'row', alignItems: 'center' },
-  headerIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
   caret: {
     position: 'absolute',
     transform: [{ rotate: '45deg' }],
-    backgroundColor: 'rgba(38,40,50,0.96)',
+    backgroundColor: colors.panelSolid,
     borderRightWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.22)',
+    borderColor: glass.panelBorder,
   },
-});
+}));

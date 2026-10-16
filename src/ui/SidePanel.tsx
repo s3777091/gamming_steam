@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowUpRight, X, type LucideIcon } from 'lucide-react-native';
+import { ArrowUpRight, type LucideIcon } from 'lucide-react-native';
 
 import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
@@ -13,6 +13,7 @@ import { Press } from './Press';
 import { useUi } from './scale';
 import { useMotion } from './motion';
 import { T } from './Text';
+import { PanelHeader } from './PanelHeader';
 
 /**
  * Ngăn kéo bên phải Liquid Glass (iOS 26):
@@ -32,7 +33,7 @@ export function SidePanel({
   headerExtension?: ReactNode;
   children: ReactNode;
 }) {
-  const { colors } = useTheme();
+  const { material } = useTheme();
   const styles = useStyles();
   const { s, width: screenWidth, insets } = useUi();
   const { reduceMotion } = useMotion();
@@ -98,30 +99,14 @@ export function SidePanel({
 
           {/* Vạch sáng Specular Rim ở mép trái ngăn kéo */}
           <LinearGradient
-            colors={['rgba(255,255,255,0.24)', 'rgba(255,255,255,0.07)', 'rgba(255,255,255,0.12)']}
+            colors={material.panelEdge}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             pointerEvents="none"
             style={styles.specularLeft}
           />
 
-          <View style={[styles.header, { paddingHorizontal: s(16), paddingVertical: s(12) }]}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <T size={16} weight="semibold" numberOfLines={1} tracking={-0.025}>{title}</T>
-              {subtitle ? <T size={10.5} color={colors.text3} numberOfLines={1} style={{ marginTop: s(2) }}>{subtitle}</T> : null}
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8) }}>
-              {action}
-              <Press
-                onPress={closeWithAnimation}
-                sound="back"
-                accessibilityLabel="Đóng"
-                style={[styles.close, { width: s(32), height: s(32), borderRadius: s(16) }]}
-              >
-                <X size={s(15)} color={colors.text2} strokeWidth={2} />
-              </Press>
-            </View>
-          </View>
+          <PanelHeader title={title} subtitle={subtitle} action={action} onClose={closeWithAnimation} />
           {headerExtension}
           <FocusScroll
             style={{ flex: 1 }}
@@ -138,7 +123,7 @@ export function SidePanel({
 
 /** Icon + câu thông báo ở giữa cho trạng thái rỗng / lỗi trong panel. */
 export function PanelMessage({ icon: Icon, message, hint }: { icon: LucideIcon; message: string; hint?: string }) {
-  const { colors } = useTheme();
+  const { colors, glass } = useTheme();
   const { s } = useUi();
   return (
     <View style={{ minHeight: s(200), alignItems: 'center', justifyContent: 'center', paddingHorizontal: s(20) }}>
@@ -149,9 +134,9 @@ export function PanelMessage({ icon: Icon, message, hint }: { icon: LucideIcon; 
           borderRadius: s(28),
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: 'rgba(255,255,255,0.06)',
+          backgroundColor: glass.surfaceThin,
           borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.1)',
+          borderColor: glass.borderSubtle,
         }}
       >
         <Icon size={s(26)} color={colors.text3} strokeWidth={1.6} />
@@ -202,27 +187,13 @@ const useStyles = makeStyles(({ glass }) => ({
     bottom: 0,
     width: 1.5,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: glass.borderSubtle,
-  },
-  close: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: glass.controlBorder,
-    backgroundColor: glass.control,
-  },
   link: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: glass.controlBorder,
+    backgroundColor: glass.control,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,

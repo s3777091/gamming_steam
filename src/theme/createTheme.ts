@@ -1,5 +1,6 @@
 import { alpha, mix } from './color';
-import type { GlassTokens, Palette, SettingsTokens, Theme, ThemeDecorSpec, ThemeId } from './types';
+import { createMaterial } from './material';
+import type { GlassTokens, MaterialKind, Palette, SettingsTokens, Theme, ThemeDecorSpec, ThemeId } from './types';
 
 /** Các màu một theme bắt buộc khai báo; mọi token còn lại tự suy ra từ đây. Viết ở dạng hex. */
 export type ThemeSeed = Pick<
@@ -25,6 +26,7 @@ export type ThemeSpec = {
   label: string;
   detail: string;
   seed: ThemeSeed;
+  material?: MaterialKind;
   /** Trang trí kèm theo theme; bỏ trống = không trang trí. */
   decor?: ThemeDecorSpec;
   /** Ghi đè từng token khi giá trị suy ra chưa đúng ý. */
@@ -39,7 +41,7 @@ export type ThemeSpec = {
  * Dựng một theme đầy đủ từ vài màu gốc. Thêm theme mới = viết một file trong `themes/`
  * gọi hàm này, rồi đăng ký nó trong `registry.ts`.
  */
-export function createTheme({ id, label, detail, seed, decor = { particles: null, ambience: null }, overrides = {} }: ThemeSpec): Theme {
+export function createTheme({ id, label, detail, seed, material: materialKind = 'glass', decor = { particles: null, ambience: null }, overrides = {} }: ThemeSpec): Theme {
   const colors: Palette = {
     ...seed,
     primaryDeep: mix(seed.primary, '#000000', 0.25),
@@ -64,6 +66,9 @@ export function createTheme({ id, label, detail, seed, decor = { particles: null
     ...overrides.colors,
   };
 
+  const material = createMaterial(materialKind, colors);
+  const seasonal = materialKind !== 'glass';
+  const edge = material.frame[0];
   const glass: GlassTokens = {
     control: 'rgba(255, 255, 255, 0.085)',
     controlActive: 'rgba(255, 255, 255, 0.22)',
@@ -104,6 +109,28 @@ export function createTheme({ id, label, detail, seed, decor = { particles: null
 
     shadow: 'rgba(0, 0, 0, 0.35)',
     shadowSoft: 'rgba(0, 0, 0, 0.18)',
+    ...(seasonal ? {
+      control: alpha(colors.cardRaised, 0.72),
+      controlActive: alpha(colors.accent, 0.2),
+      controlOverlay: alpha(colors.panelSolid, materialKind === 'frost' ? 0.3 : 0.72),
+      controlBorder: alpha(colors.accentSoft, 0.36),
+      controlBorderActive: alpha(colors.accentGlow, 0.78),
+      cardBorder: alpha(colors.accent, 0.38),
+      cardBorderActive: alpha(colors.accentGlow, 0.88),
+      cardInnerEdge: alpha(edge, 0.3),
+      surfaceUltraThin: alpha(colors.card, 0.52),
+      surfaceThin: alpha(colors.card, 0.66),
+      surface: alpha(colors.card, 0.82),
+      surfaceHighlight: alpha(colors.accentSoft, 0.16),
+      panel: alpha(colors.panelSolid, 0.96),
+      modal: alpha(colors.panelSolid, 0.97),
+      panelOverlay: alpha(colors.panelSolid, 0.88),
+      floatingBar: alpha(colors.panelSolid, 0.94),
+      border: alpha(colors.accentSoft, 0.22),
+      borderSubtle: alpha(colors.accentSoft, 0.14),
+      borderSpecular: alpha(colors.accentGlow, 0.38),
+      panelBorder: alpha(colors.accentSoft, 0.25),
+    } : {}),
     ...overrides.glass,
   };
 
@@ -141,8 +168,17 @@ export function createTheme({ id, label, detail, seed, decor = { particles: null
     pink: '#ff375f',
     gray: '#8e8e93',
     switchOff: 'rgba(255, 255, 255, 0.16)',
+    ...(seasonal ? {
+      card: glass.surfaceThin,
+      cardBorder: glass.border,
+      cardBorderSpecular: glass.borderSpecular,
+      separator: glass.borderSubtle,
+      pressedBg: glass.surfaceHighlight,
+      selectedBg: alpha(colors.accent, 0.14),
+      selectedBorder: glass.borderAccent,
+    } : {}),
     ...overrides.settings,
   };
 
-  return { id, label, detail, colors, glass, settings, decor };
+  return { id, label, detail, colors, material, glass, settings, decor };
 }

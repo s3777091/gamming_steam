@@ -1,0 +1,36 @@
+# Match the project's Git exclusions; EAS generates native projects from config.
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+*.orig.*
+*.jks
+/credentials.json
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.pem
+.env*.local
+*.tsbuildinfo
+/ios
+/android
+.gradle-build.log
+build/
+.cxx/
+.gradle/
+*.apk
+*.aab
+
+# Local diagnostics and previous builds are not application source.
+/releases/
+/bugreport-*
+/emulator_screen*.png
+/.claude/

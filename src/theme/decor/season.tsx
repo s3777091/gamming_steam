@@ -7,31 +7,20 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Crown, Flower2, Ghost, Snowflake, type LucideIcon } from 'lucide-react-native';
 
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 import { useDecorEnabled, useTheme } from '../ThemeProvider';
-import type { SeasonGlyph, SeasonSpec } from '../types';
-
-const GLYPHS: Record<SeasonGlyph, LucideIcon> = {
-  snowflake: Snowflake,
-  ghost: Ghost,
-  blossom: Flower2,
-  crown: Crown,
-};
+import type { SeasonSpec } from '../types';
+import { SeasonGlyphIcon } from './glyph';
+import { SeasonalCorners } from './surfaces';
 
 /** Mùa của theme đang dùng, hoặc null khi theme không theo mùa / người dùng tắt trang trí. */
 export function useSeason(): SeasonSpec | null {
   const { decor } = useTheme();
   const enabled = useDecorEnabled();
   return enabled ? (decor.season ?? null) : null;
-}
-
-export function SeasonGlyphIcon({ glyph, size, color }: { glyph: SeasonGlyph; size: number; color: string }) {
-  const Icon = GLYPHS[glyph];
-  return <Icon size={size} color={color} strokeWidth={2} />;
 }
 
 /** Huy hiệu tròn nhỏ mang ký hiệu mùa. */
@@ -57,8 +46,8 @@ function Medallion({ season, size }: { season: SeasonSpec; size: number }) {
 
 /** Khung avatar theo mùa (kiểu avatar decoration). `size` là cạnh avatar bên trong. */
 export function AvatarFrame({ size, children }: { size: number; children: ReactNode }) {
-  const { colors } = useTheme();
-  const { s } = useUi();
+  const { material } = useTheme();
+  const { s, scale } = useUi();
   const season = useSeason();
   if (!season) return <>{children}</>;
 
@@ -78,18 +67,19 @@ export function AvatarFrame({ size, children }: { size: number; children: ReactN
     );
   }
 
-  const ring = s(2);
+  const ring = s(material.kind === 'frost' ? 3 : 2);
   const badge = s(14);
   return (
     <View style={{ width: size, height: size }}>
       <LinearGradient
         pointerEvents="none"
-        colors={[colors.accentGlow, colors.accent, colors.primary]}
+        colors={material.frame}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{ position: 'absolute', left: -ring, top: -ring, width: size + ring * 2, height: size + ring * 2, borderRadius: size }}
       />
       {children}
+      <SeasonalCorners size={size / scale * 0.72} twin={false} inset={-3} />
       <View pointerEvents="none" style={{ position: 'absolute', top: -badge * 0.35, left: -badge * 0.35 }}>
         <Medallion season={season} size={badge} />
       </View>

@@ -44,7 +44,7 @@ export function RemoteConnectionMenu({
   onSleep,
   onWake,
 }: RemoteConnectionMenuProps) {
-  const { colors } = useTheme();
+  const { glass, colors } = useTheme();
   const styles = useStyles();
   const { s, width: screenWidth, insets } = useUi();
   const [anim] = useState(() => new Animated.Value(0));
@@ -277,8 +277,8 @@ export function RemoteConnectionMenu({
                 {
                   height: s(36),
                   borderRadius: s(11),
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  borderColor: 'rgba(255, 255, 255, 0.16)',
+                  backgroundColor: glass.surface,
+                  borderColor: glass.controlBorder,
                 },
               ]}
               accessibilityLabel="Làm mới kết nối remote"
@@ -303,16 +303,16 @@ export function RemoteConnectionMenu({
                   {
                     height: s(36),
                     borderRadius: s(11),
-                    backgroundColor: 'rgba(192, 132, 252, 0.15)',
-                    borderColor: 'rgba(192, 132, 252, 0.32)',
+                    backgroundColor: glass.surfaceHighlight,
+                    borderColor: glass.borderAccent,
                   },
                 ]}
                 accessibilityLabel="Ru PC ngủ & thoát"
               >
                 {isSleeping ? (
-                  <ActivityIndicator size="small" color="#c084fc" />
+                  <ActivityIndicator size="small" color={colors.accentSoft} />
                 ) : (
-                  <Moon size={s(14)} color="#c084fc" strokeWidth={2} />
+                  <Moon size={s(14)} color={colors.accentSoft} strokeWidth={2} />
                 )}
               </Press>
             ) : (
@@ -369,9 +369,9 @@ const useStyles = makeStyles(({ glass }) => ({
   closeBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: glass.surface,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: glass.border,
   },
   actionRow: {
     flexDirection: 'row',

@@ -14,7 +14,9 @@ const DECOR_KEY = 'jetsona:ui_theme_decor';
 export type ThemeChangeOptions = {
   /** Điểm giọt màu rơi xuống (toạ độ cửa sổ), thường là chỗ người dùng vừa bấm. */
   origin?: ThemeTransitionOrigin;
-  /** Gọi đúng lúc giọt màu chạm xuống, ví dụ để phát âm thanh. */
+  /** Gọi khi giọt màu bắt đầu rơi, ví dụ để phát tiếng huýt. */
+  onStart?: () => void;
+  /** Gọi đúng lúc giọt màu chạm xuống, ví dụ để phát tiếng bloop. */
   onImpact?: () => void;
 };
 
@@ -109,6 +111,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           theme={getTheme(transition.to)}
           origin={transition.origin ?? null}
           committed={themeId === transition.to}
+          onStart={transition.onStart}
           onImpact={transition.onImpact}
           onCovered={() => dispatch({ type: 'commit', id: transition.to })}
           onDone={finish}

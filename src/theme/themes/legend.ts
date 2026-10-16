@@ -4,6 +4,7 @@ import { createTheme } from '../createTheme';
 export const legendTheme = createTheme({
   id: 'legend',
   label: 'Legend',
+  material: 'gilded',
   detail: 'Vàng huyền thoại trên nền tím hoàng gia',
   decor: {
     particles: 'motes',

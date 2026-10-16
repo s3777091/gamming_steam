@@ -351,15 +351,15 @@ export function PromotionPanel({ promotion, specials, onOpenGame, onClose }: {
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
+const useStyles = makeStyles(({ colors, glass }) => ({
   avatar: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: glass.controlBorder,
+    backgroundColor: glass.surface,
   },
   level: {
     position: 'absolute',
@@ -367,7 +367,7 @@ const useStyles = makeStyles(({ colors }) => ({
     alignItems: 'center',
     backgroundColor: colors.accent,
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: glass.controlBorderActive,
     shadowColor: colors.accent,
     shadowOpacity: 0.35,
     shadowRadius: 6,
@@ -377,8 +377,8 @@ const useStyles = makeStyles(({ colors }) => ({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: glass.border,
+    backgroundColor: glass.surfaceThin,
   },
   nowPlaying: {
     flexDirection: 'row',
@@ -396,21 +396,21 @@ const useStyles = makeStyles(({ colors }) => ({
     justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(17,28,41,0.8)',
+    borderColor: glass.border,
+    backgroundColor: glass.panel,
   },
   emptyActivity: {
     justifyContent: 'center',
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: glass.controlBorder,
   },
   stats: {
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: glass.border,
+    backgroundColor: glass.surfaceUltraThin,
   },
   notice: {
     borderWidth: StyleSheet.hairlineWidth,
@@ -432,14 +432,14 @@ const useStyles = makeStyles(({ colors }) => ({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: glass.border,
+    backgroundColor: glass.surface,
   },
   pillButton: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: glass.controlBorder,
+    backgroundColor: glass.surface,
   },
 }));

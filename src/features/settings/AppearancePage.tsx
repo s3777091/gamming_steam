@@ -12,11 +12,12 @@ import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 import { rowStyle, SettingsGroup, ToggleRow } from './controls';
+import { AppearancePreview } from './AppearancePreview';
 
 /** Ô xem trước: nền, dải màu chính và chấm màu nhấn của theme. */
 const ThemeSwatch = forwardRef<View, { theme: Theme }>(function ThemeSwatch({ theme }, ref) {
   const { s } = useUi();
-  const { colors } = theme;
+  const { colors, glass, material } = theme;
   return (
     <View
       ref={ref}
@@ -28,7 +29,7 @@ const ThemeSwatch = forwardRef<View, { theme: Theme }>(function ThemeSwatch({ th
         overflow: 'hidden',
         backgroundColor: colors.bg,
         borderWidth: StyleSheet.hairlineWidth,
-        borderColor: 'rgba(255, 255, 255, 0.22)',
+        borderColor: glass.cardBorder,
       }}
     >
       <LinearGradient
@@ -37,6 +38,7 @@ const ThemeSwatch = forwardRef<View, { theme: Theme }>(function ThemeSwatch({ th
         end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+      <LinearGradient colors={material.activeSheen} style={StyleSheet.absoluteFill} />
       <View
         style={{
           position: 'absolute',
@@ -88,6 +90,8 @@ function ThemeRow({
   return (
     <Press
       onPress={select}
+      // Đổi theme đã có tiếng huýt + bloop của giọt màu; tiếng click sẽ nuốt mất tiếng huýt.
+      sound={active ? 'select' : false}
       pressScale={0.995}
       accessibilityRole="radio"
       accessibilityState={{ checked: active }}
@@ -100,7 +104,7 @@ function ThemeRow({
           {theme.label}
         </T>
         <T size={10.4} color={appleColors.textTertiary} numberOfLines={1} style={{ marginTop: s(1.5) }}>
-          {theme.detail}
+          {theme.material.label} · {theme.detail}
         </T>
       </View>
       {active ? <Check size={s(16)} color={appleColors.accent} strokeWidth={2.6} /> : null}
@@ -111,7 +115,11 @@ function ThemeRow({
 export function AppearancePage() {
   const { themeId, setThemeId, themes, decorEnabled, setDecorEnabled } = useThemeControl();
   const select = (id: ThemeId, origin?: ThemeTransitionOrigin) =>
-    setThemeId(id, { origin, onImpact: () => playUiSound('transition') });
+    setThemeId(id, {
+      origin,
+      onStart: () => playUiSound('themeFall'),
+      onImpact: () => playUiSound('themeSplash'),
+    });
 
   return (
     <>
@@ -120,7 +128,10 @@ export function AppearancePage() {
           <ThemeRow key={theme.id} theme={theme} active={theme.id === themeId} onSelect={select} />
         ))}
       </SettingsGroup>
-      <SettingsGroup footer="Hiệu ứng nền (tuyết, sương, hoa rơi), khung avatar, biểu tượng và lời chúc theo mùa. Không hiện khi đang chơi game.">
+      <SettingsGroup title="Xem trước" footer="Xem chất liệu, khung avatar và màn chờ của theme hiện tại. Xem thử không mở game hay kết nối máy tính.">
+        <AppearancePreview />
+      </SettingsGroup>
+      <SettingsGroup footer="Cảnh nền, hạt trôi, vân bề mặt, khung avatar và hiệu ứng chọn theo mùa. Không hiện khi đang chơi game.">
         <ToggleRow
           label="Hiệu ứng trang trí"
           detail="Dấu ấn mùa của theme đang dùng"

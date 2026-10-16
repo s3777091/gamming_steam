@@ -4,6 +4,7 @@ import { createTheme } from '../createTheme';
 export const halloweenTheme = createTheme({
   id: 'halloween',
   label: 'Halloween',
+  material: 'haunted',
   detail: 'Cam bí ngô trên nền tím đêm',
   decor: {
     particles: 'embers',

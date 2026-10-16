@@ -1,6 +1,7 @@
 export const LOADING_READY_HOLD_MS = 2_000;
-export const OPENING_DISSOLVE_TIME = 3.35;
-export const OPENING_FINISH_TIME = 4.2;
+// The opening clip walks into a doorway of light; reveal once the light fills most of the frame.
+export const OPENING_DISSOLVE_TIME = 4.7;
+export const OPENING_FINISH_TIME = 5.5;
 // This watchdog starts only after loading has finished and the opening begins.
 export const OPENING_WATCHDOG_MS = 8_000;
 

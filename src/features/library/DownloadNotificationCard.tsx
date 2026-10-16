@@ -3,7 +3,6 @@
 
 import { useRouter } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { CircleAlert, CircleCheck, Download, FileText, HardDrive, Monitor, Pause, Play } from 'lucide-react-native';
 
 import {
@@ -13,7 +12,7 @@ import {
   formatSpeed,
   isDownloadActive,
 } from '@/lib/steam-downloads';
-import { alpha, makeStyles, useTheme, type Palette } from '@/theme';
+import { alpha, makeStyles, SurfaceSheen, useTheme, type Palette } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -71,12 +70,7 @@ export function DownloadNotificationCard({ item, canControl, onPause, onResume, 
   return (
     <View style={[styles.card, { padding: s(12), borderRadius: s(16), gap: s(12) }]}>
       {/* Specular top rim */}
-      <LinearGradient
-        colors={['rgba(255,255,255,0.18)', 'rgba(255,255,255,0.02)', 'transparent']}
-        locations={[0, 0.4, 1]}
-        style={[StyleSheet.absoluteFill, { height: '35%' }]}
-        pointerEvents="none"
-      />
+      <SurfaceSheen />
 
       <View style={[styles.thumb, { width: s(96), height: s(54), borderRadius: s(9) }]}>
         {imageUrl ? <Img source={{ uri: imageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : null}
@@ -139,14 +133,14 @@ export function DownloadNotificationCard({ item, canControl, onPause, onResume, 
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
+const useStyles = makeStyles(({ colors, glass }) => ({
   card: {
     overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: alpha(colors.accent, 0.3),
-    backgroundColor: 'rgba(10,20,35,0.7)',
+    backgroundColor: glass.panel,
     shadowColor: '#000',
     shadowOpacity: 0.25,
     shadowRadius: 10,
@@ -155,9 +149,9 @@ const useStyles = makeStyles(({ colors }) => ({
   },
   thumb: {
     overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: glass.surface,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: glass.border,
   },
   thumbBar: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)' },
   badge: {
@@ -165,18 +159,18 @@ const useStyles = makeStyles(({ colors }) => ({
     alignItems: 'center',
     gap: 4,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: glass.controlBorder,
   },
-  track: { width: '100%', overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.12)' },
+  track: { width: '100%', overflow: 'hidden', backgroundColor: glass.controlActive },
   action: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: glass.controlBorder,
+    backgroundColor: glass.surface,
   },
   actionPrimary: {
-    borderColor: 'rgba(255,255,255,0.4)',
+    borderColor: glass.controlBorderActive,
     backgroundColor: colors.accent,
     shadowColor: colors.accent,
     shadowOpacity: 0.4,

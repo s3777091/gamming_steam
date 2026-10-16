@@ -14,6 +14,7 @@ import type { AppNotification } from '@/features/library/types';
 import { getBackendBaseUrl } from '@/lib/config';
 import { listGameScreenshots } from '@/lib/game-screenshots';
 import { resolveProfileAvatarUri } from '@/lib/profile-avatar';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useMotion } from '@/ui/motion';
 import { useUi } from '@/ui/scale';
@@ -36,7 +37,7 @@ function Stagger({ index, children }: { index: number; children: React.ReactNode
   const { reduceMotion } = useMotion();
   const [value] = useState(() => new Animated.Value(reduceMotion ? 1 : 0));
   useEffect(() => {
-    if (reduceMotion) return;
+    if (reduceMotion) { value.setValue(1); return; }
     const animation = Animated.timing(value, {
       toValue: 1,
       duration: 320,
@@ -62,6 +63,7 @@ function Stagger({ index, children }: { index: number; children: React.ReactNode
 // ------------------------------------------------------------------ thiết bị
 
 function BatteryRing({ device, index }: { device: LocalDevice; index: number }) {
+  const { glass, colors } = useTheme();
   const { s } = useUi();
   const { reduceMotion } = useMotion();
   const size = s(58);
@@ -72,7 +74,7 @@ function BatteryRing({ device, index }: { device: LocalDevice; index: number }) 
   const [fill] = useState(() => new Animated.Value(reduceMotion ? 1 : 0));
 
   useEffect(() => {
-    if (reduceMotion) return;
+    if (reduceMotion) { fill.setValue(1); return; }
     const animation = Animated.timing(fill, {
       toValue: 1,
       duration: 900,
@@ -94,7 +96,7 @@ function BatteryRing({ device, index }: { device: LocalDevice; index: number }) 
       <View style={{ width: s(74), alignItems: 'center' }}>
         <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
           <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
-            <Circle cx={size / 2} cy={size / 2} r={radius} stroke="rgba(255,255,255,0.12)" strokeWidth={stroke} fill="rgba(0,0,0,0.22)" />
+            <Circle cx={size / 2} cy={size / 2} r={radius} stroke={glass.border} strokeWidth={stroke} fill={alpha(colors.bgDeep, 0.4)} />
             <AnimatedCircle
               cx={size / 2}
               cy={size / 2}
@@ -123,6 +125,7 @@ function BatteryRing({ device, index }: { device: LocalDevice; index: number }) 
 }
 
 export function DevicesPanel({ devices }: { devices: LocalDevice[] }) {
+  const styles = useStyles();
   const { s } = useUi();
   const sorted = useMemo(
     () => [...devices].sort((a, b) => DEVICE_KIND_ORDER.indexOf(a.kind) - DEVICE_KIND_ORDER.indexOf(b.kind)),
@@ -148,17 +151,19 @@ export function DevicesPanel({ devices }: { devices: LocalDevice[] }) {
 
 // ------------------------------------------------------------------ thông báo
 
-function notificationLine(item: AppNotification): { kind: string; title: string; detail: string; image: string | null; Icon: typeof Bell; tint: string } {
+function notificationLine(item: AppNotification, accent: string): { kind: string; title: string; detail: string; image: string | null; Icon: typeof Bell; tint: string } {
   if (item.type === 'discount') {
     return { kind: 'Ưu đãi', title: item.gameTitle, detail: `Giảm ${item.discountPercent}% trên Steam`, image: item.imageUrl, Icon: Tag, tint: '#34c759' };
   }
   if (item.type === 'update') {
-    return { kind: 'Cập nhật', title: item.gameTitle, detail: item.title, image: item.gameImageUrl, Icon: Sparkles, tint: '#64a8ff' };
+    return { kind: 'Cập nhật', title: item.gameTitle, detail: item.title, image: item.gameImageUrl, Icon: Sparkles, tint: accent };
   }
   return { kind: 'Đã gỡ', title: item.gameTitle, detail: item.message || 'Đã gỡ khỏi máy tính', image: item.gameImageUrl ?? null, Icon: Trash2, tint: '#ff9f0a' };
 }
 
 export function NotificationsPanel({ notifications }: { notifications: AppNotification[] }) {
+  const { colors } = useTheme();
+  const styles = useStyles();
   const { s } = useUi();
   const shown = notifications.slice(0, 4);
   if (shown.length === 0) {
@@ -174,7 +179,7 @@ export function NotificationsPanel({ notifications }: { notifications: AppNotifi
   return (
     <View style={{ gap: s(6) }}>
       {shown.map((item, index) => {
-        const line = notificationLine(item);
+        const line = notificationLine(item, colors.accentSoft);
         return (
           <Stagger key={item.id} index={index}>
             <View style={[styles.inset, styles.row, { padding: s(8), gap: s(10), borderRadius: s(14) }]}>
@@ -206,6 +211,7 @@ export function NotificationsPanel({ notifications }: { notifications: AppNotifi
 
 /** Avatar tài khoản app: ảnh nếu có, không thì chữ cái đầu trên nền gradient. */
 export function UserAvatar({ uri, name, size, ring = false }: { uri: string | null; name: string; size: number; ring?: boolean }) {
+  const { colors, material } = useTheme();
   const initial = (name.trim()[0] || '?').toLocaleUpperCase('vi');
   // Avatar lưu dạng đường dẫn tương đối (/storage/v1/object/public/avatars/…); Image của RN
   // không có origin nên phải ghép base URL của region đang dùng, không thì ảnh im lặng không hiện.
@@ -219,7 +225,7 @@ export function UserAvatar({ uri, name, size, ring = false }: { uri: string | nu
         <Img source={{ uri: resolved }} style={StyleSheet.absoluteFill} contentFit="cover" onError={() => setFailed(resolved)} />
       ) : (
         <>
-          <LinearGradient colors={['#5e5ce6', '#bf5af2']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={[colors.primary, colors.primaryDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
           <T weight="bold" color="#ffffff" style={{ fontSize: inner * 0.42, lineHeight: inner * 0.52 }}>{initial}</T>
         </>
       )}
@@ -228,7 +234,7 @@ export function UserAvatar({ uri, name, size, ring = false }: { uri: string | nu
   if (!ring) return body;
   return (
     <LinearGradient
-      colors={['#64d2ff', '#5e5ce6', '#bf5af2']}
+      colors={material.frame}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{ width: size, height: size, borderRadius: size / 2, alignItems: 'center', justifyContent: 'center' }}
@@ -250,6 +256,7 @@ export function ProfilePanel({
   /** Dòng trạng thái có chấm xanh, ví dụ "Đang điều khiển PC". */
   status: string;
 }) {
+  const styles = useStyles();
   const { s } = useUi();
   const [shots, setShots] = useState<number | null>(null);
 
@@ -289,18 +296,18 @@ export function ProfilePanel({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles(({ colors, glass }) => ({
   inset: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: glass.surfaceThin,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: glass.borderSubtle,
   },
   empty: {
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: glass.surfaceThin,
   },
   row: { flexDirection: 'row', alignItems: 'center' },
-  thumb: { overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.08)' },
+  thumb: { overflow: 'hidden', backgroundColor: glass.surface },
   dot: { backgroundColor: APPLE_GREEN },
-  rowIcon: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#5e5ce6' },
-});
+  rowIcon: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+}));

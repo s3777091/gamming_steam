@@ -4,7 +4,7 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode,
 } from 'react';
 
-export type UiSound = 'focus' | 'navigate' | 'select' | 'confirm' | 'back' | 'transition';
+export type UiSound = 'focus' | 'navigate' | 'select' | 'confirm' | 'back' | 'transition' | 'themeFall' | 'themeSplash';
 
 type UiSoundSettings = {
   enabled: boolean;
@@ -27,6 +27,8 @@ const SOURCES: Record<UiSound, number> = {
   confirm: require('../../../assets/sounds/ui-confirm.wav'),
   back: require('../../../assets/sounds/ui-back.wav'),
   transition: require('../../../assets/sounds/ui-transition.wav'),
+  themeFall: require('../../../assets/sounds/theme-fall.wav'),
+  themeSplash: require('../../../assets/sounds/theme-splash.wav'),
 };
 const SOUND_GAIN: Record<UiSound, number> = {
   focus: 0.72,
@@ -35,6 +37,8 @@ const SOUND_GAIN: Record<UiSound, number> = {
   confirm: 0.9,
   back: 0.78,
   transition: 0.7,
+  themeFall: 0.8,
+  themeSplash: 0.9,
 };
 const MIN_INTERVAL_MS: Record<UiSound, number> = {
   focus: 50,
@@ -43,6 +47,8 @@ const MIN_INTERVAL_MS: Record<UiSound, number> = {
   confirm: 120,
   back: 100,
   transition: 120,
+  themeFall: 300,
+  themeSplash: 300,
 };
 /** One physical action may update focus, open a layer, and change a route in the same frame. */
 const GLOBAL_MIN_INTERVAL_MS = 35;

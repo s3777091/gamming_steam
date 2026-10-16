@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { ChevronRight, Gamepad2, Info, Newspaper, ShoppingBag, Trash2, Trophy, X, type LucideIcon } from 'lucide-react-native';
+import { ChevronRight, Gamepad2, Info, Newspaper, ShoppingBag, Trash2, Trophy, type LucideIcon } from 'lucide-react-native';
 
 import { FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
@@ -14,6 +14,8 @@ import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
+import { PanelHeader } from '@/ui/PanelHeader';
+import { useMotion } from '@/ui/motion';
 
 export type GameOptionsModalProps = {
   game: PcGame;
@@ -40,9 +42,9 @@ function ActionItem({
   disabled?: boolean;
   autoFocus?: boolean;
 }) {
-  const { glass } = useTheme();
+  const { glass, colors } = useTheme();
   const { s } = useUi();
-  const tint = danger ? '#f87171' : iconColor || 'rgba(255,255,255,0.92)';
+  const tint = danger ? colors.danger : iconColor || colors.accentSoft;
 
   return (
     <Press
@@ -76,7 +78,7 @@ function ActionItem({
           left: 0,
           right: 0,
           height: StyleSheet.hairlineWidth,
-          backgroundColor: 'rgba(255,255,255,0.12)',
+          backgroundColor: glass.borderSpecular,
         }}
         pointerEvents="none"
       />
@@ -88,9 +90,9 @@ function ActionItem({
             borderRadius: s(8),
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: danger ? 'rgba(239,68,68,0.14)' : glass.surface,
+            backgroundColor: danger ? 'rgba(239,68,68,0.14)' : glass.surfaceHighlight,
             borderWidth: StyleSheet.hairlineWidth,
-            borderColor: danger ? 'rgba(239,68,68,0.24)' : glass.border,
+            borderColor: danger ? 'rgba(239,68,68,0.24)' : glass.borderAccent,
           }}
         >
           <Icon size={s(15)} color={tint} strokeWidth={2} />
@@ -118,6 +120,7 @@ export function GameOptionsModal({
   onUninstall,
 }: GameOptionsModalProps) {
   const { colors } = useTheme();
+  const { reduceMotion } = useMotion();
   const styles = useStyles();
   const { s, width, height, insets } = useUi();
   const [enter] = useState(() => new Animated.Value(0));
@@ -129,7 +132,7 @@ export function GameOptionsModal({
     enter.stopAnimation();
     Animated.timing(enter, {
       toValue: 0,
-      duration: 150,
+      duration: reduceMotion ? 0 : 150,
       easing: Easing.bezier(0.4, 0, 1, 1),
       useNativeDriver: true,
     }).start(({ finished }) => {
@@ -140,7 +143,7 @@ export function GameOptionsModal({
       onClose();
       after?.();
     });
-  }, [enter, onClose]);
+  }, [enter, onClose, reduceMotion]);
 
   useBack(() => closeWithAnimation());
 
@@ -149,13 +152,13 @@ export function GameOptionsModal({
     enter.setValue(0);
     const animation = Animated.timing(enter, {
       toValue: 1,
-      duration: 220,
+      duration: reduceMotion ? 0 : 220,
       easing: Easing.bezier(0.16, 1, 0.3, 1),
       useNativeDriver: true,
     });
     animation.start();
     return () => animation.stop();
-  }, [enter]);
+  }, [enter, reduceMotion]);
 
   const choose = (panel: LibraryPanel) => {
     closeWithAnimation(() => onOpenPanel(panel));
@@ -204,11 +207,11 @@ export function GameOptionsModal({
             },
           ]}
         >
-          <GlassBackdrop material="panel" intensity={36} radius={s(22)} />
+          <GlassBackdrop material="panel" radius={s(22)} />
 
           {/* Header với ảnh bìa nhỏ, tên game và nút đóng */}
-          <View style={[styles.header, { paddingHorizontal: s(16), paddingTop: s(13), paddingBottom: s(11) }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(11), flex: 1, minWidth: 0 }}>
+          <PanelHeader title={game.title} subtitle="Tùy chọn trò chơi" onClose={() => closeWithAnimation()}
+            leading={
               <View style={[styles.avatar, { width: s(38), height: s(38), borderRadius: s(10) }]}>
                 {artwork ? (
                   <Img source={{ uri: artwork }} style={StyleSheet.absoluteFill} contentFit="cover" />
@@ -216,29 +219,8 @@ export function GameOptionsModal({
                   <Gamepad2 size={s(20)} color={colors.accent} strokeWidth={1.8} />
                 )}
               </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <T size={14} weight="semibold" numberOfLines={1} tracking={-0.02}>
-                  {game.title}
-                </T>
-                <T size={10} color={colors.text3} numberOfLines={1} style={{ marginTop: s(1.5) }}>
-                  Tùy chọn trò chơi
-                </T>
-              </View>
-            </View>
+            } />
 
-            <Press
-              onPress={() => { playUiSound('back'); closeWithAnimation(); }}
-              sound="back"
-              accessibilityLabel="Đóng"
-              style={[styles.close, { width: s(28), height: s(28), borderRadius: s(14) }]}
-            >
-              <X size={s(14)} color="rgba(255,255,255,0.75)" strokeWidth={2} />
-            </Press>
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* Danh sách hành động hỗ trợ cuộn nếu màn hình quá nhỏ */}
           <ScrollView
             style={{ flexShrink: 1 }}
             showsVerticalScrollIndicator={false}
@@ -247,7 +229,6 @@ export function GameOptionsModal({
           >
             <ActionItem
               icon={Info}
-              iconColor="#38bdf8"
               label="Thông tin game"
               autoFocus
               onPress={() => choose('info')}
@@ -265,7 +246,6 @@ export function GameOptionsModal({
             {game.steamAppId ? (
               <ActionItem
                 icon={Trophy}
-                iconColor="#facc15"
                 label="Thành tựu"
                 onPress={() => choose('achievements')}
               />
@@ -274,7 +254,6 @@ export function GameOptionsModal({
             {game.storeUrl ? (
               <ActionItem
                 icon={ShoppingBag}
-                iconColor="#a78bfa"
                 label="Cửa hàng Steam"
                 onPress={handleStore}
               />
@@ -320,12 +299,6 @@ const useStyles = makeStyles(({ glass }) => ({
     shadowOffset: { width: 0, height: 14 },
     elevation: 20,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
   avatar: {
     overflow: 'hidden',
     alignItems: 'center',
@@ -333,13 +306,6 @@ const useStyles = makeStyles(({ glass }) => ({
     backgroundColor: glass.surface,
     borderWidth: 1,
     borderColor: glass.border,
-  },
-  close: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: glass.control,
-    borderWidth: 1,
-    borderColor: glass.controlBorder,
   },
   divider: {
     height: StyleSheet.hairlineWidth,

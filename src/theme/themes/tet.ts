@@ -4,6 +4,7 @@ import { createTheme } from '../createTheme';
 export const tetTheme = createTheme({
   id: 'tet',
   label: 'Tết',
+  material: 'lacquer',
   detail: 'Đỏ may mắn và vàng hoa mai',
   decor: {
     particles: 'petals',

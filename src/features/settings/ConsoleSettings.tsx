@@ -5,7 +5,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Easing, StyleSheet, View } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import {
@@ -138,7 +137,7 @@ function NavItem({
   active: boolean;
   onPress: () => void;
 }) {
-  const { settings: appleColors } = useTheme();
+  const { material, settings: appleColors } = useTheme();
   const { s } = useUi();
   const Icon = entry.icon;
   return (
@@ -163,13 +162,13 @@ function NavItem({
       {active ? (
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: s(12), overflow: 'hidden' }]}>
           <LinearGradient
-            colors={['rgba(255, 255, 255, 0.16)', 'rgba(255, 255, 255, 0.02)']}
+            colors={material.controlSheen}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
           <LinearGradient
-            colors={['rgba(255, 255, 255, 0.45)', 'rgba(255, 255, 255, 0.06)', 'transparent']}
+            colors={material.rim}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1 }}
@@ -220,7 +219,7 @@ export default function ConsoleSettings({
   backdropUrl?: string | null;
   onClose: () => void;
 }) {
-  const { settings: appleColors, colors, glass } = useTheme();
+  const { material, settings: appleColors, colors, glass } = useTheme();
   const { s, width, insets } = useUi();
   const [category, setCategory] = useState<SettingsCategory>(initialCategory);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -344,11 +343,7 @@ export default function ConsoleSettings({
               style={[StyleSheet.absoluteFill, { opacity: 0.4 }]}
               contentFit="cover"
             />
-            <BlurView
-              intensity={60}
-              tint="dark"
-              style={StyleSheet.absoluteFill}
-            />
+            <GlassBackdrop material="panel" />
           </View>
         ) : null}
 
@@ -405,18 +400,11 @@ export default function ConsoleSettings({
               overflow: 'hidden',
             }}
           >
-            <BlurView intensity={36} tint="dark" style={StyleSheet.absoluteFill} />
-            <LinearGradient
-              colors={['rgba(255, 255, 255, 0.04)', 'rgba(255, 255, 255, 0.01)', 'rgba(255, 255, 255, 0.02)']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              pointerEvents="none"
-              style={StyleSheet.absoluteFill}
-            />
+            <GlassBackdrop material="panel" />
 
             {/* Vệt sáng viền phải (Specular right edge rim) */}
             <LinearGradient
-              colors={['rgba(255, 255, 255, 0.18)', 'rgba(255, 255, 255, 0.04)', 'transparent']}
+              colors={material.panelEdge}
               start={{ x: 1, y: 0 }}
               end={{ x: 0, y: 0 }}
               pointerEvents="none"
@@ -542,26 +530,14 @@ export default function ConsoleSettings({
                     width: s(32),
                     height: s(32),
                     borderRadius: s(16),
-                    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                    backgroundColor: glass.control,
                     borderWidth: 1,
-                    borderColor: 'rgba(255, 255, 255, 0.16)',
+                    borderColor: glass.controlBorder,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: s(16), overflow: 'hidden' }]}>
-                    <BlurView
-                      intensity={24}
-                      tint="dark"
-                      style={StyleSheet.absoluteFill}
-                    />
-                    <LinearGradient
-                      colors={['rgba(255, 255, 255, 0.20)', 'transparent']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 0, y: 0.8 }}
-                      style={StyleSheet.absoluteFill}
-                    />
-                  </View>
+                  <GlassBackdrop material="control" radius={s(16)} />
                   <X size={s(15)} color="rgba(255, 255, 255, 0.85)" strokeWidth={2.2} />
                 </Press>
               </View>

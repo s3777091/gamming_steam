@@ -41,7 +41,7 @@ import {
 } from '@/lib/stream-resume';
 import { type GameDownload, allDownloads, downloadForApp, isDownloadActive, uninstallForApp } from '@/lib/steam-downloads';
 import { type PurchaseOffer, type PurchaseTarget, purchaseKind } from '@/lib/steam-purchase';
-import { makeStyles } from '@/theme';
+import { makeStyles, ThemeDecor } from '@/theme';
 import { useUi } from '@/ui/scale';
 import { GlassBackdrop, GlassBlurProvider } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
@@ -645,6 +645,7 @@ export default function ConsoleScreen() {
         <BlurTargetView ref={blurTargetRef} style={StyleSheet.absoluteFill}>
           <LibraryBackdrop url={backdropUrl} fallbackUrl={activeTab === 'store' ? storeBackdropFallback : activeTab === 'games' ? selected?.artworkUrl : null} store={activeTab === 'store'} />
           <PcWallpaper visible={activeTab === 'pc'} />
+          <ThemeDecor scenery paused={pathname !== '/' || Boolean(settingsCategory)} />
         </BlurTargetView>
 
         <View

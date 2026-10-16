@@ -76,4 +76,43 @@ writeWav('ui-transition.wav', 0.128, (t, d) => {
   return tone * fade(t, d, 0.008, 0.082) * (0.78 + p * 0.22);
 });
 
+// smooth() ở trên kẹp về [-1, 1] nên phồng lên ở thân các âm dài; các âm cũ giữ nguyên như đã
+// phát hành, còn âm mới dùng bản kẹp đúng [0, 1].
+const smooth01 = (edge0, edge1, value) => {
+  const x = Math.max(0, Math.min(1, (value - edge0) / (edge1 - edge0)));
+  return x * x * (3 - 2 * x);
+};
+const fade01 = (t, duration, attack, release) => smooth01(0, attack, t) * (1 - smooth01(duration - release, duration, t));
+
+// Pha của một sóng sin có tần số trượt mũ từ f0 tới f1 (tích phân tần số theo thời gian).
+const glidePhase = (f0, f1, k, t) => Math.PI * 2 * (f1 * t - ((f1 - f0) * (1 - Math.exp(-k * t))) / k);
+
+// Nhiễu trắng ổn định (cùng seed luôn ra cùng file) cho tiếng gió / nước.
+let seed = 7;
+const noise = () => {
+  seed = (seed * 1_664_525 + 1_013_904_223) >>> 0;
+  return seed / 2 ** 31 - 1;
+};
+
+// Đổi theme: tiếng huýt trượt xuống kiểu hoạt hình khi giọt màu rơi.
+writeWav('theme-fall.wav', 0.42, (t, d) => {
+  const whistle = Math.sin(glidePhase(1500, 620, 5.5, t));
+  const vibrato = 1 + 0.03 * sine(9, t);
+  return whistle * vibrato * 0.09 * fade01(t, d, 0.04, 0.12);
+});
+
+// Đổi theme: "bloop" giọt nước khi chạm, rồi tiếng xoẹt mềm khi vòng màu lan ra.
+let low = 0;
+writeWav('theme-splash.wav', 0.7, (t, d) => {
+  // Giọt nước: cao độ vút lên rất nhanh rồi tắt — đặc trưng của tiếng "bloop".
+  const bloop = Math.sin(glidePhase(320, 1350, 38, t)) * 0.2 * Math.exp(-t * 16) * smooth01(0, 0.004, t);
+  const thump = sine(105, t) * 0.09 * Math.exp(-t * 32);
+  // Whoosh: nhiễu qua lọc thông thấp có tần số cắt mở dần, phồng lên rồi tắt theo vòng màu.
+  const cutoff = 0.04 + 0.22 * smooth01(0.05, 0.35, t);
+  low += (noise() - low) * cutoff;
+  const swell = smooth01(0.04, 0.22, t) * (1 - smooth01(0.3, d, t));
+  const whoosh = low * 0.24 * swell;
+  return (bloop + thump + whoosh) * fade01(t, d, 0.002, 0.2);
+});
+
 console.log(`Generated UI sounds in ${output}`);

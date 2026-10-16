@@ -36,7 +36,7 @@ export function FocusRing({
   visible?: boolean;
   onHidden?: () => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, glass, material } = useTheme();
   const ui = useContext(UiContext);
   const { active, reduceMotion } = useMotion();
   const s = ui ? ui.s : (n: number) => n;
@@ -153,14 +153,14 @@ export function FocusRing({
             left: hInset,
             right: hInset,
             borderRadius: pillRadius,
-            backgroundColor: isDanger ? 'rgba(239, 68, 68, 0.08)' : 'rgba(255, 255, 255, 0.05)',
+            backgroundColor: isDanger ? 'rgba(239, 68, 68, 0.08)' : glass.surfaceUltraThin,
             opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 0.8] }),
             overflow: 'hidden',
           }}
         >
           {/* Ánh phản quang mép trên (Top rim specular sheen) */}
           <LinearGradient
-            colors={['rgba(255, 255, 255, 0.30)', 'rgba(255, 255, 255, 0.02)', 'transparent']}
+            colors={material.rim}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
             pointerEvents="none"
@@ -185,7 +185,7 @@ export function FocusRing({
             right: hInset,
             borderRadius: pillRadius,
             borderWidth: 1.1,
-            borderColor: isDanger ? 'rgba(255, 140, 130, 0.80)' : 'rgba(255, 255, 255, 0.58)',
+            borderColor: isDanger ? 'rgba(255, 140, 130, 0.80)' : material.focusInner,
             opacity: breathe.interpolate({ inputRange: [0, 1], outputRange: [1, 0.75] }),
           }}
         />
@@ -271,7 +271,7 @@ export function FocusRing({
           bottom: -0.5,
           borderRadius: Math.max(0, radius + 0.5),
           borderWidth: innerRingWidth,
-          borderColor: isDanger ? 'rgba(255, 140, 130, 0.85)' : 'rgba(255, 255, 255, 0.58)',
+          borderColor: isDanger ? 'rgba(255, 140, 130, 0.85)' : material.focusInner,
           opacity: breathe.interpolate({
             inputRange: [0, 1],
             outputRange: [1, 0.72],

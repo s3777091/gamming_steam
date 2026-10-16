@@ -32,7 +32,7 @@ const TAB_ITEM_WIDTH = 66;
  *  - Canh chỉnh linh hoạt theo số lượng icon và thiết bị thực tế bên trong.
  */
 function DeviceStatusButton({ devices, open, onPress }: { devices: LocalDevice[]; open: boolean; onPress: () => void }) {
-  const { colors } = useTheme();
+  const { glass, colors } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const [anim] = useState(() => new Animated.Value(open ? 1 : 0));
@@ -87,12 +87,12 @@ function DeviceStatusButton({ devices, open, onPress }: { devices: LocalDevice[]
 
   const pillBg = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(255, 255, 255, 0.08)', alpha(colors.accent, 0.22)],
+    outputRange: [glass.control, glass.controlActive],
   });
 
   const pillBorder = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(255, 255, 255, 0.16)', colors.accent],
+    outputRange: [glass.controlBorder, glass.controlBorderActive],
   });
 
   const accessibilityLabel = controllerBattery !== null
@@ -153,12 +153,12 @@ function DeviceStatusButton({ devices, open, onPress }: { devices: LocalDevice[]
                         transform: [{ translateX }],
                         backgroundColor: i === 0 ? 'transparent' : anim.interpolate({
                           inputRange: [0, 1],
-                          outputRange: ['rgba(18, 22, 30, 0.95)', 'rgba(0, 0, 0, 0)'],
+                          outputRange: [alpha(colors.panelSolid, 0.95), alpha(colors.panelSolid, 0)],
                         }),
                         borderWidth: i === 0 ? 0 : 1.5,
                         borderColor: i === 0 ? 'transparent' : anim.interpolate({
                           inputRange: [0, 1],
-                          outputRange: ['rgba(28, 34, 46, 0.9)', 'rgba(0, 0, 0, 0)'],
+                          outputRange: [alpha(colors.cardRaised, 0.9), alpha(colors.cardRaised, 0)],
                         }),
                       },
                     ]}
@@ -231,7 +231,7 @@ function RemoteStatusButton({
   onPress: () => void;
   anchorRef?: RefObject<View | null>;
 }) {
-  const { colors } = useTheme();
+  const { glass, colors } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const isOnline = reachable || online === true;
@@ -250,8 +250,8 @@ function RemoteStatusButton({
             width: s(32),
             height: s(32),
             borderRadius: s(16),
-            backgroundColor: open ? alpha(colors.accent, 0.24) : 'rgba(255,255,255,0.08)',
-            borderColor: open ? colors.accent : 'rgba(255,255,255,0.18)',
+            backgroundColor: open ? glass.controlActive : glass.control,
+            borderColor: open ? glass.controlBorderActive : glass.controlBorder,
           },
         ]}
       >
@@ -585,7 +585,7 @@ export function LibraryHeader({
   /** Không truyền thì chạm cụm icon mở thẳng Cài đặt > Thiết bị. */
   onToggleDeviceMenu?: () => void;
 }) {
-  const { colors } = useTheme();
+  const { glass, colors } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const totalNotifications = notificationCount !== undefined
@@ -632,8 +632,8 @@ export function LibraryHeader({
                   width: s(32),
                   height: s(32),
                   borderRadius: s(16),
-                  borderColor: totalNotifications > 0 ? alpha(colors.accent, 0.4) : 'rgba(255,255,255,0.16)',
-                  backgroundColor: totalNotifications > 0 ? alpha(colors.accent, 0.14) : 'rgba(255,255,255,0.08)',
+                  borderColor: totalNotifications > 0 ? glass.borderAccent : glass.controlBorder,
+                  backgroundColor: totalNotifications > 0 ? glass.surfaceHighlight : glass.control,
                 },
               ]}
             >
@@ -677,7 +677,7 @@ export function LibraryHeader({
             <Settings size={s(16)} color="rgba(255,255,255,0.72)" strokeWidth={1.8} />
           </Press>
         </SeasonalIcon>
-        <View style={{ width: StyleSheet.hairlineWidth, height: s(20), backgroundColor: 'rgba(255,255,255,0.16)' }} />
+        <View style={{ width: StyleSheet.hairlineWidth, height: s(20), backgroundColor: glass.controlActive }} />
         <SteamAccountButton profile={steamProfile} onPress={onOpenProfile} />
       </View>
     </View>
@@ -691,7 +691,7 @@ const useStyles = makeStyles(({ colors, glass }) => ({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.28)',
+    borderColor: glass.controlBorder,
     backgroundColor: glass.control,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -759,8 +759,8 @@ const useStyles = makeStyles(({ colors, glass }) => ({
     justifyContent: 'center',
     overflow: 'visible',
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.45)',
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderColor: glass.controlBorderActive,
+    backgroundColor: glass.controlActive,
     shadowColor: colors.accent,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.25,

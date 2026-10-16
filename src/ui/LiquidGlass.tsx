@@ -59,7 +59,7 @@ export const LiquidGlass = forwardRef<View, LiquidGlassProps>(function LiquidGla
   },
   ref,
 ) {
-  const { glass, colors } = useTheme();
+  const { glass, colors, material } = useTheme();
   const specularAlpha = typeof specular === 'number' ? specular : specular ? 1 : 0;
 
   return (
@@ -78,38 +78,34 @@ export const LiquidGlass = forwardRef<View, LiquidGlassProps>(function LiquidGla
       ]}
     >
       {/* 1. Lớp làm mờ quang học Liquid Glass Blur */}
-      <BlurView
-        intensity={intensity}
+      {material.panelBlur > 0 ? <BlurView
+        intensity={Math.min(100, intensity * material.panelBlur / 34)}
         tint={tint}
         blurTarget={blurTarget}
         blurMethod={Platform.OS === 'android' && blurTarget ? 'dimezisBlurViewSdk31Plus' : 'none'}
         blurReductionFactor={3}
         style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden' }]}
-      />
+      /> : null}
 
       {/* 2. Lớp phản quang khúc xạ ánh sáng (Light Refraction Sheen) */}
       {sheen ? (
         <LinearGradient
-          colors={[
+          colors={material.kind === 'glass' ? [
             `rgba(255, 255, 255, ${0.18 * specularAlpha})`,
             `rgba(255, 255, 255, ${0.04 * specularAlpha})`,
             'rgba(255, 255, 255, 0)',
-          ]}
+          ] : material.activeSheen}
           start={{ x: 0, y: 0 }}
           end={{ x: 0.8, y: 0.9 }}
           pointerEvents="none"
-          style={[StyleSheet.absoluteFill, { borderRadius: radius }]}
+          style={[StyleSheet.absoluteFill, { borderRadius: radius, opacity: material.kind === 'glass' ? 1 : specularAlpha }]}
         />
       ) : null}
 
       {/* 3. Vành sáng viền cạnh trên (Specular Top Edge Rim) */}
       {specularAlpha > 0 ? (
         <LinearGradient
-          colors={[
-            `rgba(255, 255, 255, ${0.55 * specularAlpha})`,
-            `rgba(255, 255, 255, ${0.12 * specularAlpha})`,
-            'transparent',
-          ]}
+          colors={material.rim}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           pointerEvents="none"
@@ -118,6 +114,7 @@ export const LiquidGlass = forwardRef<View, LiquidGlassProps>(function LiquidGla
             {
               borderTopLeftRadius: radius,
               borderTopRightRadius: radius,
+              opacity: specularAlpha,
             },
           ]}
         />
@@ -140,7 +137,7 @@ export function LiquidAmbientAurora({
   active?: boolean;
   opacity?: number;
 }) {
-  const { colors } = useTheme();
+  const { colors, id } = useTheme();
   if (!active) return null;
 
   return (
@@ -164,7 +161,7 @@ export function LiquidAmbientAurora({
 
       {/* Orb 2: Deep Violet / Indigo Glow (Trung tâm & bên phải) */}
       <LinearGradient
-        colors={['rgba(120, 86, 255, 0.35)', 'rgba(88, 86, 214, 0.08)', 'transparent']}
+        colors={id === 'console' ? ['rgba(120, 86, 255, 0.35)', 'rgba(88, 86, 214, 0.08)', 'transparent'] : [alpha(colors.accent, 0.24), alpha(colors.cardRaised, 0.08), 'transparent']}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[
@@ -181,7 +178,7 @@ export function LiquidAmbientAurora({
 
       {/* Orb 3: Cyan / Teal Refraction Flare (Dưới phải) */}
       <LinearGradient
-        colors={['rgba(0, 242, 254, 0.22)', 'rgba(32, 156, 255, 0.05)', 'transparent']}
+        colors={id === 'console' ? ['rgba(0, 242, 254, 0.22)', 'rgba(32, 156, 255, 0.05)', 'transparent'] : [alpha(colors.accentGlow, 0.16), alpha(colors.primary, 0.05), 'transparent']}
         start={{ x: 0.8, y: 0.8 }}
         end={{ x: 0.1, y: 0.1 }}
         style={[

@@ -4,7 +4,6 @@
 // Ô game nằm đúng chỗ của Tab game cũ: game vẫn chạy trên PC sau khi bấm Home
 // trong stream hiện logo ở đây; bấm vào là nối lại stream và vào thẳng game đó.
 
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, StyleSheet, View } from 'react-native';
@@ -16,7 +15,8 @@ import type { LocalDevice } from '@/features/devices/useInputDevices';
 import type { AppNotification } from '@/features/library/types';
 import { PC_ROUTES, pcPostJson } from '@/lib/pc-api';
 import { forgetStreamGame, type ResumableGame } from '@/lib/stream-resume';
-import { alpha, makeStyles, useTheme } from '@/theme';
+import { alpha, CardSurface, HeaderAccent, makeStyles, useTheme } from '@/theme';
+import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
@@ -66,7 +66,7 @@ export function HomeControlCenter({
   onResume: (game: ResumableGame) => void;
   onClose: () => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, glass } = useTheme();
   const styles = useStyles();
   const { s, insets } = useUi();
   const { reduceMotion } = useMotion();
@@ -162,7 +162,7 @@ export function HomeControlCenter({
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.root, { opacity: fade }]} pointerEvents={open ? 'auto' : 'none'} accessibilityViewIsModal>
       <FocusLayer>
-        <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill} />
+        <GlassBackdrop material="scrim" />
         <LinearGradient
           colors={[alpha(colors.bgDeep, 0.82), alpha(colors.bgDeep, 0.3), alpha(colors.bgDeep, 0.9)]}
           locations={[0, 0.45, 1]}
@@ -190,11 +190,7 @@ export function HomeControlCenter({
               style={[styles.gameCard, { width: s(360), height: s(176), borderRadius: s(22) }]}
             >
               {game.heroUrl ? <Img source={{ uri: game.heroUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
-              <LinearGradient
-                colors={[alpha(colors.bg, 0.15), alpha(colors.bg, 0.92)]}
-                locations={[0.25, 1]}
-                style={StyleSheet.absoluteFill}
-              />
+              <CardSurface shade radius={s(22)} />
               <View style={[styles.cardTag, { top: s(12), left: s(12), paddingHorizontal: s(8), paddingVertical: s(3), borderRadius: s(8), gap: s(5) }]}>
                 <View style={[styles.greenDot, { width: s(6), height: s(6), borderRadius: s(3) }]} />
                 <T size={9.5} weight="bold" color="#4ade80">ĐANG CHẠY TRÊN PC</T>
@@ -206,8 +202,8 @@ export function HomeControlCenter({
                   <T size={16} weight="bold" color="#ffffff" numberOfLines={1}>{game.title}</T>
                 )}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6), marginTop: s(6) }}>
-                  <Play size={s(11)} color="#c7d2fe" fill="#c7d2fe" />
-                  <T size={10.5} weight="semibold" color="#c7d2fe">Chạm để quay lại game</T>
+                  <Play size={s(11)} color={colors.accentSoft} fill={colors.accentSoft} />
+                  <T size={10.5} weight="semibold" color={colors.accentSoft}>Chạm để quay lại game</T>
                 </View>
               </View>
             </Press>
@@ -222,7 +218,7 @@ export function HomeControlCenter({
         {/* Dock */}
         <View style={[styles.dockWrapper, { bottom: s(12) + insets.bottom }]}>
           <View style={[styles.dockBar, { borderRadius: s(22), padding: s(5), gap: s(4) }]}>
-            <BlurView intensity={65} tint="dark" style={[StyleSheet.absoluteFill, { borderRadius: s(22), overflow: 'hidden' }]} />
+            <GlassBackdrop material="panel" radius={s(22)} />
             {items.map((item, index) => {
               const Icon = item.icon;
               const popoverOpen = Boolean(item.popover && popover?.id === item.popover);
@@ -253,7 +249,8 @@ export function HomeControlCenter({
                       width: s(42),
                       height: s(42),
                       borderRadius: s(14),
-                      backgroundColor: popoverOpen ? 'rgba(255,255,255,0.18)' : 'transparent',
+                      backgroundColor: popoverOpen ? glass.controlActive : 'transparent',
+                      borderColor: popoverOpen ? glass.controlBorderActive : 'transparent',
                     },
                   ]}
                 >
@@ -280,13 +277,14 @@ export function HomeControlCenter({
               );
             })}
             <View style={[styles.divider, { height: s(22), marginHorizontal: s(8) }]} />
+            <HeaderAccent />
             <T size={13} weight="semibold" color="rgba(255,255,255,0.9)" tabular style={{ marginRight: s(8) }}>{clock}</T>
           </View>
         </View>
 
         {message ? (
           <View pointerEvents="none" style={[styles.toast, { bottom: s(86) + insets.bottom, paddingHorizontal: s(16), paddingVertical: s(7), borderRadius: s(16) }]}>
-            <BlurView intensity={45} tint="dark" style={StyleSheet.absoluteFill} />
+            <GlassBackdrop material="panel" radius={s(16)} />
             <T size={11.5} weight="medium" color="rgba(255,255,255,0.88)">{message}</T>
           </View>
         ) : null}
@@ -296,11 +294,10 @@ export function HomeControlCenter({
           anchor={popover?.anchor ?? null}
           title={popoverShown === 'devices' ? 'Thiết bị' : popoverShown === 'profile' ? 'Tài khoản' : 'Thông báo'}
           icon={popoverShown === 'devices' ? Gamepad2 : popoverShown === 'profile' ? UserRound : Bell}
-          accent={popoverShown === 'notifications' ? '#ff9f0a' : popoverShown === 'devices' ? '#34c759' : '#bf5af2'}
           width={popoverShown === 'notifications' ? 360 : 320}
           action={popoverShown === 'notifications' && unreadCount > 0 ? (
             <Press onPress={onMarkAllRead} hitSlop={8}>
-              <T size={10} weight="semibold" color="#64a8ff">Đánh dấu đã đọc</T>
+              <T size={10} weight="semibold" color={colors.accentSoft}>Đánh dấu đã đọc</T>
             </Press>
           ) : null}
           onClose={() => setPopover(null)}
@@ -323,22 +320,22 @@ export function HomeControlCenter({
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
+const useStyles = makeStyles(({ colors, glass }) => ({
   root: { zIndex: 300, elevation: 300, backgroundColor: alpha(colors.bgDeep, 0.6) },
   topBar: { position: 'absolute', alignItems: 'flex-end', zIndex: 20 },
   closeBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: glass.control,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: glass.controlBorder,
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   gameCard: {
     overflow: 'hidden',
-    backgroundColor: '#141722',
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: glass.cardBorder,
     shadowColor: '#000',
     shadowOpacity: 0.5,
     shadowRadius: 24,
@@ -349,28 +346,28 @@ const useStyles = makeStyles(({ colors }) => ({
     position: 'absolute',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: glass.panel,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    borderColor: glass.border,
   },
   greenDot: { backgroundColor: '#4ade80' },
   dockWrapper: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   dockBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(20,22,30,0.55)',
+    backgroundColor: glass.panel,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: glass.panelBorder,
   },
-  dockBtn: { alignItems: 'center', justifyContent: 'center' },
-  divider: { width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(255,255,255,0.25)' },
+  dockBtn: { alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth },
+  divider: { width: StyleSheet.hairlineWidth, backgroundColor: glass.border },
   gameTile: {
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderColor: glass.controlBorder,
+    backgroundColor: glass.surface,
   },
   badge: {
     position: 'absolute',
@@ -384,7 +381,7 @@ const useStyles = makeStyles(({ colors }) => ({
     justifyContent: 'center',
     backgroundColor: '#ef4444',
     borderWidth: 1.2,
-    borderColor: '#0b0d14',
+    borderColor: colors.panelSolid,
   },
   liveDot: {
     position: 'absolute',
@@ -399,6 +396,6 @@ const useStyles = makeStyles(({ colors }) => ({
     alignSelf: 'center',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    borderColor: glass.panelBorder,
   },
 }));
