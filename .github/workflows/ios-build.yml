@@ -1,64 +1,131 @@
-name: iOS IPA
+name: iOS unsigned IPA
 
 on:
   workflow_dispatch:
   push:
     branches: [feat/theme-system]
-    paths: [.github/workflows/ios-build.yml]
+    # Sửa tài liệu thì không cần .ipa mới.
+    paths-ignore:
+      - '**/*.md'
+      - '.gitignore'
+      - '.vscode/**'
 
-permissions:
-  contents: read
+# Push liên tiếp thì chỉ giữ lần cuối — mỗi run bị huỷ sớm là 70 phút quota
+# không bị đốt. Build cũ đằng nào cũng lỗi thời ngay khi có commit mới.
+concurrency:
+  group: ios-ipa-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    # Thoát nhanh cho commit không đáng build: ghi [skip ipa] trong message.
+    #
+    # BẪY: điều kiện này quét toàn bộ message, kể cả phần thân. Commit nào NHẮC
+    # TỚI chuỗi đó — ví dụ commit tài liệu hoá chính cái cờ này — cũng bị bỏ qua.
+    # Muốn nói về nó trong message thì viết tách ra, đừng viết liền nguyên chuỗi.
+    #
+    # workflow_dispatch không có head_commit; contains(null, …) = false nên
+    # bấm tay luôn chạy, không bao giờ bị cờ này chặn.
+    if: "!contains(github.event.head_commit.message, '[skip ipa]')"
+    # macos-15 mang Xcode Swift 6.1, mà ExpoModulesJSI của SDK 57 đòi Swift
+    # tools 6.2 (Xcode 26) — build sẽ chết ở "Could not resolve package
+    # dependencies". Dùng image mới hơn.
+    runs-on: macos-26
+    timeout-minutes: 60
+
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - name: Check Expo authentication
-        shell: bash
+      - uses: actions/checkout@v4
+
+      # Image có thể cài sẵn nhiều bản Xcode; chọn bản cao nhất thay vì tin vào
+      # mặc định, để lần sau image đổi cũng không gãy.
+      - name: Chọn Xcode mới nhất
         run: |
-          if [ -z "$EXPO_TOKEN" ]; then
-            echo "::error::Add the EXPO_TOKEN repository secret, and configure remote iOS signing credentials using the ios-preview profile."
+          ls -d /Applications/Xcode*.app
+          LATEST=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Dùng: $LATEST"
+          sudo xcode-select -s "$LATEST/Contents/Developer"
+          xcodebuild -version
+          swift --version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Cài dependency
+        run: npm ci
+
+      - name: Lint and typecheck
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test:ios-keyboard
+
+      # Thư mục ios/ nằm trong .gitignore nên phải sinh lại mỗi lần build.
+      # --no-install để tự chạy pod install ở bước sau cho dễ đọc log.
+      - name: Prebuild iOS
+        run: npx expo prebuild --platform ios --no-install
+
+      - name: Cài CocoaPods
+        working-directory: ios
+        run: pod install --repo-update
+
+      # Scheme phải lấy từ .xcodeproj CỦA APP, không phải từ workspace: danh
+      # sách scheme của workspace gộp cả scheme của Pods, và phần tử [0] của nó
+      # là một pod (EXConstants) — build cái đó thì ra framework chứ không ra
+      # .app, nên bước đóng gói chết mà bước build vẫn báo thành công.
+      - name: Dò workspace + scheme
+        id: xc
+        working-directory: ios
+        run: |
+          WS=$(ls -d *.xcworkspace | head -1)
+          PROJ=$(ls -d *.xcodeproj | head -1)
+          SCHEME=$(xcodebuild -project "$PROJ" -list -json \
+            | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).project.schemes[0]))")
+          echo "workspace=$WS" >> "$GITHUB_OUTPUT"
+          echo "scheme=$SCHEME"  >> "$GITHUB_OUTPUT"
+          echo "Workspace: $WS | Project: $PROJ | Scheme: $SCHEME"
+
+      - name: Build .app không ký
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -workspace "${{ steps.xc.outputs.workspace }}" \
+            -scheme "${{ steps.xc.outputs.scheme }}" \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            build
+
+      # .ipa chỉ là file zip có thư mục Payload/ ở gốc. Tự đóng gói vì
+      # `xcodebuild -exportArchive` bắt buộc phải có provisioning profile.
+      #
+      # Dò .app thay vì ghi cứng Build/Products/Release-iphoneos — vị trí đó
+      # thay đổi theo cấu hình, và đoán sai thì bước này chết dù build đã xong.
+      - name: Đóng gói thành .ipa
+        run: |
+          APP=$(find ios/build -type d -name "*.app" \
+                  -not -path "*/Index.noindex/*" \
+                  -not -path "*.app/*" | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::Không tìm thấy .app trong ios/build"
+            find ios/build -maxdepth 5 -type d | head -60
             exit 1
           fi
-      - name: Build signed iPhone IPA on EAS
-        run: npx eas-cli@latest build --platform ios --profile ios-preview --non-interactive --wait --json > ios-build.json
-      - name: Download IPA and record source
-        shell: bash
-        run: |
-          node --input-type=module <<'NODE'
-          import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
-          import { createHash } from 'node:crypto';
-          const result = JSON.parse(readFileSync('ios-build.json', 'utf8'));
-          const build = Array.isArray(result) ? result[0] : result;
-          if (build.status !== 'FINISHED' || !build.artifacts?.buildUrl) {
-            throw new Error('EAS did not return a completed iOS build with an IPA artifact');
-          }
-          const response = await fetch(build.artifacts.buildUrl);
-          if (!response.ok) throw new Error(`IPA download failed: ${response.status}`);
-          const ipa = Buffer.from(await response.arrayBuffer());
-          if (ipa.readUInt32LE(0) !== 0x04034b50) throw new Error('Artifact is not an IPA ZIP archive');
-          mkdirSync('releases/ios', { recursive: true });
-          writeFileSync('releases/ios/jetsona.ipa', ipa);
-          writeFileSync('releases/ios/jetsona.ipa.sha256', `${createHash('sha256').update(ipa).digest('hex')}  jetsona.ipa\n`);
-          writeFileSync('releases/ios/build-info.json', JSON.stringify({
-            status: build.status, commit: process.env.GITHUB_SHA,
-            buildId: build.id, profile: 'ios-preview',
-            workflow: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-          }, null, 2));
-          NODE
+          echo "Tìm thấy: $APP"
+          rm -rf /tmp/pkg && mkdir -p /tmp/pkg/Payload
+          cp -R "$APP" /tmp/pkg/Payload/
+          (cd /tmp/pkg && zip -qry "$GITHUB_WORKSPACE/jetsona-unsigned.ipa" Payload)
+          ls -lh "$GITHUB_WORKSPACE/jetsona-unsigned.ipa"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: jetsona-ios-${{ github.sha }}
-          path: releases/ios/
+          # Kèm mã commit để phân biệt các bản build khi tải nhiều lần.
+          name: jetsona-ios-unsigned-${{ github.sha }}
+          path: jetsona-unsigned.ipa
           if-no-files-found: error
+          retention-days: 14
