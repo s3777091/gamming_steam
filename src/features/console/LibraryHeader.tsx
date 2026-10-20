@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } 
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { Bell, Gamepad2, Monitor, MonitorSmartphone, Settings } from 'lucide-react-native';
 
-import { batteryColor, lowestControllerBattery } from '@/features/devices/battery';
+import { batteryColor, batteryPercent, lowestControllerBattery } from '@/features/devices/battery';
 import { DEVICE_KIND_ORDER, type LocalDevice } from '@/features/devices/useInputDevices';
 import { KIND_ICONS } from '@/features/devices/kindIcons';
 import { formatClock } from '@/features/library/format';
@@ -54,7 +54,6 @@ function DeviceStatusButton({ devices, open, onPress }: { devices: LocalDevice[]
   const displayDevices = useMemo(() => sortedDevices.slice(0, 4), [sortedDevices]);
   const overflowCount = sortedDevices.length > 4 ? sortedDevices.length - 4 : 0;
   const N = displayDevices.length;
-  const hasBattery = controllerBattery !== null;
 
   const ICON_WRAP = s(22);
   const ICON_SIZE = s(14.5);
@@ -62,19 +61,15 @@ function DeviceStatusButton({ devices, open, onPress }: { devices: LocalDevice[]
   const OVERLAP_OFFSET = s(13); // Khoảng cách giữa các icon khi đè lên nhau (overlap 9dp)
   const SHIFT_DELTA = (ICON_WRAP + SEPARATED_GAP) - OVERLAP_OFFSET; // 15dp
   const PADDING_H = s(9);
-  const batteryWidth = hasBattery ? s(28) : 0;
   const overflowWidth = overflowCount > 0 ? s(16) : 0;
 
-  // Tính độ rộng theo số lượng icon và thiết bị
+  // Tính độ rộng theo số lượng icon và thiết bị (pin hiện bằng màu icon tay cầm, không chiếm chỗ)
   let collapsedContentWidth = ICON_WRAP;
   let separatedContentWidth = ICON_WRAP;
 
   if (N >= 2) {
-    collapsedContentWidth = ICON_WRAP + (N - 1) * OVERLAP_OFFSET + batteryWidth + overflowWidth;
-    separatedContentWidth = ICON_WRAP + (N - 1) * (ICON_WRAP + SEPARATED_GAP) + batteryWidth + overflowWidth;
-  } else if (N === 1) {
-    collapsedContentWidth = ICON_WRAP + batteryWidth;
-    separatedContentWidth = ICON_WRAP + batteryWidth;
+    collapsedContentWidth = ICON_WRAP + (N - 1) * OVERLAP_OFFSET + overflowWidth;
+    separatedContentWidth = ICON_WRAP + (N - 1) * (ICON_WRAP + SEPARATED_GAP) + overflowWidth;
   }
 
   const collapsedTotalWidth = collapsedContentWidth + PADDING_H * 2;
@@ -163,28 +158,18 @@ function DeviceStatusButton({ devices, open, onPress }: { devices: LocalDevice[]
                       },
                     ]}
                   >
-                    <Icon size={ICON_SIZE} color={open ? colors.accent : colors.text} strokeWidth={1.8} />
+                    <Icon
+                      size={ICON_SIZE}
+                      color={
+                        device.kind === 'controller' && device.battery !== null
+                          ? batteryColor(batteryPercent(device.battery), colors)
+                          : open ? colors.accent : colors.text
+                      }
+                      strokeWidth={1.8}
+                    />
                   </Animated.View>
                 );
               })}
-
-              {hasBattery ? (
-                <Animated.View
-                  style={{
-                    marginLeft: s(4),
-                    transform: [{
-                      translateX: anim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-(N - 1) * SHIFT_DELTA, 0],
-                      }),
-                    }],
-                  }}
-                >
-                  <T size={10.5} weight="bold" color={batteryColor(controllerBattery, colors)} tabular>
-                    {controllerBattery}%
-                  </T>
-                </Animated.View>
-              ) : null}
 
               {overflowCount > 0 ? (
                 <Animated.View

@@ -18,6 +18,10 @@ public final class JetsonaInputModule: Module {
   private var engines: [Int: CHHapticEngine] = [:]
   private var players: [Int: any CHHapticPatternPlayer] = [:]
   private var speakerOverridden = false
+  // iOS posts no notification when a controller's battery changes, and it often
+  // reads the level only some time after connect. Re-check while the app is open.
+  private var batteryTimer: Timer?
+  private var reportedBatteries: [Int: Float] = [:]
 
   // Game Controller and UIKit are always accessed on the main queue, including
   // synchronous JS getters. Input callbacks run on that same queue.
@@ -125,7 +129,24 @@ public final class JetsonaInputModule: Module {
         self?.refreshDevices()
       })
     }
+    batteryTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
+      self?.checkBatteries()
+    }
     refreshDevices()
+  }
+
+  /// -1 while iOS doesn't know the level: in the `.unknown` state `batteryLevel`
+  /// is a placeholder (often 1.0), which showed up as a fake 100%.
+  private func batteryLevel(_ controller: GCController) -> Float {
+    guard let battery = controller.battery, battery.batteryState != .unknown else { return -1 }
+    return battery.batteryLevel
+  }
+
+  private func checkBatteries() {
+    guard foreground, !controllers.isEmpty else { return }
+    if controllers.mapValues(batteryLevel) != reportedBatteries {
+      sendEvent("onDevicesChanged", ["devices": devices()])
+    }
   }
 
   private func refreshDevices(notify: Bool = true) {
@@ -288,6 +309,9 @@ public final class JetsonaInputModule: Module {
     JetsonaInputViewController.current?.updateInputPolicy()
     observers.forEach(NotificationCenter.default.removeObserver)
     observers.removeAll()
+    batteryTimer?.invalidate()
+    batteryTimer = nil
+    reportedBatteries.removeAll()
     controllers.values.forEach { unbind($0) }
     mice.values.forEach { unbind($0) }
     GCKeyboard.coalesced?.keyboardInput?.keyChangedHandler = nil
@@ -299,10 +323,11 @@ public final class JetsonaInputModule: Module {
   }
 
   private func devices() -> [[String: Any]] {
+    reportedBatteries = controllers.mapValues(batteryLevel)
     var result: [[String: Any]] = controllers.keys.sorted().compactMap { id in
       guard let controller = controllers[id] else { return nil }
       return device(id, name: controller.vendorName ?? "Game controller", kind: "controller",
-        source: "gamepad", battery: controller.battery?.batteryLevel ?? -1,
+        source: "gamepad", battery: reportedBatteries[id] ?? -1,
         rumble: controller.haptics != nil)
     }
     if let keyboard = GCKeyboard.coalesced {

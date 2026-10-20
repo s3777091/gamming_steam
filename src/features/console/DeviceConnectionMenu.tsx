@@ -22,21 +22,18 @@ export type DeviceConnectionMenuProps = {
   onOpenSettings: () => void;
 };
 
-/** Thanh pin nhỏ: vỏ + phần ruột tô theo % và màu theo mức pin. */
+/** Thanh pin nhỏ: vỏ + phần ruột tô theo % và màu theo mức pin (không kèm số, % nằm ở accessibilityLabel). */
 function BatteryGauge({ percent }: { percent: number }) {
   const { colors } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const color = batteryColor(percent, colors);
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(3) }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <View style={[styles.gaugeShell, { width: s(15), height: s(7), borderRadius: s(2), padding: s(1) }]}>
-          <View style={{ width: `${Math.max(8, percent)}%`, height: '100%', borderRadius: s(1), backgroundColor: color }} />
-        </View>
-        <View style={{ width: s(1.5), height: s(3), borderRadius: s(1), backgroundColor: 'rgba(255,255,255,0.45)', marginLeft: s(0.5) }} />
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <View style={[styles.gaugeShell, { width: s(20), height: s(8), borderRadius: s(2.5), padding: s(1) }]}>
+        <View style={{ width: `${Math.max(8, percent)}%`, height: '100%', borderRadius: s(1.5), backgroundColor: color }} />
       </View>
-      <T size={9} weight="bold" color={color} tabular>{percent}%</T>
+      <View style={{ width: s(1.5), height: s(3.5), borderRadius: s(1), backgroundColor: 'rgba(255,255,255,0.45)', marginLeft: s(0.5) }} />
     </View>
   );
 }
@@ -80,7 +77,11 @@ function DeviceTile({
         },
       ]}
     >
-      <Icon size={s(17)} color={device.kind === 'controller' ? colors.accentSoft : colors.text} strokeWidth={1.9} />
+      <Icon
+        size={s(17)}
+        color={percent !== null ? batteryColor(percent, colors) : device.kind === 'controller' ? colors.accentSoft : colors.text}
+        strokeWidth={1.9}
+      />
       {percent !== null ? <BatteryGauge percent={percent} /> : null}
     </Press>
   );
@@ -116,7 +117,7 @@ function getMenuDimensions(count: number, s: (v: number) => number) {
  * Menu thiết bị đang kết nối, thả xuống từ cụm icon thiết bị trên header:
  * - Cùng hiệu ứng slide out và khung glass với menu Remote PC.
  * - Tự động canh chỉnh kích thước khung và tile theo số lượng thiết bị bên trong.
- * - Mỗi thiết bị là một icon; tay cầm kèm thanh pin + % hiện tại.
+ * - Mỗi thiết bị là một icon; icon tay cầm tô màu theo mức pin, kèm thanh pin (không ghi số).
  */
 export function DeviceConnectionMenu({ open, anchorRef, devices, onClose, onOpenSettings }: DeviceConnectionMenuProps) {
   const { colors } = useTheme();

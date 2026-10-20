@@ -9,11 +9,11 @@ export function batteryPercent(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value * 100)));
 }
 
-/** Màu theo mức pin: đỏ khi sắp hết, vàng khi thấp, trắng khi còn nhiều. */
-export function batteryColor(percent: number, colors: Pick<Palette, 'danger' | 'warning' | 'text'>): string {
-  if (percent <= 15) return colors.danger;
-  if (percent <= 35) return colors.warning;
-  return colors.text;
+/** Màu theo mức pin, tô thẳng lên icon tay cầm thay cho con số %: đỏ sắp hết, vàng thấp, xanh còn nhiều. */
+export function batteryColor(percent: number, colors: Pick<Palette, 'danger' | 'warning' | 'success'>): string {
+  if (percent <= 20) return colors.danger;
+  if (percent <= 50) return colors.warning;
+  return colors.success;
 }
 
 /** Pin thấp nhất trong các tay cầm có báo pin (cái sắp tắt trước mới đáng để ý); null khi không có. */

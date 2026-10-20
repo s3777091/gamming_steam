@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bell, Monitor, Play, RotateCcw, Settings2, UserRound, X } from 'lucide-react-native';
+import { Bell, Monitor, Play, Settings2, UserRound, X } from 'lucide-react-native';
 
 import { FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
@@ -75,7 +75,7 @@ function LoadingPreviewModal({ onClose }: { onClose: () => void }) {
 }
 
 function LoadingPreviewScene({ onClose }: { onClose: () => void }) {
-  const { colors, glass, label } = useTheme();
+  const { colors, glass } = useTheme();
   const { s, insets } = useUi();
   const { active } = useMotion();
   const [progress, setProgress] = useState(8);
@@ -93,22 +93,14 @@ function LoadingPreviewScene({ onClose }: { onClose: () => void }) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgDeep, alignItems: 'center', justifyContent: 'center', padding: s(24) }}>
       <LinearGradient colors={[colors.cardRaised, colors.bgDeep]} style={StyleSheet.absoluteFill} />
-      <View pointerEvents={finished ? 'auto' : 'none'} accessibilityElementsHidden={!finished} importantForAccessibility={finished ? 'auto' : 'no-hide-descendants'} style={{ alignItems: 'center' }}>
-      <T size={22} weight="semibold">Xem thử hoàn tất</T>
-      <T size={11} color={colors.text2} style={{ marginTop: s(8) }}>{label} · Không kết nối máy tính</T>
-      <View style={{ flexDirection: 'row', gap: s(12), marginTop: s(24) }}>
-        <Press onPress={replay} focusable={finished} style={{ padding: s(14), borderRadius: s(14), flexDirection: 'row', gap: s(8), backgroundColor: glass.control, borderWidth: 1, borderColor: glass.controlBorder }}>
-          <RotateCcw size={s(16)} color={colors.text} /><T size={12}>Xem lại</T>
-        </Press>
-        <Press onPress={onClose} focusable={finished} style={{ padding: s(14), borderRadius: s(14), flexDirection: 'row', gap: s(8), backgroundColor: glass.control, borderWidth: 1, borderColor: glass.controlBorder }}>
-          <X size={s(16)} color={colors.text} /><T size={12}>Đóng</T>
-        </Press>
-      </View>
-      </View>
+      <T size={22} weight="semibold" accessibilityElementsHidden={!finished} importantForAccessibility={finished ? 'auto' : 'no-hide-descendants'}>Xem thử hoàn tất</T>
       <StreamLoading key={run} preview visible={progress < 100} phase="waiting" progress={progress} status={status} launch={PREVIEW_LAUNCH} onRetry={replay} onExit={onClose} onFinished={complete} />
-      <View pointerEvents="none" style={{ position: 'absolute', top: insets.top + s(18), left: insets.left + s(18), zIndex: 45, backgroundColor: glass.panel, borderRadius: s(12), paddingHorizontal: s(10), paddingVertical: s(6) }}>
-        <T size={10} color={colors.text2}>Xem thử · {label}</T>
-      </View>
+      {finished ? (
+        <Press onPress={onClose} autoFocus sound="back" pressScale={0.92} accessibilityLabel="Đóng xem thử"
+          style={{ position: 'absolute', top: insets.top + s(16), right: insets.right + s(16), zIndex: 45, width: s(36), height: s(36), borderRadius: s(18), alignItems: 'center', justifyContent: 'center', backgroundColor: glass.control, borderWidth: 1, borderColor: glass.controlBorder }}>
+          <X size={s(16)} color={colors.text} strokeWidth={2.2} />
+        </Press>
+      ) : null}
     </View>
   );
 }

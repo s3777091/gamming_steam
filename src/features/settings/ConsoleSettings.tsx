@@ -391,21 +391,15 @@ export default function ConsoleSettings({
         />
         <ThemeDecor />
 
-        {/* 4. Bố cục hai cột Master - Detail Liquid Glass */}
-        <View
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            paddingLeft: insets.left,
-            paddingRight: insets.right,
-            paddingTop: insets.top,
-            paddingBottom: insets.bottom,
-          }}
-        >
+        {/* 4. Bố cục hai cột Master - Detail Liquid Glass.
+            Nền hai cột tràn tới mép màn hình; vùng an toàn (tai thỏ, thanh home trên
+            iPhone) chỉ đẩy nội dung vào trong, không để lộ dải nền quanh khung. */}
+        <View style={{ flex: 1, flexDirection: 'row' }}>
           {/* CỘT TRÁI (MASTER / SIDEBAR): Liquid Glass Panel */}
           <View
             style={{
-              width: navWidth,
+              width: navWidth + insets.left,
+              paddingLeft: insets.left,
               backgroundColor: appleColors.sidebarBg,
               borderRightWidth: 1,
               borderRightColor: appleColors.cardBorder,
@@ -433,7 +427,8 @@ export default function ConsoleSettings({
             {/* Top Bar của Sidebar: Tiêu đề Cài đặt chuẩn Glass */}
             <View
               style={{
-                height: s(52),
+                height: s(52) + insets.top,
+                paddingTop: insets.top,
                 flexDirection: 'row',
                 alignItems: 'center',
                 paddingHorizontal: s(16),
@@ -464,7 +459,7 @@ export default function ConsoleSettings({
             <FocusScroll
               style={{ flex: 1 }}
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: s(10), paddingVertical: s(10) }}
+              contentContainerStyle={{ paddingHorizontal: s(10), paddingTop: s(10), paddingBottom: s(10) + insets.bottom }}
             >
               {SECTIONS.map((section, index) => (
                 <View key={section.id}>
@@ -491,12 +486,13 @@ export default function ConsoleSettings({
           </View>
 
           {/* CỘT PHẢI (DETAIL): Liquid Glass Background & Panels */}
-          <View style={{ flex: 1, backgroundColor: alpha(colors.bg, 0.40), overflow: 'hidden' }}>
+          <View style={{ flex: 1, paddingRight: insets.right, backgroundColor: alpha(colors.bg, 0.40), overflow: 'hidden' }}>
 
             {/* Top Bar của Detail */}
             <View
               style={{
-                height: s(52),
+                height: s(52) + insets.top,
+                paddingTop: insets.top,
                 flexDirection: 'row',
                 alignItems: 'center',
                 paddingHorizontal: s(24),
@@ -562,7 +558,7 @@ export default function ConsoleSettings({
               contentContainerStyle={{
                 paddingHorizontal: s(24),
                 paddingTop: s(8),
-                paddingBottom: s(36),
+                paddingBottom: s(36) + insets.bottom,
               }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
