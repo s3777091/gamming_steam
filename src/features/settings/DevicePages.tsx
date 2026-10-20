@@ -73,7 +73,7 @@ function deviceStatus(device: LocalDevice): string {
   if (device.kind === 'headset') {
     return device.bluetooth ? 'Bluetooth · Đang phát âm thanh stream' : 'Đang phát âm thanh stream';
   }
-  return device.bluetooth ? 'Bluetooth' : 'Có dây / USB';
+  return device.transport === 'unknown' ? 'Đã kết nối với iOS' : device.bluetooth ? 'Bluetooth' : 'Có dây / USB';
 }
 
 const DEVICE_COLORS: Record<string, keyof SettingsTokens> = {
@@ -166,9 +166,11 @@ export function DevicesPage({ notify }: { notify: Notify }) {
         <ActionRow
           icon={Bluetooth}
           iconBg={appleColors.blue}
-          label={bluetooth.enabled ? 'Mở cài đặt Bluetooth' : 'Bluetooth đang tắt'}
+            label={bluetooth.stateKnown === false ? 'Ghép đôi phụ kiện trong Cài đặt iOS' : bluetooth.enabled ? 'Mở cài đặt Bluetooth' : 'Bluetooth đang tắt'}
           detail={
-            !bluetooth.supported
+              bluetooth.stateKnown === false
+                ? 'Mở Cài đặt hệ thống > Bluetooth để ghép đôi, sau đó quay lại Jetsona'
+                : !bluetooth.supported
               ? 'Máy này không hỗ trợ Bluetooth.'
               : bluetooth.enabled
                 ? 'Ghép đôi tay cầm, bàn phím, chuột hoặc tai nghe mới'

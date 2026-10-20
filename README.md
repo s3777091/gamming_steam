@@ -18,6 +18,16 @@ npx expo prebuild --platform android
 npx expo run:android        # cần dev build vì có module native + WebRTC
 ```
 
+### iOS
+
+Cấu hình build và tình trạng kiểm thử: [IOS_READINESS.md](./IOS_READINESS.md).
+`jetsona-input` có bản Swift dùng Game Controller cho tay cầm, bàn phím và chuột
+đã ghép đôi trong Cài đặt iOS, gồm phụ kiện Bluetooth. Chạy
+`npx eas-cli@latest build --platform ios --profile ios-preview` để tạo bản nội bộ
+cho thiết bị đã đăng ký; cần chứng chỉ và provisioning profile Apple.
+`ios-simulator` dùng để kiểm tra biên dịch, không cài trực tiếp lên iPhone.
+Multipath Wi-Fi/di động và chụp khung video native chưa có trên iOS.
+
 Cấu hình trong `app.json > extra`: `backendBaseUrl`, `supabaseAnonKey` (cùng giá trị
 với jetson-phone). Có thể ghi đè bằng `EXPO_PUBLIC_BACKEND_URL`,
 `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
@@ -109,7 +119,7 @@ tay cầm.
 
 ```bash
 npm test
-npx expo lint
+npm run lint
 npx tsc --noEmit
 cd android
 ./gradlew :jetsona-input:testReleaseUnitTest

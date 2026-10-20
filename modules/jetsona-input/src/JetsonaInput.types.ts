@@ -11,6 +11,8 @@ export type NativeInputDevice = {
   productId: number;
   /** Tên trùng một thiết bị Bluetooth đã ghép đôi. */
   bluetooth: boolean;
+  /** iOS Game Controller does not expose HID transport; do not label it as USB. */
+  transport?: 'bluetooth' | 'usb' | 'unknown';
   /** 0..1, hoặc -1 khi thiết bị không báo pin. */
   battery: number;
   rumble: boolean;
@@ -20,6 +22,8 @@ export type NativeInputDevice = {
 export type NativeBluetoothInfo = {
   supported: boolean;
   enabled: boolean;
+  /** False when the OS does not expose the global Bluetooth radio state. */
+  stateKnown?: boolean;
   /** Đã có quyền BLUETOOTH_CONNECT (Android 12+). */
   permitted: boolean;
   bonded: { name: string; type: number | null }[];

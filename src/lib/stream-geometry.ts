@@ -1,5 +1,6 @@
 import { Dimensions, PixelRatio } from 'react-native';
 import { getDisplayInfo } from 'jetsona-input';
+import { virtualDisplayGeometry } from './stream-display';
 
 /** Physical pixels of the surface a session is played on. */
 export type DisplayGeometry = { width: number; height: number };
@@ -19,6 +20,12 @@ export type HostDisplay = DisplayGeometry & {
   captureTargetStale?: boolean;
   /** Number of Windows displays seen by the capture-session agent. */
   displays?: number;
+  displayMode?: 'physical' | 'virtual';
+  displayState?: 'local' | 'streaming' | 'recovery';
+  watchdogReady?: boolean;
+  restoreVerified?: boolean;
+  /** Live CCD targets, separate from the parked VDD's advertised capabilities. */
+  current?: (DisplayGeometry & { refreshHz: number })[];
   /** Trusted hardware policy; never infer this from the current streamed mode. */
   resolutionFloorWidth?: number;
   /** Lower floor allowed only when a mode exactly matches the viewer's shape. */
@@ -196,6 +203,7 @@ export function streamGeometryForTier(
   host?: HostDisplay | null,
 ): DisplayGeometry {
   if (host) {
+    if (host.displayMode === 'virtual') return virtualDisplayGeometry(host, tierWidth, display);
     // A floor is explicit hardware policy. `/display` reports the mode at this
     // instant, which may be the temporary mode requested by another/previous
     // stream; treating host.width as a floor creates a resolution ratchet.

@@ -2,7 +2,7 @@
 // Phản hồi tức thì khi người dùng bấm nút, gạt cần analog, bóp cò trên tay cầm ngoài.
 // Hỗ trợ đổi bố cục linh hoạt: Xbox, PlayStation, Nintendo. Có chế độ chú thích (Callouts).
 
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, {
   Circle,
@@ -50,7 +50,6 @@ export function Gamepad2DVisualizer({
   layout = 'xbox',
   leftDeadzone = 0.08,
   rightDeadzone = 0.08,
-  triggerDeadzone = 0.05,
   showCallouts = true,
   onButtonPress,
 }: Gamepad2DVisualizerProps) {

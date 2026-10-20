@@ -2,7 +2,7 @@
 // Bắt các sự kiện chuột từ module native: Chuột trái (LMB), Chuột phải (RMB), Chuột giữa (MMB),
 // Nút hông Back/Forward, lăn chuột (Wheel Up/Down), và theo dõi chuyển động con trỏ (Movement Radar).
 
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, {
   Defs,

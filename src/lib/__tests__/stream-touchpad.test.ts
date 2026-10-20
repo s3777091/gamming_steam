@@ -14,6 +14,7 @@ const hooks = registerHooks({
     if (specifier.startsWith('@/lib/')) {
       return nextResolve(new URL(`../${specifier.slice('@/lib/'.length)}.ts`, import.meta.url).href, context);
     }
+    if (specifier.startsWith('.') && !/\.[a-z]+$/i.test(specifier)) return nextResolve(`${specifier}.ts`, context);
     return nextResolve(specifier, context);
   },
 });
@@ -90,4 +91,15 @@ test('replacing a connection releases a drag on its original client', () => {
   f.handlers.onPanResponderMove(f.point(150, 100), { numberActiveTouches: 1 });
   f.touchpad.update({ ...f.context, getClient: () => null });
   assert.deepEqual(f.calls.filter((call) => call[0] === 'button'), [['button', true, 1], ['button', false, 1]]);
+});
+
+test('VDD touch coordinates follow the un-stretched video when the viewport differs slightly', () => {
+  const f = fixture();
+  f.touchpad.update({ ...f.context, videoSize: { width: 2560, height: 1440 }, allowStretch: false });
+  const videoWidth = 500 * 2560 / 1440;
+  const left = (1000 - videoWidth) / 2;
+  f.handlers.onPanResponderGrant(f.point(left + videoWidth * 0.25, 125), { numberActiveTouches: 1 });
+  f.handlers.onPanResponderRelease();
+  assert.ok(Math.abs(Number(f.calls[0][1]) - 0.25) < 1e-10);
+  assert.equal(f.calls[0][2], 0.25);
 });

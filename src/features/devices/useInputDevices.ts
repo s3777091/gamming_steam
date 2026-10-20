@@ -22,6 +22,7 @@ export type LocalDevice = {
   name: string;
   kind: DeviceKind;
   bluetooth: boolean;
+  transport?: NativeInputDevice['transport'];
   /** 0..1, hoặc null khi thiết bị không báo pin. */
   battery: number | null;
   rumble: boolean;
@@ -34,6 +35,7 @@ export function toLocal(device: NativeInputDevice): LocalDevice {
     name: device.name,
     kind: device.kind,
     bluetooth: device.bluetooth,
+    transport: device.transport,
     battery: device.battery >= 0 ? device.battery : null,
     rumble: device.rumble,
   };

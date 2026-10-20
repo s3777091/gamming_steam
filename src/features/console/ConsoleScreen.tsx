@@ -604,9 +604,7 @@ export default function ConsoleScreen() {
         menuOpen={menuOpen}
         onMenuOpenChange={setMenuOpen}
         onSelectGame={selectGame}
-        onOpenPanel={setPanel}
         onPlay={() => void play()}
-        onUninstall={setUninstallTarget}
         onOpenPrompt={openPrompt}
         onInstallStart={startFlight}
         onInstallResult={resolveFlight}

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -230,7 +230,7 @@ export function MultipathSection() {
             checked={autoCellular}
             onChange={(val) => void toggleCellular(val)}
           />
-        ) : (
+        ) : capabilities.isDualWifiSupported ? (
           <>
             {status.secondary.status === 'connected' ? (
               /* Thẻ Wi-Fi phụ tinh gọn - Chạm vào để mở/thu gọn nút [X Ngắt kết nối] */
@@ -323,6 +323,13 @@ export function MultipathSection() {
               />
             )}
           </>
+        ) : (
+          <InfoRow
+            label="Đường truyền phụ"
+            value={Platform.OS === 'ios'
+              ? 'iOS tự chọn Wi-Fi hoặc di động; phiên stream dùng một đường truyền'
+              : 'Thiết bị chưa hỗ trợ đường truyền phụ'}
+          />
         )}
       </SettingsGroup>
 

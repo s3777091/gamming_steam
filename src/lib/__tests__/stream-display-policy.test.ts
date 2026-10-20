@@ -33,7 +33,8 @@ const hooks = registerHooks({
 });
 const { completeSettings, clientDisplayGeometry, fetchStreamSettingsDefaults, resolveMoonlightSettings } = await import('../stream-settings.ts');
 const { displayRefreshHz } = await import('../display-refresh.ts');
-const { applyStreamHostPolicy } = await import('../stream-host-policy.ts');
+const { applyStreamHostPolicy, streamHostReadinessIssue } = await import('../stream-host-policy.ts');
+const { assertVirtualDisplayStream, parseHostDisplay } = await import('../stream-display.ts');
 hooks.deregister();
 
 test('Auto sees 120 Hz capability while the panel is idling at 60 Hz', async () => {
@@ -193,4 +194,91 @@ test('missing or unavailable cloud defaults still produce a complete device Auto
     assert.equal(settings.codec, 'auto');
     assert.equal(settings.hdr, 'off');
   }
+});
+
+const VIRTUAL_PC = {
+  ok: true, width: 1920, height: 1080, displayMode: 'virtual', displayState: 'local',
+  canSwitchResolution: true, captureTargetStale: false, displays: 1, watchdogReady: true, restoreVerified: true,
+  current: [{ width: 1920, height: 1080, refreshHz: 100 }],
+  modes: [
+    { width: 1920, height: 1080, refreshRates: [60, 100] },
+    { width: 2560, height: 1440, refreshRates: [60, 90, 120] },
+    { width: 2560, height: 1600, refreshRates: [60, 120] },
+    { width: 2732, height: 2048, refreshRates: [60, 120] },
+  ],
+};
+const vdd = (value = VIRTUAL_PC) => applyStreamHostPolicy(parseHostDisplay(value), 'pc')!;
+
+test('mobile requests 1440p/120 on VDD independently of the physical 1080p/100 baseline', () => {
+  const host = vdd();
+  assert.equal(host.resolutionFloorWidth, 0);
+  assert.equal(streamHostReadinessIssue(host, 'pc'), null);
+  const stream = resolveMoonlightSettings(completeSettings('user', { resolution: '1440p', frame_rate: 120 }), null, host, 120, { width: 2560, height: 1440 });
+  assert.deepEqual(stream.videoSizeCustom, { width: 2560, height: 1440 });
+  assert.equal(stream.fps, 120);
+});
+
+test('VDD fills 16:10 and between-tier 4:3 panels using their real supported pixel modes', () => {
+  for (const panel of [{ width: 2560, height: 1600 }, { width: 2732, height: 2048 }]) {
+    const stream = resolveMoonlightSettings(completeSettings('user'), null, vdd(), 120, panel);
+    assert.deepEqual(stream.videoSizeCustom, panel);
+    assert.equal(stream.fps, 120);
+  }
+});
+
+test('VDD refuses missing size, shape and manually requested Hz instead of falling back', () => {
+  const settings = completeSettings('user', { resolution: '1440p', frame_rate: 120 });
+  assert.throws(() => resolveMoonlightSettings(settings, null, vdd(), 120, { width: 2560, height: 1800 }), /tỷ lệ/);
+  assert.throws(() => resolveMoonlightSettings({ ...settings, resolution: '4k' }, null, vdd(), 120, { width: 3840, height: 2160 }), /3840/);
+  assert.throws(() => resolveMoonlightSettings({ ...settings, frame_rate: 144 }, null, vdd(), 144, { width: 2560, height: 1440 }), /144 Hz/);
+});
+
+test('Auto only chooses a refresh rate supported at the selected VDD resolution', () => {
+  const host = vdd({ ...VIRTUAL_PC, modes: [{ width: 2560, height: 1440, refreshRates: [60, 90, 120] }] });
+  const stream = resolveMoonlightSettings(completeSettings('user'), { bandwidthMbps: 45 }, host, 120, { width: 2560, height: 1440 });
+  assert.ok([60, 90, 120].includes(stream.fps));
+  assert.equal(resolveMoonlightSettings(completeSettings('user'), null, host, 144, { width: 2560, height: 1440 }).fps, 120);
+  const slow = { ...host, modes: [{ width: 2560, height: 1440, refreshRates: [60, 100] }] };
+  assert.equal(resolveMoonlightSettings(completeSettings('user'), null, slow, 120, { width: 2560, height: 1440 }).fps, 100);
+});
+
+test('VDD readiness rejects missing watchdog, restore proof, topology and Hz capabilities', () => {
+  for (const changes of [
+    { watchdogReady: false }, { restoreVerified: false }, { displayState: undefined },
+    { displayState: 'recovery' }, { captureTargetStale: undefined }, { displays: 2 },
+    { canSwitchResolution: false }, { modes: [{ width: 2560, height: 1440 }] },
+  ]) {
+    assert.ok(streamHostReadinessIssue(vdd({ ...VIRTUAL_PC, ...changes } as typeof VIRTUAL_PC), 'pc'), JSON.stringify(changes));
+  }
+  assert.equal(streamHostReadinessIssue(vdd({ ...VIRTUAL_PC, displayState: 'streaming', restoreVerified: false }), 'pc'), null);
+  assert.equal(streamHostReadinessIssue(homePc(HOME_PC_MODES), 'pc'), null);
+  assert.equal(streamHostReadinessIssue(null, 'pc'), 'display-unavailable');
+});
+
+test('mobile parser preserves validated VDD metadata without coercing success flags or invalid modes', () => {
+  assert.equal(parseHostDisplay({ ...VIRTUAL_PC, width: Infinity }), null);
+  assert.equal(parseHostDisplay({ ...VIRTUAL_PC, width: '1920' }), null);
+  const parsed = parseHostDisplay({
+    ...VIRTUAL_PC, canSwitchResolution: 'false', captureTargetStale: 'false', displays: '1', watchdogReady: 'true',
+    modes: [null, {}, { width: Infinity, height: 1080 },
+      { width: 2560, height: 1440, refreshRates: [120, 60, 0, 1, NaN, '144', 120] },
+      { width: 2560, height: 1440, refreshRates: [90] }],
+  })!;
+  assert.equal(parsed.canSwitchResolution, false);
+  assert.equal(parsed.captureTargetStale, undefined);
+  assert.equal(parsed.displays, undefined);
+  assert.equal(parsed.watchdogReady, undefined);
+  assert.deepEqual(parsed.modes, [{ width: 2560, height: 1440, refreshRates: [60, 90, 120] }]);
+});
+
+test('applied VDD must be the single active target at the exact requested size and Hz', () => {
+  const size = { width: 2560, height: 1440 };
+  const active = { ...vdd(), displayState: 'streaming' as const, current: [{ ...size, refreshHz: 119.88 }] };
+  assert.doesNotThrow(() => assertVirtualDisplayStream(active, size, 120));
+  for (const changes of [
+    { displayState: 'local' as const }, { current: undefined }, { displays: 2 }, { watchdogReady: false },
+    { current: [{ width: 1920, height: 1080, refreshHz: 120 }] },
+    { current: [{ ...size, refreshHz: 100 }] },
+    { current: [{ ...size, refreshHz: 120 }, { ...size, refreshHz: 120 }] },
+  ]) assert.throws(() => assertVirtualDisplayStream({ ...active, ...changes }, size, 120));
 });

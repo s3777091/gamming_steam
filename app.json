@@ -12,13 +12,18 @@
       "bundleIdentifier": "cloud.protexa.jetsona.console",
       "supportsTablet": true,
       "requireFullScreen": true,
+      "buildNumber": "1",
       "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        },
         "NSLocalNetworkUsageDescription": "Jetsona cần truy cập mạng nội bộ để truyền hình ảnh và điều khiển máy tính ở nhà.",
         "NSBluetoothAlwaysUsageDescription": "Jetsona dùng Bluetooth để nhận tay cầm, bàn phím và chuột khi chơi game từ xa."
       }
     },
     "android": {
       "package": "cloud.protexa.jetsona.console",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#080c12",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -71,6 +76,7 @@
         }
       ],
       "./plugins/with-jetsona-android",
+      "./plugins/with-jetsona-ios",
       "expo-font",
       "expo-image",
       [

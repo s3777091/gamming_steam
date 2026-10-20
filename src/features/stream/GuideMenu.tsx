@@ -38,7 +38,6 @@ import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { ControlPopover, type PopoverAnchor } from '@/features/control-center/ControlPopover';
 import { DevicesPanel, NotificationsPanel, ProfilePanel, UserAvatar } from '@/features/control-center/ControlCenterPanels';
 import type { PendingGameLaunch } from '@/lib/game-launch';
-import type { StreamSettings } from '@/lib/stream-settings';
 import { uploadGameScreenshot } from '@/lib/game-screenshots';
 import { PC_ROUTES, pcFetch } from '@/lib/pc-api';
 import { rememberStreamGame } from '@/lib/stream-resume';
@@ -97,8 +96,6 @@ export function GuideMenu({
   status,
   watchParty,
   launch,
-  videoSize,
-  streamSettings,
   notificationCount: notificationCountProp,
   onClose,
   onHome,
@@ -113,8 +110,6 @@ export function GuideMenu({
   status?: string | null;
   watchParty: WatchPartyState;
   launch?: PendingGameLaunch | null;
-  videoSize?: { width: number; height: number };
-  streamSettings?: StreamSettings | null;
   notificationCount?: number;
   onClose: () => void;
   onHome: () => void;

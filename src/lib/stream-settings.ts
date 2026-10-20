@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { autoFrameRate } from './display-refresh';
 import { DEVICE_STREAM_DEFAULTS, panelResolution } from './stream-display-policy';
+import { frameRateForDisplay } from './stream-display';
 import {
   DEFAULT_LOADING_THEME_ID,
   isLoadingThemeId,
@@ -687,7 +688,12 @@ export function resolveMoonlightSettings(
     ? affordableResolution(geometryResolution, measured)
     : geometryResolution;
 
-  const { width, height } = streamGeometryFor(geometryResolution, display, hostDisplay);
+  // Native Auto uses the panel's real pixels, including between-tier devices.
+  // Explicit choices keep their requested width. VDD never inherits the local
+  // physical monitor's floor or silently substitutes a nearby mode.
+  const { width, height } = hostDisplay?.displayMode === 'virtual' && settings.resolution === 'auto'
+    ? streamGeometryForTier(Math.min(RESOLUTION_SIZE[geometryResolution][0], display.width), display, hostDisplay)
+    : streamGeometryFor(geometryResolution, display, hostDisplay);
 
   // The bitrate tables are written for each tier's nominal 16:9 frame. A 16:10
   // panel carries ~11% more pixels at the same tier, so carry the same
@@ -724,13 +730,14 @@ export function resolveMoonlightSettings(
   // Moonlight/Sunshine nhận fps tuỳ ý. Cũng chỉ chặn auto: người dùng tự chọn
   // 120 fps thì vẫn đi qua nguyên vẹn.
   const hostRefresh = hostRefreshCeiling(hostDisplay, { width, height });
-  const fps = settings.frame_rate
+  const requestedFps = settings.frame_rate
     ?? affordableFrameRate(
       Math.min(autoFrameRate(displayRefreshHz ?? null), ceiling.fps, hostRefresh ?? Number.POSITIVE_INFINITY),
       qualityResolution,
       pixelScale,
       measured,
     );
+  const fps = frameRateForDisplay(hostDisplay, { width, height }, requestedFps, settings.frame_rate != null);
 
   const fpsScale = fpsBitrateScale(fps);
   const requestedBitrate =

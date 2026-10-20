@@ -43,6 +43,9 @@ yarn-error.*
 
 # build/log artefacts
 .gradle-build.log
+/releases/
+/bugreport-*
+/emulator_screen*.png
 
 # native build output
 build/

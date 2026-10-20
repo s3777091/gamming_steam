@@ -2,7 +2,7 @@
 // Bắt sự kiện phím vật lý từ cổng Android native và làm sáng các phím tương ứng trên mô hình 2D.
 // Hiển thị mã phím, mã web, Virtual Key (VK), phím bổ trợ (Shift/Ctrl/Alt/Meta) và N-Key Rollover.
 
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import {
   addListener,

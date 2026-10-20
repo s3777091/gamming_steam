@@ -2,7 +2,7 @@
 // then play the door opening once and reveal the game artwork and title.
 import { LinearGradient } from 'expo-linear-gradient';
 import { Monitor, RefreshCw, X } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react';
 import { Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 
 import type { PendingGameLaunch } from '@/lib/game-launch';

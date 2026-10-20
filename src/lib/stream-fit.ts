@@ -24,14 +24,14 @@ import { fullBleedStretch, type DisplayGeometry } from '@/lib/stream-geometry';
 export const MAX_FULL_BLEED_STRETCH = 1.05;
 
 /** Khung hình thật sự được vẽ trên máy xem, sau khi đã chặn trần giãn. */
-function renderedBox(stream: DisplayGeometry, viewer: DisplayGeometry) {
+function renderedBox(stream: DisplayGeometry, viewer: DisplayGeometry, allowStretch: boolean) {
   const streamAspect = stream.width / Math.max(1, stream.height);
   const viewerAspect = viewer.width / Math.max(1, viewer.height);
   let width = viewer.width;
   let height = viewer.height;
   if (viewerAspect > streamAspect) width = height * streamAspect;
   else height = width / streamAspect;
-  const stretch = streamStretch(stream, viewer);
+  const stretch = allowStretch ? streamStretch(stream, viewer) : { scaleX: 1, scaleY: 1 };
   width *= stretch.scaleX;
   height *= stretch.scaleY;
   return { width, height, left: (viewer.width - width) / 2, top: (viewer.height - height) / 2 };
@@ -64,8 +64,9 @@ export function pointOnStream(
   y: number,
   stream: DisplayGeometry,
   viewer: DisplayGeometry,
+  allowStretch = true,
 ): { x: number; y: number } {
-  const box = renderedBox(stream, viewer);
+  const box = renderedBox(stream, viewer, allowStretch);
   return {
     x: Math.min(1, Math.max(0, (x - box.left) / Math.max(1, box.width))),
     y: Math.min(1, Math.max(0, (y - box.top) / Math.max(1, box.height))),

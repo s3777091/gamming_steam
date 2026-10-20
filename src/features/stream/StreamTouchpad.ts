@@ -14,6 +14,7 @@ type TouchpadContext = {
   live: boolean;
   videoSize: Size;
   stage: Size;
+  allowStretch?: boolean;
   getClient: () => NativeMoonlightClient | null;
   getSettings: () => InputSettings;
 };
@@ -43,7 +44,7 @@ export class StreamTouchpad {
   };
 
   private point(x: number, y: number) {
-    return pointOnStream(x, y, this.context.videoSize, this.context.stage);
+    return pointOnStream(x, y, this.context.videoSize, this.context.stage, this.context.allowStretch);
   }
 
   readonly panHandlers = PanResponder.create({

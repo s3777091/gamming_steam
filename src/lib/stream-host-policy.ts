@@ -65,6 +65,17 @@ export function streamHostReadinessIssue(
   host: HostDisplay | null,
   targetId: StreamTargetId,
 ): StreamHostReadinessIssue | null {
+  if (targetId === 'pc' && !host) return 'display-unavailable';
+  if (targetId === 'pc' && host?.displayMode === 'virtual') {
+    if (host.captureTargetStale !== false) return 'capture-target-stale';
+    if (host.displays !== 1) return 'multiple-displays';
+    if (host.watchdogReady !== true
+      || (host.displayState !== 'local' && host.displayState !== 'streaming')
+      || (host.displayState === 'local' && host.restoreVerified !== true)) return 'topology-unverified';
+    if (!host.canSwitchResolution) return 'resolution-switch-disabled';
+    if (!host.modes?.some(mode => mode.refreshRates?.length)) return 'modes-unavailable';
+    return null;
+  }
   if (targetId !== 'vm') return null;
   if (!host) return 'display-unavailable';
   if (host.captureTargetStale) return 'capture-target-stale';
@@ -95,7 +106,8 @@ export function applyStreamHostPolicy(
   if (host) {
     return {
       ...host,
-      resolutionFloorWidth: STREAM_RESOLUTION_FLOOR_WIDTH[targetId],
+      resolutionFloorWidth: host.displayMode === 'virtual' ? 0 : STREAM_RESOLUTION_FLOOR_WIDTH[targetId],
+      ...(host.displayMode === 'virtual' ? { aspectResolutionFloorWidth: 0 } : {}),
       ...(targetId === 'vm'
         ? { aspectResolutionFloorWidth: VM_ASPECT_RESOLUTION_FLOOR_WIDTH }
         : {}),

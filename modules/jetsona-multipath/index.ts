@@ -12,31 +12,17 @@ export const hasNativeMultipath = Native != null;
 
 const DEFAULT_CAPABILITIES: NetworkCapabilities = {
   hasCellular: false,
-  isDualWifiSupported: true, // Giả lập hỗ trợ trên Galaxy Tab S9
-  primaryWifi: {
-    ssid: 'Galaxy_Tab_S9_Wifi_5G',
-    frequency: 5240,
-    band: '5GHz',
-    linkSpeedMbps: 866,
-    rssi: -45,
-    isHbsCapable: true,
-  },
+  isDualWifiSupported: false,
+  primaryWifi: {},
 };
 
 const DEFAULT_STATUS: MultipathStatus = {
   isMultipathActive: false,
   mode: 'single_wifi',
-  primary: {
-    ssid: 'Galaxy_Tab_S9_Wifi_5G',
-    frequency: 5240,
-    band: '5GHz',
-    linkSpeedMbps: 866,
-    rssi: -45,
-    isHbsCapable: true,
-  },
+  primary: {},
   secondary: {
     type: 'none',
-    status: 'disconnected',
+    status: 'unavailable',
   },
 };
 
@@ -45,35 +31,7 @@ export function getNetworkCapabilities(): NetworkCapabilities {
 }
 
 export function getAvailableWifiNetworks(): AvailableWifi[] {
-  return Native?.getAvailableWifiNetworks() ?? [
-    {
-      ssid: 'Văn Phòng 5G Studio',
-      bssid: 'aa:bb:cc:dd:ee:01',
-      frequency: 5745,
-      band: '5GHz',
-      level: -42,
-      isHbsCandidate: true,
-      capabilities: '[WPA2-PSK-CCMP][RSN-PSK-CCMP]',
-    },
-    {
-      ssid: 'Văn Phòng 5G Guest',
-      bssid: 'aa:bb:cc:dd:ee:02',
-      frequency: 5180,
-      band: '5GHz',
-      level: -58,
-      isHbsCandidate: true,
-      capabilities: '[WPA2-PSK-CCMP]',
-    },
-    {
-      ssid: 'Văn Phòng 2.4G',
-      bssid: 'aa:bb:cc:dd:ee:03',
-      frequency: 2437,
-      band: '2.4GHz',
-      level: -50,
-      isHbsCandidate: false,
-      capabilities: '[WPA2-PSK-CCMP]',
-    },
-  ];
+  return Native?.getAvailableWifiNetworks() ?? [];
 }
 
 export function enableCellularFallback(): boolean {
@@ -85,7 +43,7 @@ export function disableCellularFallback(): void {
 }
 
 export function connectSecondaryWifi(ssid: string, password?: string): boolean {
-  return Native?.connectSecondaryWifi(ssid, password) ?? true;
+  return Native?.connectSecondaryWifi(ssid, password) ?? false;
 }
 
 export function disconnectSecondaryWifi(): void {

@@ -3,6 +3,7 @@
 // là một bộ dữ liệu.
 
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { AppState } from 'react-native';
 
 import { supabaseConfigured } from '@/lib/config';
 import { UI_DEMO } from '@/lib/demo';
@@ -27,20 +28,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
     let unsubscribe: (() => void) | null = null;
     // Chốt host vn/cn TRƯỚC khi tạo Supabase client, để client dùng đúng edge ngay từ đầu.
-    void bootstrapActiveRegion().finally(() => {
+    void bootstrapActiveRegion().catch(() => {
+      // A storage failure must not prevent login using the default region.
+    }).then(() => {
       if (!active) return;
       const supabase = createClient();
       if (!supabase || !supabaseConfigured) {
         setState({ status: 'config-error' });
         return;
       }
+      // Refresh only while visible: iOS suspends timers when the app backgrounds.
+      const syncRefresh = () => {
+        if (AppState.currentState === 'active') void supabase.auth.startAutoRefresh();
+        else supabase.auth.stopAutoRefresh();
+      };
+      syncRefresh();
+      const appState = AppState.addEventListener('change', syncRefresh);
       const apply = (user: { id: string; email?: string | null } | null | undefined) => {
         if (!active) return;
         setState(user ? { status: 'signed-in', userId: user.id, email: user.email ?? null } : { status: 'signed-out' });
       };
-      void supabase.auth.getSession().then(({ data }) => apply(data.session?.user));
+      void supabase.auth.getSession().then(({ data }) => apply(data.session?.user)).catch(() => apply(null));
       const { data } = supabase.auth.onAuthStateChange((_event, session) => apply(session?.user));
-      unsubscribe = () => data.subscription.unsubscribe();
+      unsubscribe = () => {
+        data.subscription.unsubscribe();
+        appState.remove();
+        supabase.auth.stopAutoRefresh();
+      };
     });
     return () => {
       active = false;

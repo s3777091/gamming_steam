@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Download, Ellipsis, FileText, HardDrive, Monitor, Pause, Play, Trash2, Trophy } from 'lucide-react-native';
 
 import { isSteamAppId } from '@/features/library/format';
-import type { LibraryPanel, PcGame } from '@/features/library/types';
+import type { PcGame } from '@/features/library/types';
 import type { PcLibrary } from '@/features/library/usePcLibrary';
 import type { SteamDownloads } from '@/features/library/useSteamDownloads';
 import { type GameDownload, type GameUninstall, downloadForApp, primaryDownload, uninstallForApp } from '@/lib/steam-downloads';
@@ -260,16 +260,14 @@ const GameCard = memo(function GameCard({ game, active, achievements, onSelect, 
 });
 
 /** Tab Games: logo + nút của game đang chọn, phía dưới là kệ mọi game trên PC. */
-export const GamesView = memo(function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenChange, onSelectGame, onOpenPanel, onPlay, onUninstall, onOpenPrompt, onInstallStart, onInstallResult }: {
+export const GamesView = memo(function GamesView({ library, downloads, reachable, menuOpen, onMenuOpenChange, onSelectGame, onPlay, onOpenPrompt, onInstallStart, onInstallResult }: {
   library: PcLibrary;
   downloads: SteamDownloads;
   reachable: boolean;
   menuOpen: boolean;
   onMenuOpenChange: (open: boolean) => void;
   onSelectGame: (id: string) => void;
-  onOpenPanel: (panel: LibraryPanel) => void;
   onPlay: () => void;
-  onUninstall: (game: PcGame) => void;
   /** Mở hộp thoại Steam đang chờ trả lời (chọn nơi cài đặt hoặc điều khoản). */
   onOpenPrompt: () => void;
   /** Bấm Tải: thẻ game thu vào ô nhỏ rồi chờ kết quả (xem DownloadFlight). */

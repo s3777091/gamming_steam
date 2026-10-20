@@ -29,5 +29,5 @@ declare class JetsonaInputNative extends NativeModule<JetsonaInputModuleEvents> 
   releaseFrame(): void;
 }
 
-/** null trên iOS/web: module chỉ có ở bản Android. */
+/** Null on web or a native binary built before JetsonaInput was linked. */
 export default requireOptionalNativeModule<JetsonaInputNative>('JetsonaInput');

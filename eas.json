@@ -3,6 +3,27 @@
     "appVersionSource": "local"
   },
   "build": {
+    "ios-development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "credentialsSource": "remote",
+      "env": { "EXPO_PUBLIC_UI_DEMO": "0" }
+    },
+    "ios-simulator": {
+      "extends": "ios-development",
+      "ios": { "simulator": true }
+    },
+    "ios-preview": {
+      "distribution": "internal",
+      "credentialsSource": "remote",
+      "env": { "EXPO_PUBLIC_UI_DEMO": "0" }
+    },
+    "ios-production": {
+      "distribution": "store",
+      "credentialsSource": "remote",
+      "autoIncrement": true,
+      "env": { "EXPO_PUBLIC_UI_DEMO": "0" }
+    },
     "preview": {
       "distribution": "internal",
       "credentialsSource": "local",

@@ -19,7 +19,7 @@ import {
   fetchMoonlightTarget,
   NativeMoonlightClient,
 } from '@/lib/moonlight-native';
-import { PC_ROUTES, pcFetch } from '@/lib/pc-api';
+import { PC_ROUTES, pcFetchJson } from '@/lib/pc-api';
 import { realtimeChannelInstance, realtimeChannels } from '@/lib/realtime-channels';
 import {
   claimLease,
@@ -34,7 +34,8 @@ import {
 import { createStreamSetupToken } from '@/lib/setup-token';
 import { loadInputSettings, subscribeInputSettings, DEFAULT_INPUT_SETTINGS, type InputSettings } from '@/lib/input-settings';
 import { detectStreamDeviceClass } from '@/lib/stream-device';
-import { applyStreamHostPolicy, applyStreamTargetTransportPolicy } from '@/lib/stream-host-policy';
+import { assertVirtualDisplayStream, parseHostDisplay } from '@/lib/stream-display';
+import { applyStreamHostPolicy, applyStreamTargetTransportPolicy, streamHostReadinessIssue } from '@/lib/stream-host-policy';
 import { fetchDeviceNetworkMeasurement } from '@/lib/stream-network';
 import { acquireStreamSetupLock } from '@/lib/stream-setup-lock';
 import {
@@ -75,43 +76,18 @@ function friendlyConnectError(error: unknown): string {
 }
 
 async function fetchHostDisplay(): Promise<HostDisplay | null> {
+  let data: unknown;
   try {
-    const response = await pcFetch(PC_ROUTES.display, { cache: 'no-store' });
-    if (!response.ok) return null;
-    const data = (await response.json()) as {
-      ok?: boolean; width?: unknown; height?: unknown; canSwitchResolution?: unknown; modes?: unknown;
-      captureTargetStale?: unknown; displays?: unknown;
-    };
-    const width = Number(data.width);
-    const height = Number(data.height);
-    if (!data.ok || width < 640 || height < 480) return null;
-    const modes = Array.isArray(data.modes)
-      ? data.modes
-        .map((raw) => {
-          const mode = raw as { width?: unknown; height?: unknown; refreshRates?: unknown };
-          // Agent cũ không gửi `refreshRates`; thiếu thì để trống, không đoán.
-          const refreshRates = Array.isArray(mode.refreshRates)
-            ? mode.refreshRates.map(Number).filter((rate) => Number.isFinite(rate) && rate > 0)
-            : [];
-          return {
-            width: Number(mode.width),
-            height: Number(mode.height),
-            ...(refreshRates.length ? { refreshRates } : {}),
-          };
-        })
-        .filter((mode) => Number.isFinite(mode.width) && Number.isFinite(mode.height))
-      : undefined;
-    return {
-      width: Math.round(width),
-      height: Math.round(height),
-      canSwitchResolution: Boolean(data.canSwitchResolution),
-      modes,
-      ...(data.captureTargetStale !== undefined ? { captureTargetStale: Boolean(data.captureTargetStale) } : {}),
-      ...(data.displays !== undefined ? { displays: Number(data.displays) } : {}),
-    };
+    data = await pcFetchJson(PC_ROUTES.display, 'Không đọc được cấu hình màn hình PC.');
   } catch {
     return null;
   }
+  const display = parseHostDisplay(data);
+  // Malformed VDD metadata must not select the legacy physical fallback.
+  if (!display && (data as { displayMode?: unknown } | null)?.displayMode === 'virtual') {
+    throw new Error('Agent PC chưa trả về cấu hình màn hình ảo hợp lệ.');
+  }
+  return display;
 }
 
 export function useStreamSession({ userId, attempt, onBackground, onSessionChanged }: Options) {
@@ -177,7 +153,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
     let activeHandle: (LeaseHandle & { clientDeviceId: string }) | null = null;
     let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
     let heartbeatBusy = false;
-    let releasing = false;
+    let releaseTask: Promise<void> | null = null;
     let activeClient: NativeMoonlightClient | null = null;
     let unwatchRelease: (() => void) | null = null;
     let releaseLock: (() => void) | null = null;
@@ -187,24 +163,23 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
     const setupToken = createStreamSetupToken();
     const deviceClass = detectStreamDeviceClass();
 
-    const release = async (handle: (LeaseHandle & { clientDeviceId: string }) | null, reason: string) => {
-      if (!handle || releasing) return;
-      if (activeHandle !== handle) return; // generation guard: không bao giờ trả phiên kế cận
-      releasing = true;
+    const release = (handle: (LeaseHandle & { clientDeviceId: string }) | null, reason: string): Promise<void> => {
+      if (releaseTask) return releaseTask;
+      if (!handle || activeHandle !== handle) return Promise.resolve();
       if (heartbeatTimer) clearInterval(heartbeatTimer);
       heartbeatTimer = null;
       activeHandle = null;
       setSessionId(null);
       unwatchRelease?.();
       unwatchRelease = null;
-      await Promise.allSettled([
+      releaseTask = Promise.allSettled([
         postSessionRelease({
           clientId, targetId: TARGET_ID, cloudSessionId: handle.sessionId, setupToken: handle.setupToken,
           setupGeneration: handle.generation, clientDeviceId: handle.clientDeviceId, reason,
         }),
         supabase ? releaseLeaseRpc(supabase, handle, reason) : Promise.resolve(),
-      ]);
-      onSessionChangedRef.current?.();
+      ]).then(() => { onSessionChangedRef.current?.(); });
+      return releaseTask;
     };
 
     const fail = (message: string, detail?: string) => {
@@ -291,7 +266,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
           }),
           heartbeatLeaseRpc(supabase, activeHandle),
         ]);
-        if (serviceStatus === 410 || cloudAlive === false) fail('Phiên đã được mở trên một thiết bị khác.');
+        if (serviceStatus === 410 || cloudAlive === false) fail('Phiên từ xa đã kết thúc trên PC hoặc thiết bị khác.');
       } catch {
         // Một nhịp lỗi mạng chưa đủ để kết luận phiên đã chết; service có thời gian ân hạn.
       } finally {
@@ -299,7 +274,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
       }
     };
 
-    void (async () => {
+    const setupTask = (async () => {
       try {
         if (!supabase) throw new Error('Supabase chưa được cấu hình.');
         const { data: auth } = await supabase.auth.getSession();
@@ -332,6 +307,11 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
         setStreamSettings(settings);
         setHostDisplay(display);
 
+        if (streamHostReadinessIssue(display, TARGET_ID)) {
+          throw new Error(display
+            ? 'Màn hình ảo trên PC chưa sẵn sàng hoặc chưa khôi phục xong. Hãy thử lại sau khi PC trở về màn hình chính.'
+            : 'Không đọc được cấu hình màn hình PC. Hãy kiểm tra agent và thử lại.');
+        }
         const policyHost = applyStreamHostPolicy(display, TARGET_ID);
         const measurement = await fetchDeviceNetworkMeasurement(supabase, userId, clientDeviceId);
         if (disposed) return;
@@ -346,8 +326,8 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
         setStatus('Đang đăng ký quyền sử dụng thiết bị…');
         setProgress(24);
         const handle = await claimLeaseSession();
-        if (disposed) return;
         activeHandle = { ...handle, clientDeviceId };
+        if (disposed) { await release(activeHandle, 'user_exit'); return; }
         setSessionId(activeHandle.sessionId);
         onSessionChangedRef.current?.();
 
@@ -358,12 +338,29 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
         const sessionClaim = await postSessionClaim(target, clientId, TARGET_ID, activeHandle, clientDeviceId);
         if (!sessionClaim.ok) throw new Error(sessionClaim.error || 'Không đăng ký được phiên Sunshine.');
         if (disposed) return;
+        if (display?.displayMode === 'virtual') {
+          const fresh = await fetchHostDisplay();
+          if (disposed) return;
+          if (fresh?.displayMode !== 'virtual' || streamHostReadinessIssue(fresh, TARGET_ID)) {
+            throw new Error('Màn hình ảo trên PC chưa sẵn sàng sau khi nhận phiên.');
+          }
+        }
         setStatus(sessionClaim.action === 'resume' ? 'Đang tiếp tục phiên trước…' : 'Đang khởi động phiên WebRTC native…');
         setProgress(46);
 
         unwatchRelease = watchSessionReleased(supabase, activeHandle.sessionId, () => {
           fail('Phiên đã được kết thúc bởi chủ khác.');
         });
+
+        const acceptDimensions = (dimensions: { width: number; height: number }): boolean => {
+          if (display?.displayMode === 'virtual' && (dimensions.width !== resolved.videoSizeCustom.width
+            || dimensions.height !== resolved.videoSizeCustom.height)) {
+            fail('Hình ảnh nhận được không đúng độ phân giải màn hình ảo đã yêu cầu.');
+            return false;
+          }
+          setVideoSize(dimensions);
+          return true;
+        };
 
         activeClient = new NativeMoonlightClient(
           TARGET_ID,
@@ -378,22 +375,32 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
               setProgress((value) => Math.min(88, Math.max(value + 5, 52)));
             },
             onStream: (url) => {
-              if (disposed) return;
-              setStreamURL(url);
-              setStatus('Đang truyền trực tiếp');
-              setProgress(100);
-              setPhase('live');
+              if (disposed || !activeClient) return;
+              // Keep the game-launch gate closed until a fresh CCD observation
+              // confirms that only the requested virtual mode is active.
+              void (async () => {
+                if (display?.displayMode === 'virtual') {
+                  const applied = await fetchHostDisplay();
+                  if (disposed || !activeClient) return;
+                  assertVirtualDisplayStream(applied, resolved.videoSizeCustom, resolved.fps);
+                }
+                if (disposed || !activeClient) return;
+                setStreamURL(url);
+                setStatus('Đang truyền trực tiếp');
+                setProgress(100);
+                setPhase('live');
+              })().catch(error => fail(friendlyConnectError(error)));
             },
             onReady: (dimensions) => {
-              if (disposed) return;
-              if (dimensions) setVideoSize(dimensions);
+              if (disposed || !activeClient) return;
+              if (dimensions && !acceptDimensions(dimensions)) return;
               setProgress((value) => Math.max(value, 92));
               setStatus('Đã kết nối · đang chờ khung hình đầu tiên…');
             },
-            onVideoDimensions: (dimensions) => { if (!disposed) setVideoSize(dimensions); },
-            onInputReady: () => { if (!disposed) setInputReady(true); },
+            onVideoDimensions: (dimensions) => { if (!disposed && activeClient) acceptDimensions(dimensions); },
+            onInputReady: () => { if (!disposed && activeClient) setInputReady(true); },
             onAudioReady: () => {
-              if (disposed) return;
+              if (disposed || !activeClient) return;
               startSpeakerRoute();
               setAudioReady(!inputSettings.audioMuted);
             },
@@ -419,9 +426,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
         heartbeatTimer = setInterval(() => { void heartbeat(); }, 5_000);
       } catch (error) {
         if (!disposed) {
-          setStatus(friendlyConnectError(error));
-          setPhase('error');
-          void release(activeHandle, 'startup_error');
+          fail(friendlyConnectError(error));
         }
       }
     })();
@@ -451,9 +456,13 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
       activeClient = null;
       clientRef.current = null;
       setClient(null);
-      void release(activeHandle, 'user_exit');
-      releaseLock?.();
-      releaseLock = null;
+      // Claims may finish after unmount. Let that generation finish releasing
+      // before a retry can acquire the setup lock and change the PC display.
+      void setupTask.finally(async () => {
+        await release(activeHandle, 'user_exit');
+        releaseLock?.();
+        releaseLock = null;
+      });
     };
   }, [attempt, userId]);
 

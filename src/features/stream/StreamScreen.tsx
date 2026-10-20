@@ -83,7 +83,7 @@ export default function StreamScreen() {
   const session = useStreamSession({ userId, attempt, onBackground: exit });
   const {
     phase, status, progress, streamURL, videoSize, inputReady, errorDetail,
-    streamSettings, loadingThemeId, client, clientRef, sessionId, inputSettingsRef, rumbleRef, persistSettings,
+    streamSettings, hostDisplay, loadingThemeId, client, clientRef, sessionId, inputSettingsRef, rumbleRef, persistSettings,
   } = session;
   const live = phase === 'live';
   const gate = useGameLaunchGate(launch, live);
@@ -235,13 +235,15 @@ export default function StreamScreen() {
   useLayoutEffect(() => {
     touchpad.update({
       live, videoSize, stage,
+      allowStretch: hostDisplay?.displayMode !== 'virtual',
       getClient: () => clientRef.current,
       getSettings: () => inputSettingsRef.current,
     });
-  }, [clientRef, inputSettingsRef, live, stage, touchpad, videoSize]);
+  }, [clientRef, hostDisplay?.displayMode, inputSettingsRef, live, stage, touchpad, videoSize]);
   useEffect(() => () => touchpad.release(), [touchpad]);
 
-  const stretch = useMemo(() => streamStretchStyle(videoSize, stage), [stage, videoSize]);
+  const stretch = useMemo(() => hostDisplay?.displayMode === 'virtual'
+    ? undefined : streamStretchStyle(videoSize, stage), [hostDisplay?.displayMode, stage, videoSize]);
   const controller = useMemo(
     () => ({ name: profile.displayName, avatarUrl: profile.avatarUrl, email: profile.email }),
     [profile.avatarUrl, profile.displayName, profile.email],
@@ -339,8 +341,6 @@ export default function StreamScreen() {
         status={guideStatus}
         watchParty={watchParty}
         launch={launch}
-        videoSize={videoSize}
-        streamSettings={streamSettings}
         onClose={() => closeGuide(true)}
         onHome={() => { closeGuide(false); exit(); }}
         onReload={reload}
