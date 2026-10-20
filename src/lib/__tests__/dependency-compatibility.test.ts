@@ -5,6 +5,17 @@ import test from 'node:test';
 
 const require = createRequire(import.meta.url);
 
+test('clean installs resolve the patched URI decoder from its root vendor package', () => {
+  const manifest = require('../../../package.json');
+  const lock = require('../../../package-lock.json');
+  const decoder = lock.packages['node_modules/decode-uri-component'];
+  assert.equal(lock.packages[''].dependencies['decode-uri-component'], manifest.dependencies['decode-uri-component']);
+  assert.equal(manifest.overrides['decode-uri-component'], '$decode-uri-component');
+  assert.equal(decoder.resolved, 'vendor/decode-uri-component');
+  const vendorManifest = require(`../../../${decoder.resolved}/package.json`);
+  assert.equal(lock.packages[decoder.resolved].version, vendorManifest.version);
+});
+
 test('Router query-string keeps its CommonJS API and decodes Vietnamese with the security override', () => {
   const fromRouter = createRequire(require.resolve('expo-router/package.json'));
   const query = fromRouter('query-string');

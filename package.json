@@ -8,6 +8,7 @@
     "@react-native-community/netinfo": "12.0.1",
     "@react-native-community/slider": "5.2.0",
     "@supabase/supabase-js": "^2.117.3",
+    "decode-uri-component": "file:./vendor/decode-uri-component",
     "expo": "~57.0.30",
     "expo-asset": "~57.0.19",
     "expo-audio": "~57.0.5",
@@ -58,7 +59,7 @@
   },
   "private": true,
   "overrides": {
-    "decode-uri-component": "file:./vendor/decode-uri-component",
+    "decode-uri-component": "$decode-uri-component",
     "xcode": {
       "uuid": "11.1.1"
     }

@@ -10,3 +10,8 @@ This copy preserves upstream's implementation, changing only
 `export default function` to `module.exports = function` for CommonJS consumers.
 The MIT license is retained. Remove this compatibility distribution when the
 SDK's query-string dependency includes the patched decoder itself.
+
+The app declares this directory as a direct file dependency and references that
+dependency from its npm override. This keeps the lockfile link rooted at
+`vendor/decode-uri-component` on clean EAS installs, rather than resolving the
+relative override inside `node_modules/query-string`.
