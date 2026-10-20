@@ -12,6 +12,7 @@ import android.hardware.input.InputManager
 import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
+import android.net.wifi.WifiManager
 import android.graphics.Bitmap
 import android.os.Build
 import android.os.Handler
@@ -76,6 +77,7 @@ class JetsonaInputModule : Module(), InputSink {
   private var previousSpeakerphone: Boolean? = null
   private var previousDisplayModeId: Int? = null
   private var previousRefreshRate: Float? = null
+  private var streamWifiLock: WifiManager.WifiLock? = null
 
   private val inputManager: InputManager?
     get() = appContext.reactContext?.getSystemService(Context.INPUT_SERVICE) as? InputManager
@@ -83,6 +85,8 @@ class JetsonaInputModule : Module(), InputSink {
     get() = appContext.reactContext?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
   private val bluetoothAdapter: BluetoothAdapter?
     get() = (appContext.reactContext?.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager)?.adapter
+  private val wifiManager: WifiManager?
+    get() = appContext.reactContext?.applicationContext?.getSystemService(Context.WIFI_SERVICE) as? WifiManager
 
   private val deviceListener = object : InputManager.InputDeviceListener {
     override fun onInputDeviceAdded(deviceId: Int) = scheduleDevices()
@@ -125,6 +129,7 @@ class JetsonaInputModule : Module(), InputSink {
     OnActivityEntersBackground {
       releaseAllInput()
       runOnUi { applyStreamFrameRate(it, 0.0) }
+      setStreamWifiLock(false)
     }
     OnDestroy { detach() }
 
@@ -160,7 +165,11 @@ class JetsonaInputModule : Module(), InputSink {
     Function("describeDevice") { deviceId: Int -> describeDevice(deviceId) }
 
     Function("getDisplayInfo") { displayInfo() }
-    Function("setStreamFrameRate") { fps: Double -> runOnUi { applyStreamFrameRate(it, fps) } }
+    Function("setStreamFrameRate") { fps: Double ->
+      runOnUi { applyStreamFrameRate(it, fps) }
+      // Same lifecycle as the stream itself: fps > 0 while live, 0 on stop.
+      setStreamWifiLock(fps.isFinite() && fps > 0.0)
+    }
 
     // Chụp khung hình đang hiện trên cửa sổ (kể cả video RTCView) bằng PixelCopy.
     // Tách hai bước: grabFrame giữ bitmap NGAY (trước khi menu che), exportFrame
@@ -193,6 +202,7 @@ class JetsonaInputModule : Module(), InputSink {
 
   private fun detach() {
     detachWindow()
+    setStreamWifiLock(false)
     removeListeners()
     stopSpeakerRoute()
     attachedActivity = null
@@ -442,6 +452,31 @@ class JetsonaInputModule : Module(), InputSink {
     attributes.preferredDisplayModeId = chosen.modeId
     attributes.preferredRefreshRate = chosen.refreshRate
     window.attributes = attributes
+  }
+
+
+  // Wi-Fi power save parks the radio between beacons and background scans take
+  // it off-channel; both show up as periodic latency spikes, packet loss and
+  // IDR re-requests mid-stream. Hold a low-latency lock only while streaming.
+  private fun setStreamWifiLock(enabled: Boolean) {
+    val held = streamWifiLock
+    if (!enabled) {
+      if (held?.isHeld == true) held.release()
+      return
+    }
+    if (held?.isHeld == true) return
+    val lock = held ?: run {
+      val manager = wifiManager ?: return
+      @Suppress("DEPRECATION")
+      val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+      } else {
+        WifiManager.WIFI_MODE_FULL_HIGH_PERF
+      }
+      manager.createWifiLock(mode, "jetsona:stream").apply { setReferenceCounted(false) }
+    }
+    streamWifiLock = lock
+    try { lock.acquire() } catch (_: Exception) {}
   }
 
 
