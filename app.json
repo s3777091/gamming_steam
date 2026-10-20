@@ -88,7 +88,7 @@
       [
         "expo-audio",
         {
-          "microphonePermission": false,
+          "microphonePermission": "Bộ âm thanh của luồng stream mở đường âm thanh hai chiều. Jetsona không ghi âm và không gửi giọng nói của bạn.",
           "recordAudioAndroid": false,
           "enableBackgroundPlayback": false
         }
