@@ -17,6 +17,7 @@ import {
   Mouse,
   Palette,
   RefreshCw,
+  Rocket,
   Sparkles,
   Volume2,
   Wifi,
@@ -35,6 +36,7 @@ import { T } from '@/ui/Text';
 import { AppearancePage } from './AppearancePage';
 import { PillButton } from './controls';
 import { AudioPage, ControllerPage, DevicesPage, KeyboardPage, MousePage } from './DevicePages';
+import { GameBoosterPage } from './GameBoosterPage';
 import { LatencyPage, NetworkPage, QualityPage, VideoPage } from './StreamPages';
 import { useInputSettings } from './useInputSettings';
 import { useStreamSettingsDraft } from './useStreamSettingsDraft';
@@ -45,6 +47,7 @@ export type SettingsCategory =
   | 'video'
   | 'latency'
   | 'network'
+  | 'booster'
   | 'devices'
   | 'controller'
   | 'mouse'
@@ -52,13 +55,14 @@ export type SettingsCategory =
   | 'audio'
   | 'appearance';
 
-type SettingsSection = 'streaming' | 'devices' | 'app';
+type SettingsSection = 'streaming' | 'game' | 'devices' | 'app';
 
 type Tone = 'error' | 'success' | 'info';
 type Notice = { id: number; tone: Tone; title: string; detail?: string };
 
 const SECTIONS: { id: SettingsSection; label: string }[] = [
   { id: 'streaming', label: 'STREAMING' },
+  { id: 'game', label: 'CHƠI GAME' },
   { id: 'devices', label: 'THIẾT BỊ' },
   { id: 'app', label: 'ỨNG DỤNG' },
 ];
@@ -75,6 +79,7 @@ const CATEGORIES: {
   { id: 'video', label: 'Hình ảnh', detail: 'Độ phân giải, FPS, codec, bitrate và lớp phủ', icon: MonitorPlay, section: 'streaming', color: 'blue' },
   { id: 'latency', label: 'Độ trễ & độ mượt', detail: 'Bộ đệm, frame pacing và V-Sync', icon: Gauge, section: 'streaming', color: 'orange' },
   { id: 'network', label: 'Mạng', detail: 'Khu vực và kiểm tra đường truyền', icon: Wifi, section: 'streaming', color: 'blue' },
+  { id: 'booster', label: 'Game Booster', detail: 'Máy tính tự tối ưu khi bấm Play: Auto, Cao, Cân bằng, Tiết kiệm', icon: Rocket, section: 'game', color: 'red' },
   { id: 'devices', label: 'Thiết bị', detail: 'Thiết bị đang nối với máy này', icon: Monitor, section: 'devices', color: 'gray' },
   { id: 'controller', label: 'Tay cầm', detail: 'Bố cục nút, rung và vùng chết', icon: Gamepad2, section: 'devices', color: 'red' },
   { id: 'mouse', label: 'Chuột', detail: 'Tốc độ con trỏ và cuộn', icon: Mouse, section: 'devices', color: 'teal' },
@@ -265,7 +270,9 @@ export default function ConsoleSettings({
   let page: ReactNode;
   if (meta.section !== 'streaming') {
     page =
-      category === 'appearance' ? (
+      category === 'booster' ? (
+        <GameBoosterPage notify={notify} />
+      ) : category === 'appearance' ? (
         <AppearancePage />
       ) : category === 'devices' ? (
         <DevicesPage notify={notify} />

@@ -11,6 +11,13 @@
 //
 // File này giữ phần thuần (không React) để test được bằng node --test.
 
+import {
+  GAME_BOOST_META,
+  isResolvedGameBoostMode,
+  type GameBoostMode,
+  type ResolvedGameBoostMode,
+} from './game-booster';
+
 export type GameSessionPhase =
   | 'queued'
   | 'boosting'
@@ -29,6 +36,10 @@ export type GameBoostSummary = {
   powerPlan: string | null;
   gameMode: boolean;
   gamePriority: string | null;
+  /** Mức PC đã chạy (Auto đã được đổi thành mức cụ thể). Agent cũ không gửi. */
+  mode?: ResolvedGameBoostMode | null;
+  /** Mức người dùng chọn trong Cài đặt → Game Booster. */
+  requestedMode?: GameBoostMode | null;
 };
 
 export type GameSessionStatus = {
@@ -189,6 +200,10 @@ export function gameLaunchErrorMessage(code: string | null): string {
 export function boostHighlights(boost: GameBoostSummary | null): string[] {
   if (!boost) return [];
   const lines: string[] = [];
+  if (isResolvedGameBoostMode(boost.mode)) {
+    const label = GAME_BOOST_META[boost.mode].label;
+    lines.push(boost.requestedMode === 'auto' ? `Tự động · ${label}` : label);
+  }
   if (boost.trimmedMb >= 64) {
     lines.push(
       boost.trimmedMb >= 1024
@@ -198,7 +213,7 @@ export function boostHighlights(boost: GameBoostSummary | null): string[] {
   }
   if (boost.closedApps.length) lines.push(`Tắt ${boost.closedApps.length} ứng dụng nền`);
   if (boost.lowered.length) lines.push('Hạ ưu tiên ứng dụng nền');
-  if (boost.gamePriority) lines.push('Ưu tiên CPU cho game');
+  if (boost.gamePriority && boost.gamePriority !== 'Normal') lines.push('Ưu tiên CPU cho game');
   if (boost.powerPlan) lines.push('Hiệu năng tối đa');
   if (boost.gameMode) lines.push('Game Mode');
   return lines;

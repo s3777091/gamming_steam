@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { getGameBoostMode } from '@/lib/game-booster-settings';
 import { PC_ROUTES, pcFetchJson, pcPostJson } from '@/lib/pc-api';
 import { TimedCache } from '@/lib/timed-cache';
 
@@ -176,9 +177,11 @@ export function usePcLibrary() {
     setLaunchingId(selected.id);
     setError(null);
     try {
+      // Mức tối ưu chọn trong Cài đặt → Game Booster; PC cũ bỏ qua trường này.
+      const boostMode = await getGameBoostMode();
       const launched = await pcPostJson<{ ok?: boolean; sessionId?: unknown; resumed?: boolean }>(
         PC_ROUTES.gameLaunch,
-        { id: selected.id },
+        { id: selected.id, boostMode },
         'Không mở được trò chơi.',
       );
       return {
