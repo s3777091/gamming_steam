@@ -5,7 +5,7 @@
 // Header kệ game và Cài đặt > Thiết bị cùng đọc từ đây nên luôn báo giống nhau.
 
 import { useCallback, useEffect, useState } from 'react';
-import { PermissionsAndroid, Platform } from 'react-native';
+import { AppState, PermissionsAndroid, Platform } from 'react-native';
 import {
   addListener,
   getBluetooth,
@@ -55,9 +55,20 @@ export function useInputDevices() {
   useEffect(() => {
     const offDevices = addListener('onDevicesChanged', ({ devices: next }) => setDevices(next.map(toLocal)));
     const offBluetooth = addListener('onBluetoothChanged', (next) => setBluetooth(next));
+    const sync = () => {
+      setDevices(getDevices().map(toLocal));
+      setBluetooth(getBluetooth());
+    };
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') sync();
+    });
+    // Subscribe first, then read: a device can connect between the initial
+    // render and this effect, before JS starts receiving native events.
+    sync();
     return () => {
       offDevices();
       offBluetooth();
+      appState.remove();
     };
   }, []);
 

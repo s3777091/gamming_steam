@@ -48,7 +48,14 @@ public final class JetsonaInputModule: Module {
         self.refreshDevices()
       }
     }
-    Function("getDevices") { self.main { self.devices() } }
+    Function("getDevices") {
+      self.main {
+        // Reconcile with iOS even if a connect notification was missed. Avoid
+        // emitting a devices event from a synchronous getter (JS may re-enter).
+        self.refreshDevices(notify: false)
+        return self.devices()
+      }
+    }
     Function("getBluetooth") { self.bluetoothInfo() }
     Function("setCaptureMode") { (mode: String) in
       self.main {
@@ -121,7 +128,7 @@ public final class JetsonaInputModule: Module {
     refreshDevices()
   }
 
-  private func refreshDevices() {
+  private func refreshDevices(notify: Bool = true) {
     let currentControllers = GCController.controllers().filter { $0.extendedGamepad != nil }
     let currentMice = GCMouse.mice()
     let controllerIDs = Set(currentControllers.map { id($0) })
@@ -167,8 +174,10 @@ public final class JetsonaInputModule: Module {
     let connectedObjects = Set(currentControllers.map(ObjectIdentifier.init)
       + currentMice.map(ObjectIdentifier.init))
     ids = ids.filter { connectedObjects.contains($0.key) }
-    sendEvent("onDevicesChanged", ["devices": devices()])
-    sendEvent("onBluetoothChanged", bluetoothInfo())
+    if notify {
+      sendEvent("onDevicesChanged", ["devices": devices()])
+      sendEvent("onBluetoothChanged", bluetoothInfo())
+    }
   }
 
   private func emitController(_ controller: GCController, id: Int) {

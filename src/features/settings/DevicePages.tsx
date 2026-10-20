@@ -3,7 +3,7 @@
 // công tắc xanh #34C759, thanh trượt xanh #007AFF, chữ đen nhãn phụ xám.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import {
   ArrowRight,
   BatteryFull,
@@ -155,8 +155,10 @@ export function DevicesPage({ notify }: { notify: Notify }) {
           <View style={{ paddingHorizontal: s(16), paddingVertical: s(14) }}>
             <T size={11} color={appleColors.textTertiary}>
               {hasNativeInput
-                ? 'Chưa có thiết bị ngoại vi nào đang nối với máy này.'
-                : 'Phiên bản này chưa đọc được thiết bị ngoại vi.'}
+                ? Platform.OS === 'ios'
+                  ? 'Chưa nhận được phụ kiện từ iOS. Kiểm tra phụ kiện đã kết nối trong Cài đặt > Bluetooth, rồi quay lại Jetsona. Tai nghe chỉ hiện khi được chọn làm đầu ra âm thanh.'
+                  : 'Chưa có thiết bị ngoại vi nào đang nối với máy này.'
+                : 'Bản cài đặt thiếu module nhận thiết bị (JetsonaInput). Cần build và cài lại ứng dụng có module này.'}
             </T>
           </View>
         )}
