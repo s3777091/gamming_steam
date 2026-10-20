@@ -18,7 +18,13 @@
           "NSAllowsLocalNetworking": true
         },
         "NSLocalNetworkUsageDescription": "Jetsona cần truy cập mạng nội bộ để truyền hình ảnh và điều khiển máy tính ở nhà.",
-        "NSBluetoothAlwaysUsageDescription": "Jetsona dùng Bluetooth để nhận tay cầm, bàn phím và chuột khi chơi game từ xa."
+        "NSBluetoothAlwaysUsageDescription": "Jetsona dùng Bluetooth để nhận tay cầm, bàn phím và chuột khi chơi game từ xa.",
+        "GCSupportsControllerUserInteraction": true,
+        "GCSupportedGameControllers": [
+          {
+            "ProfileName": "ExtendedGamepad"
+          }
+        ]
       }
     },
     "android": {
