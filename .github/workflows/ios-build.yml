@@ -1,0 +1,64 @@
+name: iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/theme-system]
+    paths: [.github/workflows/ios-build.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - name: Check Expo authentication
+        shell: bash
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add the EXPO_TOKEN repository secret, and configure remote iOS signing credentials using the ios-preview profile."
+            exit 1
+          fi
+      - name: Build signed iPhone IPA on EAS
+        run: npx eas-cli@latest build --platform ios --profile ios-preview --non-interactive --wait --json > ios-build.json
+      - name: Download IPA and record source
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          const result = JSON.parse(readFileSync('ios-build.json', 'utf8'));
+          const build = Array.isArray(result) ? result[0] : result;
+          if (build.status !== 'FINISHED' || !build.artifacts?.buildUrl) {
+            throw new Error('EAS did not return a completed iOS build with an IPA artifact');
+          }
+          const response = await fetch(build.artifacts.buildUrl);
+          if (!response.ok) throw new Error(`IPA download failed: ${response.status}`);
+          const ipa = Buffer.from(await response.arrayBuffer());
+          if (ipa.readUInt32LE(0) !== 0x04034b50) throw new Error('Artifact is not an IPA ZIP archive');
+          mkdirSync('releases/ios', { recursive: true });
+          writeFileSync('releases/ios/jetsona.ipa', ipa);
+          writeFileSync('releases/ios/jetsona.ipa.sha256', `${createHash('sha256').update(ipa).digest('hex')}  jetsona.ipa\n`);
+          writeFileSync('releases/ios/build-info.json', JSON.stringify({
+            status: build.status, commit: process.env.GITHUB_SHA,
+            buildId: build.id, profile: 'ios-preview',
+            workflow: `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+          }, null, 2));
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jetsona-ios-${{ github.sha }}
+          path: releases/ios/
+          if-no-files-found: error
