@@ -37,6 +37,12 @@ type NativeStreamCallbacks = {
   onInputReady: () => void;
   onAudioReady: () => void;
   onError: (message: string) => void;
+  /**
+   * Đường mạng rớt SAU KHI stream đã lên (Wi-Fi chập chờn, signaling qua backend
+   * đứt). Client đã tự dừng; phía gọi nên nối lại thay vì báo lỗi. Thiếu callback
+   * này thì rơi về onError như cũ.
+   */
+  onDropped?: (message: string) => void;
   /** The host intentionally ended the session (including physical PC takeover). */
   onTerminated: () => void;
   /** PC báo rung cho một tay cầm (slot do app đặt khi add). Giá trị 0..1. */
@@ -106,6 +112,8 @@ const HEVC_CODEC_MASK = 2;
 const AV1_CODEC_MASK = 8;
 const AUDIO_SAMPLE_QUEUE_SIZE = 20;
 const WEBRTC_CONNECT_TIMEOUT_MS = 45_000;
+/** Cho ICE tự hồi sau `disconnected` chừng này trước khi coi là rớt. */
+const DISCONNECT_GRACE_MS = 15_000;
 const INPUT_CHANNELS = [
   CHANNEL.MOUSE_RELIABLE,
   CHANNEL.MOUSE_ABSOLUTE,
@@ -346,12 +354,14 @@ export class NativeMoonlightClient {
       }
     };
     ws.onerror = () => {
-      if (!this.stopped) this.fail('Không mở được kênh signaling Moonlight.');
+      if (this.stopped || this.ws !== ws) return;
+      if (this.ready) this.drop('Kênh signaling Moonlight bị gián đoạn.');
+      else this.fail('Không mở được kênh signaling Moonlight.');
     };
     ws.onclose = (event) => {
-      if (!this.stopped && this.ws === ws) {
-        this.fail(event.reason || 'Kênh signaling Moonlight đã đóng.');
-      }
+      if (this.stopped || this.ws !== ws) return;
+      if (this.ready) this.drop(event.reason || 'Kênh signaling Moonlight đã đóng.');
+      else this.fail(event.reason || 'Kênh signaling Moonlight đã đóng.');
     };
     this.connectTimer = setTimeout(() => {
       if (!this.ready && !this.stopped) this.fail('Kết nối WebRTC quá thời gian chờ.');
@@ -717,18 +727,18 @@ export class NativeMoonlightClient {
         this.disconnectTimer = null;
         this.callbacks.onStatus('WebRTC trực tiếp đã kết nối…');
       } else if (pc.connectionState === 'disconnected') {
+        // `disconnected` chỉ là vài nhịp consent STUN bị lỡ (Wi-Fi chuyển kênh,
+        // máy PC khựng lúc mở game) và libwebrtc thường tự hồi lại; cắt sớm là
+        // giết một phiên còn cứu được.
         if (this.disconnectTimer) clearTimeout(this.disconnectTimer);
         this.disconnectTimer = setTimeout(() => {
           if (!this.stopped && pc.connectionState === 'disconnected') {
-            this.fail('Kết nối WebRTC trực tiếp đã bị gián đoạn.');
+            this.drop('Kết nối WebRTC trực tiếp đã bị gián đoạn.');
           }
-        }, 5_000);
+        }, DISCONNECT_GRACE_MS);
       } else if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        if (!this.stopped) {
-          this.fail(this.connected
-            ? 'Kết nối WebRTC trực tiếp đã mất.'
-            : 'Không thiết lập được đường WebRTC trực tiếp.');
-        }
+        if (this.connected) this.drop('Kết nối WebRTC trực tiếp đã mất.');
+        else this.fail('Không thiết lập được đường WebRTC trực tiếp.');
       }
     };
 
@@ -870,6 +880,18 @@ export class NativeMoonlightClient {
   private fail(message: string): void {
     if (this.stopped) return;
     this.callbacks.onError(message);
+  }
+
+  /** Rớt mạng giữa phiên: dừng sạch rồi để phía gọi nối lại. */
+  private drop(message: string): void {
+    if (this.stopped) return;
+    const onDropped = this.callbacks.onDropped;
+    if (!onDropped) {
+      this.fail(message);
+      return;
+    }
+    this.stop();
+    onDropped(message);
   }
 }
 

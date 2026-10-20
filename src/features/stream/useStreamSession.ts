@@ -37,6 +37,7 @@ import { detectStreamDeviceClass } from '@/lib/stream-device';
 import { assertVirtualDisplayStream, parseHostDisplay } from '@/lib/stream-display';
 import { applyStreamHostPolicy, applyStreamTargetTransportPolicy, streamHostReadinessIssue } from '@/lib/stream-host-policy';
 import { fetchDeviceNetworkMeasurement } from '@/lib/stream-network';
+import { isNetworkFailure } from '@/lib/stream-reconnect';
 import { acquireStreamSetupLock } from '@/lib/stream-setup-lock';
 import {
   completeSettings,
@@ -61,6 +62,11 @@ type Options = {
   /** App xuống nền hoặc host chủ động kết thúc phiên: màn gọi sẽ thoát. */
   onBackground: () => void;
   onSessionChanged?: () => void;
+  /**
+   * Mạng rớt giữa lúc đang stream. Trả true nếu màn gọi đã lên lịch nối lại
+   * (đổi `attempt`); false thì phiên rơi vào màn lỗi như bình thường.
+   */
+  onDropped?: (message: string) => boolean;
 };
 
 const RESOURCE_KEY = 'home-pc';
@@ -90,7 +96,7 @@ async function fetchHostDisplay(): Promise<HostDisplay | null> {
   return display;
 }
 
-export function useStreamSession({ userId, attempt, onBackground, onSessionChanged }: Options) {
+export function useStreamSession({ userId, attempt, onBackground, onSessionChanged, onDropped }: Options) {
   const [phase, setPhase] = useState<StreamPhase>('connecting');
   const [status, setStatus] = useState('Đang xác nhận tài khoản…');
   const [progress, setProgress] = useState(4);
@@ -128,10 +134,12 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
   const inputSettingsRef = useRef<InputSettings>(DEFAULT_INPUT_SETTINGS);
   const onBackgroundRef = useRef(onBackground);
   const onSessionChangedRef = useRef(onSessionChanged);
+  const onDroppedRef = useRef(onDropped);
   useLayoutEffect(() => {
     onBackgroundRef.current = onBackground;
     onSessionChangedRef.current = onSessionChanged;
-  }, [onBackground, onSessionChanged]);
+    onDroppedRef.current = onDropped;
+  }, [onBackground, onSessionChanged, onDropped]);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,8 +190,28 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
       return releaseTask;
     };
 
+    /** Màn gọi nhận nối lại (mạng rớt): dừng client của lần này, giữ màn chờ. */
+    const recover = (message: string): boolean => {
+      if (!onDroppedRef.current?.(message)) return false;
+      console.warn(`[stream] reconnecting after: ${message}`);
+      activeClient?.stop();
+      stopSpeakerRoute();
+      setStreamFrameRate(0);
+      activeClient = null;
+      clientRef.current = null;
+      setClient(null);
+      setStreamURL(null);
+      // Lần nối mới (attempt đổi) sẽ dọn và trả lease của lần này.
+      setPhase('connecting');
+      setStatus('Mất kết nối · đang chờ mạng để nối lại…');
+      return true;
+    };
+
     const fail = (message: string, detail?: string) => {
       if (disposed) return;
+      if (isNetworkFailure(message) && recover(message)) return;
+      // Lý do thật nằm ở logcat (ReactNativeJS) để chẩn đoán trên máy release.
+      console.warn(`[stream] fail: ${message}${detail ? ` | ${detail}` : ''}`);
       activeClient?.stop();
       stopSpeakerRoute();
       setStreamFrameRate(0);
@@ -405,6 +433,10 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
               setAudioReady(!inputSettings.audioMuted);
             },
             onError: (message) => fail(message),
+            onDropped: (message) => {
+              if (disposed || recover(message)) return;
+              fail(message);
+            },
             onTerminated: () => {
               if (disposed) return;
               stopSpeakerRoute();

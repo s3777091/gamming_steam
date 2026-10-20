@@ -5,6 +5,7 @@
 // cửa sổ game đã lên foreground -> vào thẳng màn hình loading của game.
 
 import { useKeepAwake } from 'expo-keep-awake';
+import * as Network from 'expo-network';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -24,6 +25,7 @@ import {
   type ResumableGame,
 } from '@/lib/stream-resume';
 import { streamStretchStyle } from '@/lib/stream-fit';
+import { AutoReconnectBudget, waitForOnline } from '@/lib/stream-reconnect';
 import { getLiveBorderEnabled, subscribeLiveBorderEnabled } from '@/lib/stream-overlay-settings';
 import type { HostShortcutAction } from '@/lib/input-settings';
 import { BlurView } from 'expo-blur';
@@ -80,7 +82,13 @@ export default function StreamScreen() {
     if (router.canGoBack()) router.back(); else router.replace('/');
   }, [router]);
 
-  const session = useStreamSession({ userId, attempt, onBackground: exit });
+  // Mạng rớt giữa phiên: nối lại thẳng vào game như "Tải lại" thay vì bật màn lỗi.
+  // Hàm thật gắn bên dưới khi đã có closeGuide.
+  const [reconnectBudget] = useState(() => new AutoReconnectBudget());
+  const droppedRef = useRef<() => boolean>(() => false);
+  const onDropped = useCallback(() => droppedRef.current(), []);
+
+  const session = useStreamSession({ userId, attempt, onBackground: exit, onDropped });
   const {
     phase, status, progress, streamURL, videoSize, inputReady, errorDetail,
     streamSettings, hostDisplay, loadingThemeId, client, clientRef, sessionId, inputSettingsRef, rumbleRef, persistSettings,
@@ -168,6 +176,37 @@ export default function StreamScreen() {
     setDirectReconnect(true);
     setAttempt((value) => value + 1);
   }, [closeGuide]);
+
+  const networkWaitRef = useRef<{ cancel: () => void } | null>(null);
+  useEffect(() => () => networkWaitRef.current?.cancel(), []);
+  // Chỉ tự nối lại một phiên đã từng lên hình; lần nối đầu lỗi thì báo lỗi như cũ.
+  const wasLiveRef = useRef(false);
+  useLayoutEffect(() => {
+    if (live) wasLiveRef.current = true;
+  }, [live]);
+  useLayoutEffect(() => {
+    droppedRef.current = () => {
+      if (networkWaitRef.current) return true;
+      if (exitingRef.current || !wasLiveRef.current || !reconnectBudget.take()) return false;
+      // Mạng vừa rớt nên lệnh resume tới PC có thể lỗi; chỉ gửi khi menu đang pause game.
+      if (guideOpen) closeGuide(true);
+      setDirectReconnect(true);
+      const wait = waitForOnline(
+        () => Network.getNetworkStateAsync(),
+        (listener) => {
+          const subscription = Network.addNetworkStateListener(listener);
+          return () => subscription.remove();
+        },
+      );
+      networkWaitRef.current = wait;
+      void wait.promise.then(() => {
+        if (networkWaitRef.current !== wait) return;
+        networkWaitRef.current = null;
+        if (!exitingRef.current) setAttempt((value) => value + 1);
+      });
+      return true;
+    };
+  }, [closeGuide, guideOpen, reconnectBudget]);
 
   // Thoát game: hoạt cảnh thoát chạy trong lúc PC đóng game, rồi mới về kệ game.
   const exitGame = useCallback((game: ExitingGame) => {

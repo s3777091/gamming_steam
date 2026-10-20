@@ -387,7 +387,7 @@ function StreamLoadingSequence({
         },
       ]}>
         <T size={11} leading={1.2} color="rgba(255,255,255,0.85)" numberOfLines={1} style={styles.statusText}>
-          {failure ? 'Kết nối bị gián đoạn' : ready ? 'Sẵn sàng' : status || (direct ? 'Đang nối lại phiên chơi' : 'Đang tải trò chơi')}
+          {failure ? status || 'Kết nối bị gián đoạn' : ready ? 'Sẵn sàng' : status || (direct ? 'Đang nối lại phiên chơi' : 'Đang tải trò chơi')}
         </T>
         <T size={11} leading={1.2} tabular color="rgba(255,255,255,0.85)">{Math.round(displayedProgress)}%</T>
       </View>
