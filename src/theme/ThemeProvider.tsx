@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react';
+import { createContext, startTransition, useCallback, useContext, useEffect, useMemo, useReducer, type ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 
 import { useMotion } from '@/ui/motion';
@@ -113,7 +113,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
           committed={themeId === transition.to}
           onStart={transition.onStart}
           onImpact={transition.onImpact}
-          onCovered={() => dispatch({ type: 'commit', id: transition.to })}
+          // Cả app vẽ lại theo theme mới: chạy dạng transition để React chia nhỏ việc vẽ,
+          // tay cầm và chạm vẫn phản hồi thay vì đứng hình trong lúc màn đang bị phủ.
+          onCovered={() => startTransition(() => dispatch({ type: 'commit', id: transition.to }))}
           onDone={finish}
         />
       ) : null}

@@ -2,7 +2,10 @@
 // trông như ngoài vùng lấy nét, không có viền cứng.
 
 import { useId } from 'react';
+import { View } from 'react-native';
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
+
+const SMALL = 6;
 
 export function Glow({
   width,
@@ -20,6 +23,21 @@ export function Glow({
   core?: number;
 }) {
   const id = `g${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+  // Chấm nhỏ hơn vài pixel thì gradient không nhìn ra khác biệt; mỗi Svg là một view native
+  // riêng nên với hàng chục hạt, chấm tròn thường nhẹ hơn hẳn.
+  if (width <= SMALL && height <= SMALL) {
+    return (
+      <View
+        style={{
+          width,
+          height,
+          borderRadius: Math.max(width, height) / 2,
+          backgroundColor: color,
+          opacity: opacity * (0.55 + core * 0.45),
+        }}
+      />
+    );
+  }
   return (
     <Svg width={width} height={height}>
       <Defs>

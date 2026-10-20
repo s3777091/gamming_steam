@@ -1,4 +1,4 @@
-// Control Center ở màn chính (giữ Start + Select). Cùng dáng với menu Guide
+// Control Center ở màn chính (nút View / Select). Cùng dáng với menu Guide
 // trong stream: kính mờ, đồng hồ góc phải, dock ở đáy, popover kiểu Apple.
 //
 // Ô game nằm đúng chỗ của Tab game cũ: game vẫn chạy trên PC sau khi bấm Home
@@ -12,6 +12,7 @@ import { Bell, Gamepad2, Home, Play, Power, UserRound, X, type LucideIcon } from
 import { FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
 import type { LocalDevice } from '@/features/devices/useInputDevices';
+import { formatClock } from '@/features/library/format';
 import type { AppNotification } from '@/features/library/types';
 import { PC_ROUTES, pcPostJson } from '@/lib/pc-api';
 import { forgetStreamGame, type ResumableGame } from '@/lib/stream-resume';
@@ -37,12 +38,6 @@ type DockItem = {
   danger?: boolean;
   run?: () => void;
 };
-
-function formatClock(date: Date): string {
-  const hours = date.getHours() % 12 || 12;
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes} ${date.getHours() >= 12 ? 'PM' : 'AM'}`;
-}
 
 export function HomeControlCenter({
   open,
@@ -246,9 +241,9 @@ export function HomeControlCenter({
                   style={[
                     styles.dockBtn,
                     {
-                      width: s(42),
-                      height: s(42),
-                      borderRadius: s(14),
+                      width: s(38),
+                      height: s(38),
+                      borderRadius: s(13),
                       backgroundColor: popoverOpen ? glass.controlActive : 'transparent',
                       borderColor: popoverOpen ? glass.controlBorderActive : 'transparent',
                     },

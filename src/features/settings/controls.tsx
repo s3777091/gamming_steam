@@ -244,6 +244,7 @@ export function ToggleRow({
     <Press
       onPress={() => onChange(!checked)}
       pressScale={0.995}
+      focusVariant="row"
       accessibilityRole="switch"
       accessibilityState={{ checked }}
       style={rowStyle(s)}
@@ -282,6 +283,7 @@ export function ChoiceRow<V extends string>({
       <Press
         onPress={() => setOpen((current) => !current)}
         pressScale={0.995}
+        focusVariant="row"
         accessibilityState={{ expanded: open }}
         style={rowStyle(s)}
       >
@@ -324,6 +326,7 @@ export function ChoiceRow<V extends string>({
                     setOpen(false);
                   }}
                   pressScale={0.995}
+                  focusVariant="row"
                   accessibilityRole="radio"
                   accessibilityState={{ checked: active }}
                   style={{
@@ -531,6 +534,7 @@ export function ActionRow({
       sound={sound}
       disabled={disabled || busy}
       pressScale={0.995}
+      focusVariant="row"
       style={rowStyle(s, { opacity: disabled ? 0.4 : 1 })}
     >
       {Icon ? (

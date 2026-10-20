@@ -135,6 +135,19 @@ export function Press({
         ? 0
         : 12);
   const isCompact = (box.w > 0 && box.w <= 54 && box.h <= 54) || radius <= 18;
+  const ring = focused || ringShown ? (
+    <FocusRing
+      radius={radius}
+      variant={ringVariant}
+      tint={focusTint}
+      isSmall={isCompact}
+      visible={focused}
+      onHidden={hideRing}
+    />
+  ) : null;
+  // Viền hàng là tấm kính nằm trong khung hàng: vẽ dưới nội dung để chữ và công tắc
+  // không bị phủ mờ như đang bị vô hiệu hoá. Viền thẻ nằm ngoài mép nên vẽ đè lên.
+  const ringBehind = ringVariant === 'row';
   return (
     <AnimatedPressable
       {...rest}
@@ -151,17 +164,9 @@ export function Press({
       onPressIn={(event) => { if (pressScale !== 1) animate(pressScale); onPressIn?.(event); }}
       onPressOut={(event) => { if (pressScale !== 1) animate(1); onPressOut?.(event); }}
     >
+      {ringBehind ? ring : null}
       {children}
-      {focused || ringShown ? (
-        <FocusRing
-          radius={radius}
-          variant={ringVariant}
-          tint={focusTint}
-          isSmall={isCompact}
-          visible={focused}
-          onHidden={hideRing}
-        />
-      ) : null}
+      {ringBehind ? null : ring}
     </AnimatedPressable>
   );
 }

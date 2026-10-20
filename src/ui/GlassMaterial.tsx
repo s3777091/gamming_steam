@@ -10,11 +10,18 @@ type GlassMaterial = 'control' | 'panel' | 'scrim';
 
 const GlassBlurTargetContext = createContext<RefObject<NativeView | null> | null>(null);
 
+/**
+ * Android: mỗi BlurView blur LẠI TOÀN BỘ target ở độ phân giải gốc mỗi frame, dù bản thân
+ * nó chỉ to bằng cái nút (Dimezis BlurView 3, đường RenderNode). Chừng 8 lớp kính cùng lúc
+ * là lấp đầy cache GPU, ảnh phải upload lại mỗi frame và app tụt còn ~10 fps. `null` tắt
+ * blur thật cho nhánh con (chỉ còn màu kính) — dùng cho phần bị lớp phủ che hoặc lớp phủ
+ * kín màn hình, nơi blur không nhìn thấy được.
+ */
 export function GlassBlurProvider({
   targetRef,
   children,
 }: {
-  targetRef: RefObject<NativeView | null>;
+  targetRef: RefObject<NativeView | null> | null;
   children: ReactNode;
 }) {
   return (
@@ -54,6 +61,8 @@ export function GlassBackdrop({
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden' }]}>
       {resolvedIntensity > 0 ? <BlurView
+        // Gắn lại khi bật/tắt blur thật: expo-blur đổi target lúc đang chạy không sạch.
+        key={blurTarget ? 'live' : 'flat'}
         blurTarget={blurTarget ?? undefined}
         blurMethod={Platform.OS === 'android' && blurTarget ? 'dimezisBlurViewSdk31Plus' : 'none'}
         blurReductionFactor={3}

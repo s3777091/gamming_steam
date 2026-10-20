@@ -123,6 +123,7 @@ export function GameBoosterPage({ notify }: { notify: Notify }) {
               key={option}
               onPress={() => choose(option)}
               pressScale={0.995}
+              focusVariant="row"
               accessibilityRole="radio"
               accessibilityState={{ checked: active }}
               style={rowStyle(s, {

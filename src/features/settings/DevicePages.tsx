@@ -776,6 +776,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
               <Press
                 onPress={() => setOpenCode(open ? null : code)}
                 pressScale={0.995}
+                focusVariant="row"
                 style={rowStyle(s, {
                   minHeight: s(48),
                   backgroundColor: open ? alpha(colors.bg, 0.82) : 'transparent',

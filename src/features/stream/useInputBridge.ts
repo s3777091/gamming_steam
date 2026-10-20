@@ -7,7 +7,8 @@
 //  - Bàn phím vật lý: keycode Android -> Windows virtual-key; phím Host (mặc
 //    định Ctrl phải) giữ + phím = phím tắt của app, không gửi sang PC.
 //  - Chuột vật lý: chuyển động tương đối (pointer capture), nút, cuộn.
-//  - Nhấn Alt hoặc giữ Start + Select mở menu của app (chụp màn hình, sao chép, tab game).
+//  - Nhấn Alt hoặc nút View / Select mở menu của app (chụp màn hình, sao chép, tab game);
+//    nút View / Select vì vậy không được gửi sang PC.
 
 import { useEffect, useRef } from 'react';
 import {
@@ -17,7 +18,7 @@ import {
 
 import { toLocal, useInputDevices, type LocalDevice } from '@/features/devices/useInputDevices';
 import { useCaptureMode } from '@/features/gamepad/captureMode';
-import { listenGuideCombo } from '@/features/gamepad/guideCombo';
+import { GUIDE_BUTTON, listenGuideButton } from '@/features/gamepad/guideButton';
 import { webCodeForKeyCode, vkForWebCode } from '@/features/settings/keycodes';
 import { applyDeadzone, type HostShortcutAction, type InputSettings } from '@/lib/input-settings';
 import type { NativeMoonlightClient } from '@/lib/moonlight-native';
@@ -190,15 +191,17 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
   // Trạng thái tay cầm -> PC.
   useEffect(() => {
     if (!live) return;
-    const off = addListener('onGamepadState', (state) => {
+    const off = addListener('onGamepadState', (raw) => {
+      // View / Select là nút mở menu của app: game trên PC không thấy nút này.
+      const state = raw.buttons & GUIDE_BUTTON ? { ...raw, buttons: raw.buttons & ~GUIDE_BUTTON } : raw;
       latest.current.set(state.deviceId, state);
       sendPad(state.deviceId, state);
     });
     const offGuideKey = addListener('onGuideKey', (event) => {
       if (event.down) onGuideRef.current();
     });
-    // Tay cầm vẫn dùng tổ hợp Start + Select, không phụ thuộc nút đặc biệt của từng loại.
-    const offCombo = listenGuideCombo(() => onGuideRef.current());
+    // Tay cầm: nút View / Select, không phụ thuộc nút Home đặc biệt của từng loại.
+    const offCombo = listenGuideButton(() => onGuideRef.current());
     return () => { off(); offGuideKey(); offCombo(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live]);

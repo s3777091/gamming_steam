@@ -1,4 +1,4 @@
-// Sổ đăng ký cho nút B (quay lại), LB/RB (đổi tab) và tổ hợp Start + Select.
+// Sổ đăng ký cho nút B (quay lại), LB/RB (đổi tab) và nút View / Select (mở menu).
 // Bên web các thành phần nghe CustomEvent trên window; native không có window
 // nên dùng một ngăn xếp: thành phần mở sau cùng được hỏi trước.
 

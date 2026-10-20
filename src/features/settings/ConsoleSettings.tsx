@@ -4,7 +4,7 @@
 // icon squircle kính đa sắc và nút đóng viên thuốc kính nổi bật.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Animated, Easing, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, Platform, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import {
@@ -27,7 +27,7 @@ import {
 
 import { useBack } from '@/features/gamepad/hooks';
 import { alpha, type SettingsTokens, ThemeDecor, useTheme } from '@/theme';
-import { GlassBackdrop } from '@/ui/GlassMaterial';
+import { GlassBackdrop, GlassBlurProvider } from '@/ui/GlassMaterial';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -331,6 +331,9 @@ export default function ConsoleSettings({
 
   return (
     <FocusLayer>
+      {/* Cài đặt phủ kín màn hình trên nền đục: blur thật chỉ blur màn chính đã bị che,
+          mà mỗi ô kính lại tốn một lượt blur toàn màn (xem GlassBlurProvider). */}
+      <GlassBlurProvider targetRef={null}>
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
@@ -349,6 +352,8 @@ export default function ConsoleSettings({
               source={{ uri: backdropUrl }}
               style={[StyleSheet.absoluteFill, { opacity: 0.4 }]}
               contentFit="cover"
+              // Ảnh nền mờ được blur một lần lúc giải mã thay cho kính blur mỗi frame.
+              blurRadius={Platform.OS === 'android' ? 12 : undefined}
             />
             <GlassBackdrop material="panel" />
           </View>
@@ -633,6 +638,7 @@ export default function ConsoleSettings({
           </View>
         ) : null}
       </Animated.View>
+      </GlassBlurProvider>
     </FocusLayer>
   );
 }

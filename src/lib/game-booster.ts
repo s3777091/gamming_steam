@@ -28,7 +28,7 @@ export const GAME_BOOST_ACTION_LABEL: Record<GameBoostAction, string> = {
   gameMode: 'Bật Windows Game Mode',
   closeApps: 'Tắt app nền (OneDrive, Widgets…)',
   lowerPriority: 'Hạ ưu tiên trình duyệt, Spotify',
-  trimMemory: 'Giải phóng RAM cho game',
+  trimMemory: 'Giải phóng RAM khi máy thiếu RAM',
   gamePriority: 'Ưu tiên CPU cho game',
   noThrottle: 'Chặn Windows bóp xung game',
 };

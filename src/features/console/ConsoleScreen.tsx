@@ -219,7 +219,7 @@ export default function ConsoleScreen() {
   const deviceStatus = useDeviceStatus();
   const inputDevices = useInputDevices();
 
-  // Control Center ở màn chính (Start + Select): ô game quay lại game vẫn chạy trên PC sau khi bấm Home.
+  // Control Center ở màn chính (nút View / Select): ô game quay lại game vẫn chạy trên PC sau khi bấm Home.
   const pathname = usePathname();
   const [controlCenterOpen, setControlCenterOpen] = useState(false);
   const [resumable, setResumable] = useState<ResumableGame | null>(readResumableGame);
@@ -643,8 +643,10 @@ export default function ConsoleScreen() {
         <BlurTargetView ref={blurTargetRef} style={StyleSheet.absoluteFill}>
           <LibraryBackdrop url={backdropUrl} fallbackUrl={activeTab === 'store' ? storeBackdropFallback : activeTab === 'games' ? selected?.artworkUrl : null} store={activeTab === 'store'} />
           <PcWallpaper visible={activeTab === 'pc'} />
-          <ThemeDecor scenery paused={pathname !== '/' || Boolean(settingsCategory)} />
         </BlurTargetView>
+        {/* Đặt ngoài BlurTargetView: lớp này chuyển động mỗi frame, nếu nằm trong target thì
+            mọi ô kính mờ trên Android phải blur lại liên tục và cả app bị giật. */}
+        <ThemeDecor scenery paused={pathname !== '/' || Boolean(settingsCategory)} />
 
         <View
           style={[styles.contentFrame, {
@@ -670,6 +672,10 @@ export default function ConsoleScreen() {
             top: s(10) + insets.top,
           }]}
         >
+          {/* Header chỉ giữ màu kính, không blur thật: trên Android mỗi ô kính nhỏ vẫn blur cả
+              màn hình mỗi frame (xem GlassBlurProvider), 6 ô là đủ kéo màn chính xuống ~60 fps.
+              iOS không đổi: blurTarget chỉ có tác dụng trên Android. */}
+          <GlassBlurProvider targetRef={null}>
           <LibraryHeader
           activeTab={activeTab}
           onTabChange={switchTab}
@@ -704,6 +710,7 @@ export default function ConsoleScreen() {
             />
           )}
           />
+          </GlassBlurProvider>
         </View>
 
       {selectedStoreItem ? (() => {

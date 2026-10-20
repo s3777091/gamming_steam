@@ -7,7 +7,7 @@ import { addListener, type NativeGamepadButton } from 'jetsona-input';
 
 import { useUi } from '@/ui/scale';
 import { activateFocus, ensureFocusActive, moveFocus, scrollFocused, setFocusViewport, type Direction } from './focus';
-import { listenGuideCombo } from './guideCombo';
+import { listenGuideButton } from './guideButton';
 import { navDirection, REPEAT_DELAY_MS, REPEAT_INTERVAL_MS, scrollVector } from './navigation';
 import { dispatchBack, dispatchGuide, dispatchTab, isCursorSuspended } from './registry';
 
@@ -93,7 +93,7 @@ export default function GamepadNavigator({ enabled }: { enabled: boolean }) {
     const offGuideKey = addListener('onGuideKey', (event) => {
       if (event.down) dispatchGuide();
     });
-    const offCombo = listenGuideCombo(dispatchGuide);
+    const offCombo = listenGuideButton(dispatchGuide);
 
     return () => {
       offState();

@@ -89,6 +89,7 @@ export function QualityPage({ draft, settings }: PageProps) {
               key={profile}
               onPress={() => draft.selectProfile(profile)}
               pressScale={0.995}
+              focusVariant="row"
               accessibilityRole="radio"
               accessibilityState={{ checked: active }}
               style={rowStyle(s, { minHeight: s(50) })}

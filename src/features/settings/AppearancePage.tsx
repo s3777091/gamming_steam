@@ -1,6 +1,6 @@
 // Cài đặt → Giao diện: chọn theme cho toàn bộ app. Theme áp dụng ngay và được lưu trên máy này.
 
-import { forwardRef, useRef } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Check } from 'lucide-react-native';
@@ -114,18 +114,30 @@ function ThemeRow({
 
 export function AppearancePage() {
   const { themeId, setThemeId, themes, decorEnabled, setDecorEnabled } = useThemeControl();
-  const select = (id: ThemeId, origin?: ThemeTransitionOrigin) =>
+  // Dấu tích nhảy sang hàng vừa bấm ngay lập tức; theme thật chỉ đổi khi giọt màu phủ kín.
+  const [picked, setPicked] = useState<ThemeId | null>(null);
+  if (picked !== null && picked === themeId) setPicked(null);
+  const shownId = picked ?? themeId;
+  useEffect(() => {
+    if (picked === null) return;
+    // Yêu cầu bị bỏ qua (đang chạy hiệu ứng khác): trả dấu tích về theme thật.
+    const timer = setTimeout(() => setPicked(null), 2500);
+    return () => clearTimeout(timer);
+  }, [picked]);
+  const select = (id: ThemeId, origin?: ThemeTransitionOrigin) => {
+    if (id !== themeId) setPicked(id);
     setThemeId(id, {
       origin,
       onStart: () => playUiSound('themeFall'),
       onImpact: () => playUiSound('themeSplash'),
     });
+  };
 
   return (
     <>
       <SettingsGroup title="Theme" footer="Theme áp dụng ngay cho toàn bộ ứng dụng và được lưu trên máy này.">
         {themes.map((theme) => (
-          <ThemeRow key={theme.id} theme={theme} active={theme.id === themeId} onSelect={select} />
+          <ThemeRow key={theme.id} theme={theme} active={theme.id === shownId} onSelect={select} />
         ))}
       </SettingsGroup>
       <SettingsGroup title="Xem trước" footer="Xem chất liệu, khung avatar và màn chờ của theme hiện tại. Xem thử không mở game hay kết nối máy tính.">

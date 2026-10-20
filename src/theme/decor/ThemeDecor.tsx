@@ -3,6 +3,7 @@
 // Tắt khi người dùng tắt trong Cài đặt, đứng yên khi app chạy nền, bỏ hạt khi máy bật
 // giảm chuyển động. Màn stream không gắn lớp này.
 
+import { memo } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { useMotion } from '@/ui/motion';
@@ -12,7 +13,9 @@ import { ThemeAmbience } from './ambience';
 import { ThemeParticles } from './particles';
 import { SeasonScenery } from './SeasonScenery';
 
-export function ThemeDecor({ scenery = false, paused = false }: { scenery?: boolean; paused?: boolean }) {
+// memo: màn cha (ConsoleScreen) vẽ lại liên tục theo tiến độ tải, trạng thái mạng…; nếu vẽ
+// lại theo thì mọi hạt dựng lại nút Animated và gắn lại animation native, gây khựng.
+export const ThemeDecor = memo(function ThemeDecor({ scenery = false, paused = false }: { scenery?: boolean; paused?: boolean }) {
   const theme = useTheme();
   const enabled = useDecorEnabled();
   const { active, reduceMotion } = useMotion();
@@ -29,4 +32,4 @@ export function ThemeDecor({ scenery = false, paused = false }: { scenery?: bool
       {scenery ? <SeasonScenery /> : null}
     </View>
   );
-}
+});

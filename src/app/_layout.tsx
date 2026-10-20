@@ -33,7 +33,7 @@ function Gate() {
   const pathname = usePathname();
   const previousPathname = useRef(pathname);
   useHardwareBack();
-  // Màn chính dùng Start + Select để mở Control Center; stream tự xử lý tổ hợp này.
+  // Màn chính dùng nút View / Select để mở Control Center; stream tự xử lý nút này.
   useTemporarySystemBars(pathname !== '/stream' && pathname !== '/');
 
   useEffect(() => {

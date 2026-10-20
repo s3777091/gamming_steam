@@ -1,4 +1,4 @@
-// Menu Guide (PS5 Control Center style): mở bằng Alt hoặc Start + Select.
+// Menu Guide (PS5 Control Center style): mở bằng Alt hoặc nút View / Select.
 // Thiết kế tinh gọn, trực quan, không tạo noise.
 //
 // Góc trên phải: nút đóng. Thanh dock dưới: các nút chức năng + đồng hồ; Thông báo,
@@ -33,6 +33,7 @@ import {
 import { addListener, exportFrame, releaseFrame } from 'jetsona-input';
 
 import { useInputDevices } from '@/features/devices/useInputDevices';
+import { formatClock } from '@/features/library/format';
 import { useNotifications } from '@/features/library/useNotifications';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { ControlPopover, type PopoverAnchor } from '@/features/control-center/ControlPopover';
@@ -81,16 +82,6 @@ type DockAction = {
   locked?: boolean;
   run?: () => void;
 };
-
-function formatClock(date: Date): string {
-  let hours = date.getHours();
-  const minutes = date.getMinutes();
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  hours = hours % 12;
-  hours = hours ? hours : 12;
-  const minStr = minutes < 10 ? `0${minutes}` : `${minutes}`;
-  return `${hours}:${minStr} ${ampm}`;
-}
 
 export function GuideMenu({
   open,
@@ -532,9 +523,9 @@ export function GuideMenu({
                     style={[
                       styles.dockIconBtn,
                       {
-                        width: s(42),
-                        height: s(42),
-                        borderRadius: s(14),
+                        width: s(38),
+                        height: s(38),
+                        borderRadius: s(13),
                         backgroundColor: lit
                           ? (action.danger ? 'rgba(239,68,68,0.25)' : glass.controlActive)
                           : 'transparent',

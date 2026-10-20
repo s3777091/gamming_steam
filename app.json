@@ -12,7 +12,7 @@
       "bundleIdentifier": "cloud.protexa.jetsona.console",
       "supportsTablet": true,
       "requireFullScreen": true,
-      "buildNumber": "1",
+      "buildNumber": "2",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true

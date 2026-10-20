@@ -35,7 +35,7 @@ export function useTemporarySystemBars(enabled: boolean): void {
 
   useGuide(toggle, enabled);
 
-  // Keep the stream fully immersive; it handles the Start + Select combo itself.
+  // Keep the stream fully immersive; it handles the View / Select guide button itself.
   useEffect(() => {
     if (!enabled) hide();
     return hide;

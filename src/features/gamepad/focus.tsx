@@ -168,7 +168,13 @@ async function reveal(node: FocusNode, rect: Rect | null) {
 }
 
 function scrollLayer(direction: Direction): boolean {
-  const target = layerScrolls.get(currentLayer());
+  // Ưu tiên ScrollView chứa ô đang chọn: màn hai cột (Cài đặt) có ScrollView sidebar
+  // đăng ký trước, cuộn nó khi đang ở cột nội dung là cuộn nhầm chỗ.
+  const vertical = direction === 'up' || direction === 'down';
+  const node = focusedId === null ? undefined : nodes.get(focusedId);
+  let own: ScrollTarget | null = node?.scroll ?? null;
+  while (own && own.horizontal === vertical) own = own.parent;
+  const target = own ?? layerScrolls.get(currentLayer());
   if (!target) return false;
   if (direction === 'up' || direction === 'down') {
     if (target.horizontal) return false;
@@ -216,7 +222,15 @@ async function runMove(direction: Direction) {
   const epoch = focusEpoch;
   const items = await measureLayer(currentLayer());
   if (epoch !== focusEpoch || !items.length) return;
-  const current = focusedId === null ? undefined : items.find((entry) => entry.item.id === focusedId);
+  const measured = focusedId === null ? undefined : items.find((entry) => entry.item.id === focusedId);
+  if (measured) focusedRect = measured.rect;
+  // Ô đang chọn vẫn còn nhưng lần đo này hụt (UI bận, đo quá hạn): đi tiếp từ vị trí
+  // đã biết thay vì quay về ô mặc định — nếu không D-pad sẽ kẹt mãi ở chính ô này.
+  const node = focusedId === null ? undefined : nodes.get(focusedId);
+  const current = measured
+    ?? (node && focusedRect && node.layer === currentLayer() && !node.isDisabled()
+      ? { item: node, rect: focusedRect }
+      : undefined);
 
   // Lần bấm đầu sau khi chạm màn hình hoặc mở lớp mới: hiện tiêu điểm, chưa di chuyển.
   if (!padActive || !current) {
