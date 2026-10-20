@@ -8,6 +8,7 @@ import {
 } from 'react-native-webrtc';
 
 import { apiFetch } from '@/lib/api';
+import { WATCH_PARTY_LOCKED_MESSAGE } from '@/lib/feature-flags';
 import type { NativeMoonlightClient } from '@/lib/moonlight-native';
 import { realtimeChannels } from '@/lib/realtime-channels';
 import { createClient } from '@/lib/supabase';
@@ -175,7 +176,10 @@ export function useWatchPartyHost({
       setRoom({ sessionId, client, supabase });
       setMessage('Đã bật streaming cho người xem.');
     } catch (error) {
-      setMessage((error as Error).message || 'Chưa bật được streaming.');
+      const reason = (error as Error).message;
+      setMessage(reason?.includes('watch_party_disabled')
+        ? WATCH_PARTY_LOCKED_MESSAGE
+        : reason || 'Chưa bật được streaming.');
     } finally {
       setBusy(false);
     }
