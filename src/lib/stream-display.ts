@@ -50,12 +50,19 @@ export function parseHostDisplay(value: unknown): HostDisplay | null {
   };
 }
 
-/** No nearest-mode fallback: it can add borders or change an explicit choice. */
-export function virtualDisplayGeometry(host: HostDisplay, width: number, viewer: DisplayGeometry): DisplayGeometry {
+/**
+ * No nearest-mode fallback: it can add borders or change an explicit choice.
+ * Auto may step down to a smaller mode of the same shape — a phone panel such
+ * as 2796×1290 rarely has its own VDD mode, but 2340×1080 keeps it border-free.
+ */
+export function virtualDisplayGeometry(host: HostDisplay, width: number, viewer: DisplayGeometry, auto = false): DisplayGeometry {
   const height = width * viewer.height / viewer.width;
-  const mode = host.canSwitchResolution && host.modes?.find(mode =>
-    mode.width === width && Math.abs(mode.height - height) <= 2);
-  if (!mode) throw new Error(`Màn hình ảo chưa hỗ trợ ${width}×${Math.round(height)} đúng tỷ lệ thiết bị nhận. Hãy bổ sung chế độ hiển thị trên PC.`);
+  const modes = host.canSwitchResolution ? host.modes ?? [] : [];
+  const exact = modes.find(mode => mode.width === width && Math.abs(mode.height - height) <= 2);
+  const sameShape = auto ? modes.filter(mode => mode.width <= width
+    && Math.abs(mode.width / mode.height - viewer.width / viewer.height) < 0.009) : [];
+  const mode = exact ?? sameShape.reduce<HostDisplayMode | undefined>((best, mode) => !best || mode.width > best.width ? mode : best, undefined);
+  if (!mode) throw new Error(`Màn hình ảo chưa có mode ${width}×${Math.round(height)} hoặc mode nhỏ hơn đúng tỷ lệ thiết bị nhận. Hãy thêm mode này vào driver màn hình ảo trên PC rồi chạy lại setup.`);
   return { width: mode.width, height: mode.height };
 }
 

@@ -201,9 +201,10 @@ export function streamGeometryForTier(
   tierWidth: number,
   display: DisplayGeometry = clientDisplayGeometry(),
   host?: HostDisplay | null,
+  auto = false,
 ): DisplayGeometry {
   if (host) {
-    if (host.displayMode === 'virtual') return virtualDisplayGeometry(host, tierWidth, display);
+    if (host.displayMode === 'virtual') return virtualDisplayGeometry(host, tierWidth, display, auto);
     // A floor is explicit hardware policy. `/display` reports the mode at this
     // instant, which may be the temporary mode requested by another/previous
     // stream; treating host.width as a floor creates a resolution ratchet.

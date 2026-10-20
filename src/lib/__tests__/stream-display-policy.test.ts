@@ -233,6 +233,26 @@ test('VDD refuses missing size, shape and manually requested Hz instead of falli
   assert.throws(() => resolveMoonlightSettings({ ...settings, frame_rate: 144 }, null, vdd(), 144, { width: 2560, height: 1440 }), /144 Hz/);
 });
 
+const IPHONE_14_PRO_MAX = { width: 2796, height: 1290 };
+
+test('Auto on a 19.5:9 phone uses the native VDD mode, else the largest smaller mode of the same shape', () => {
+  const withMode = (...extra: { width: number; height: number; refreshRates: number[] }[]) =>
+    vdd({ ...VIRTUAL_PC, modes: [...VIRTUAL_PC.modes, ...extra] });
+  const native = resolveMoonlightSettings(completeSettings('user'), null,
+    withMode({ width: 2340, height: 1080, refreshRates: [60, 120] }, { width: 2796, height: 1290, refreshRates: [60, 120] }), 120, IPHONE_14_PRO_MAX);
+  assert.deepEqual(native.videoSizeCustom, IPHONE_14_PRO_MAX);
+  const shared = resolveMoonlightSettings(completeSettings('user'), null,
+    withMode({ width: 1920, height: 886, refreshRates: [60] }, { width: 2340, height: 1080, refreshRates: [60, 120] }), 120, IPHONE_14_PRO_MAX);
+  assert.deepEqual(shared.videoSizeCustom, { width: 2340, height: 1080 });
+  assert.equal(shared.fps, 120);
+});
+
+test('Auto on a phone still refuses a VDD without any mode of its shape', () => {
+  assert.throws(() => resolveMoonlightSettings(completeSettings('user'), null, vdd(), 120, IPHONE_14_PRO_MAX), /2796×1290/);
+  const larger = vdd({ ...VIRTUAL_PC, modes: [...VIRTUAL_PC.modes, { width: 3120, height: 1440, refreshRates: [60, 120] }] });
+  assert.throws(() => resolveMoonlightSettings(completeSettings('user'), null, larger, 120, IPHONE_14_PRO_MAX), /tỷ lệ/);
+});
+
 test('Auto only chooses a refresh rate supported at the selected VDD resolution', () => {
   const host = vdd({ ...VIRTUAL_PC, modes: [{ width: 2560, height: 1440, refreshRates: [60, 90, 120] }] });
   const stream = resolveMoonlightSettings(completeSettings('user'), { bandwidthMbps: 45 }, host, 120, { width: 2560, height: 1440 });

@@ -690,9 +690,9 @@ export function resolveMoonlightSettings(
 
   // Native Auto uses the panel's real pixels, including between-tier devices.
   // Explicit choices keep their requested width. VDD never inherits the local
-  // physical monitor's floor or silently substitutes a nearby mode.
+  // physical monitor's floor or silently substitutes a differently shaped mode.
   const { width, height } = hostDisplay?.displayMode === 'virtual' && settings.resolution === 'auto'
-    ? streamGeometryForTier(Math.min(RESOLUTION_SIZE[geometryResolution][0], display.width), display, hostDisplay)
+    ? streamGeometryForTier(Math.min(RESOLUTION_SIZE[geometryResolution][0], display.width), display, hostDisplay, true)
     : streamGeometryFor(geometryResolution, display, hostDisplay);
 
   // The bitrate tables are written for each tier's nominal 16:9 frame. A 16:10

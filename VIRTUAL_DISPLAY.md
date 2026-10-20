@@ -6,7 +6,7 @@ App mobile dùng vòng đời PC/Sunshine trong commit `ba94668` của repo cha.
 
 - Đọc `displayMode`, `displayState`, `watchdogReady`, `restoreVerified`, danh sách mode/Hz và các target thực sự active từ `/api/pc/display`.
 - Với profile VDD, chỉ chọn độ phân giải đúng tỷ lệ thiết bị nhận và Hz được công bố cho chính độ phân giải đó. 2560×1440/120 không bị giới hạn bởi panel vật lý 1920×1080/100. Màn 16:10 cần mode riêng, ví dụ 2560×1600/120.
-- Auto dùng kích thước pixel của thiết bị (có áp giới hạn khu vực), không làm tròn tablet 2732×2048 thành mode 3200 pixel. Auto FPS vẫn có thể giảm theo đường truyền và các Hz VDD hỗ trợ. Độ phân giải/FPS chọn thủ công không bị thay bằng mode gần nhất.
+- Auto dùng kích thước pixel của thiết bị (có áp giới hạn khu vực), không làm tròn tablet 2732×2048 thành mode 3200 pixel. Nếu VDD không có đúng mode pixel gốc, Auto dùng mode lớn nhất cùng tỷ lệ và không vượt pixel gốc (iPhone 14 Pro Max 2796×1290 → 2340×1080). Auto FPS vẫn có thể giảm theo đường truyền và các Hz VDD hỗ trợ. Độ phân giải/FPS chọn thủ công không bị thay bằng mode gần nhất.
 - Không kéo giãn video của profile VDD để che viền. Driver thiếu mode đúng kích thước/tỷ lệ/Hz sẽ báo lỗi; cần thêm mode vào cấu hình driver rồi chạy lại setup PC để quét capabilities.
 - Trước claim, kiểm tra readiness. Sau claim, đọc lại readiness. Trước khi mở game qua cổng `live`, kiểm tra một target VDD active, đúng kích thước và Hz thực tế. Frame nhận được sai kích thước sẽ dừng và release phiên.
 - Không đọc được agent sẽ dừng kết nối, tránh đoán nhầm cấu hình màn hình vật lý khi VDD đang lỗi.
