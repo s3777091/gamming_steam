@@ -33,7 +33,7 @@ const hooks = registerHooks({
 });
 const { completeSettings, clientDisplayGeometry, fetchStreamSettingsDefaults, resolveMoonlightSettings } = await import('../stream-settings.ts');
 const { displayRefreshHz } = await import('../display-refresh.ts');
-const { applyStreamHostPolicy, streamHostReadinessIssue } = await import('../stream-host-policy.ts');
+const { applyStreamHostPolicy, applyStreamTargetTransportPolicy, streamHostReadinessIssue } = await import('../stream-host-policy.ts');
 const { assertVirtualDisplayStream, parseHostDisplay } = await import('../stream-display.ts');
 hooks.deregister();
 
@@ -282,3 +282,12 @@ test('applied VDD must be the single active target at the exact requested size a
     { current: [{ ...size, refreshHz: 120 }, { ...size, refreshHz: 120 }] },
   ]) assert.throws(() => assertVirtualDisplayStream({ ...active, ...changes }, size, 120));
 });
+
+for (const target of ['pc', 'vm'] as const) {
+  for (const codec of ['auto', 'av1', 'hevc', 'h264'] as const) {
+    test(`native ${target} preserves ${codec} for device capability negotiation`, () => {
+      const transport = resolveMoonlightSettings({ ...completeSettings('user'), codec }, null, null, 60);
+      assert.equal(applyStreamTargetTransportPolicy(transport, target).videoCodec, codec === 'hevc' ? 'h265' : codec);
+    });
+  }
+}

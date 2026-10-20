@@ -23,7 +23,7 @@
     },
     "android": {
       "package": "cloud.protexa.jetsona.console",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#080c12",
         "foregroundImage": "./assets/android-icon-foreground.png",

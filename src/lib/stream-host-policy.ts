@@ -32,19 +32,12 @@ export const MINIMUM_VM_STREAM_MODE = { width: 1920, height: 1080 } as const;
 // desktop (and all of its UI) physically small.
 export const VM_ASPECT_RESOLUTION_FLOOR_WIDTH = 1600;
 
-/**
- * Moonlight-Web v2.10 advertises AV1 Main10 in Auto even for an SDR stream.
- * Sunshine then selects that format, WebRTC and RTP both connect, but Chromium
- * never presents the first keyframe. H.264 is the codec all three installed
- * Sunshine targets and supported browsers agree on, so keep the user-facing
- * Auto setting while advertising the reliable wire codec for every target.
- */
+/** Native codec negotiation is gated by RTCRtpReceiver capabilities. */
 export function applyStreamTargetTransportPolicy(
   transport: StreamTransportConfig,
   _targetId: StreamTargetId,
 ): StreamTransportConfig {
-  if (transport.videoCodec === 'h264') return transport;
-  return { ...transport, videoCodec: 'h264' };
+  return transport;
 }
 
 export type StreamHostReadinessIssue =

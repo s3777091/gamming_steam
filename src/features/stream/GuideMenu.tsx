@@ -38,6 +38,7 @@ import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { ControlPopover, type PopoverAnchor } from '@/features/control-center/ControlPopover';
 import { DevicesPanel, NotificationsPanel, ProfilePanel, UserAvatar } from '@/features/control-center/ControlCenterPanels';
 import type { PendingGameLaunch } from '@/lib/game-launch';
+import { WATCH_PARTY_ENABLED, WATCH_PARTY_LOCKED_MESSAGE } from '@/lib/feature-flags';
 import { uploadGameScreenshot } from '@/lib/game-screenshots';
 import { PC_ROUTES, pcFetch } from '@/lib/pc-api';
 import { rememberStreamGame } from '@/lib/stream-resume';
@@ -76,6 +77,8 @@ type DockAction = {
   popover?: PopoverId;
   badge?: number | string | null;
   dot?: boolean;
+  /** Tính năng bị khóa: icon mờ, bấm chỉ báo lý do. */
+  locked?: boolean;
   run?: () => void;
 };
 
@@ -221,6 +224,10 @@ export function GuideMenu({
   }), [games, hasFrame, launch?.title, run]);
 
   const toggleStreaming = useCallback(() => {
+    if (!WATCH_PARTY_ENABLED) {
+      setToastMessage(WATCH_PARTY_LOCKED_MESSAGE);
+      return;
+    }
     const toggle = () => {
       if (watchParty.live) {
         watchParty.stop();
@@ -332,6 +339,7 @@ export function GuideMenu({
       icon: Radio,
       run: toggleStreaming,
       dot: watchParty.live,
+      locked: !WATCH_PARTY_ENABLED,
     },
     {
       id: 'shot',
@@ -520,7 +528,7 @@ export function GuideMenu({
                     disabled={Boolean(busy)}
                     onPress={() => onSelectDockAction(action, index)}
                     pressScale={0.92}
-                    accessibilityLabel={action.label}
+                    accessibilityLabel={action.locked ? `${action.label} (đã khóa)` : action.label}
                     style={[
                       styles.dockIconBtn,
                       {
@@ -558,7 +566,9 @@ export function GuideMenu({
                         color={
                           action.id === 'stream' && watchParty.live
                             ? '#57eda4'
-                            : action.danger
+                            : action.locked
+                              ? 'rgba(255,255,255,0.28)'
+                              : action.danger
                               ? '#f87171'
                               : lit
                                 ? '#ffffff'
