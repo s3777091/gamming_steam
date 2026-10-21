@@ -17,6 +17,7 @@ public final class JetsonaInputModule: Module {
   private var buttonStates: [Int: [String: Bool]] = [:]
   private var engines: [Int: CHHapticEngine] = [:]
   private var players: [Int: any CHHapticPatternPlayer] = [:]
+  private var speakerRouteActive = false
   private var speakerOverridden = false
   // iOS posts no notification when a controller's battery changes, and it often
   // reads the level only some time after connect. Re-check while the app is open.
@@ -81,21 +82,11 @@ public final class JetsonaInputModule: Module {
     Function("openWifiSettings") { self.main { self.openSettings() } }
     Function("startSpeakerRoute") {
       self.main {
-        let audio = AVAudioSession.sharedInstance()
-        // Preserve Bluetooth/wired headphones. WebRTC manages category/activation.
-        if audio.currentRoute.outputs.contains(where: { $0.portType == .builtInReceiver }) {
-          do { try audio.overrideOutputAudioPort(.speaker); self.speakerOverridden = true } catch {}
-        }
+        self.speakerRouteActive = true
+        self.applySpeakerRoute()
       }
     }
-    Function("stopSpeakerRoute") {
-      self.main {
-        if self.speakerOverridden {
-          try? AVAudioSession.sharedInstance().overrideOutputAudioPort(.none)
-          self.speakerOverridden = false
-        }
-      }
-    }
+    Function("stopSpeakerRoute") { self.main { self.stopSpeakerRoute() } }
     Function("describeDevice") { (_: Int) -> [String: Any]? in nil }
     Function("getDisplayInfo") { self.main { self.displayInfo() } }
     // UIKit screenshots do not reliably include RTC Metal video surfaces.
@@ -113,11 +104,36 @@ public final class JetsonaInputModule: Module {
     return result
   }
 
+  // onAudioReady can arrive before WebRTC activates its voice-chat route.
+  // Keep the request alive and retry on route changes instead of checking once.
+  private func applySpeakerRoute() {
+    guard speakerRouteActive, foreground else { return }
+    let audio = AVAudioSession.sharedInstance()
+    // Only replace the built-in receiver; preserve the user's external output.
+    guard audio.currentRoute.outputs.contains(where: { $0.portType == .builtInReceiver }) else { return }
+    do {
+      try audio.overrideOutputAudioPort(.speaker)
+      speakerOverridden = true
+    } catch {
+      NSLog("[JetsonaAudio] Speaker route failed: %@", error.localizedDescription)
+    }
+  }
+
+  private func stopSpeakerRoute() {
+    // Clear first: removing our override also posts a route-change notification.
+    speakerRouteActive = false
+    if speakerOverridden {
+      try? AVAudioSession.sharedInstance().overrideOutputAudioPort(.none)
+      speakerOverridden = false
+    }
+  }
+
   private func resume() {
     foreground = true
     JetsonaInputViewController.appActive = true
     JetsonaInputViewController.current?.updateInputPolicy()
     refreshDevices()
+    applySpeakerRoute()
   }
 
   private func attach() {
@@ -131,6 +147,7 @@ public final class JetsonaInputModule: Module {
                  AVAudioSession.routeChangeNotification] {
       observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
         self?.refreshDevices()
+        self?.applySpeakerRoute()
       })
     }
     batteryTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
@@ -307,6 +324,7 @@ public final class JetsonaInputModule: Module {
   }
 
   private func detach() {
+    stopSpeakerRoute()
     releaseInput()
     JetsonaInputViewController.captureMode = "off"
     JetsonaInputViewController.pointerRequested = false
