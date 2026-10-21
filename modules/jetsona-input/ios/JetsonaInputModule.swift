@@ -44,14 +44,10 @@ public final class JetsonaInputModule: Module {
         JetsonaInputViewController.current?.updateInputPolicy()
       }
     }
-    OnAppEntersForeground {
-      self.main {
-        self.foreground = true
-        JetsonaInputViewController.appActive = true
-        JetsonaInputViewController.current?.updateInputPolicy()
-        self.refreshDevices()
-      }
-    }
+    // willEnterForeground is not posted on a cold launch, so also resume on
+    // didBecomeActive; otherwise input stays muted until the app is reopened.
+    OnAppEntersForeground { self.main { self.resume() } }
+    OnAppBecomesActive { self.main { self.resume() } }
     Function("getDevices") {
       self.main {
         // Reconcile with iOS even if a connect notification was missed. Avoid
@@ -117,9 +113,17 @@ public final class JetsonaInputModule: Module {
     return result
   }
 
+  private func resume() {
+    foreground = true
+    JetsonaInputViewController.appActive = true
+    JetsonaInputViewController.current?.updateInputPolicy()
+    refreshDevices()
+  }
+
   private func attach() {
     guard observers.isEmpty else { return }
-    foreground = UIApplication.shared.applicationState == .active
+    // The module is created during launch while the app is still `.inactive`.
+    foreground = UIApplication.shared.applicationState != .background
     JetsonaInputViewController.appActive = foreground
     for name in [Notification.Name.GCControllerDidConnect, .GCControllerDidDisconnect,
                  .GCKeyboardDidConnect, .GCKeyboardDidDisconnect,
