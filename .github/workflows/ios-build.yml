@@ -2,6 +2,14 @@ name: iOS unsigned IPA
 
 on:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: macOS runner (Intel fallback when ARM capacity is constrained)
+        type: choice
+        default: macos-26
+        options:
+          - macos-26
+          - macos-26-intel
   push:
     branches: [feat/theme-system]
     # Sửa tài liệu thì không cần .ipa mới.
@@ -30,7 +38,7 @@ jobs:
     # macos-15 mang Xcode Swift 6.1, mà ExpoModulesJSI của SDK 57 đòi Swift
     # tools 6.2 (Xcode 26) — build sẽ chết ở "Could not resolve package
     # dependencies". Dùng image mới hơn.
-    runs-on: macos-26
+    runs-on: ${{ inputs.runner || 'macos-26' }}
     timeout-minutes: 60
 
     steps:
