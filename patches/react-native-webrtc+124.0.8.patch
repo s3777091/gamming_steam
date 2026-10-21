@@ -1,0 +1,98 @@
+diff --git a/node_modules/react-native-webrtc/ios/RCTWebRTC/RTCVideoViewManager.m b/node_modules/react-native-webrtc/ios/RCTWebRTC/RTCVideoViewManager.m
+--- a/node_modules/react-native-webrtc/ios/RCTWebRTC/RTCVideoViewManager.m
++++ b/node_modules/react-native-webrtc/ios/RCTWebRTC/RTCVideoViewManager.m
+@@ -19,6 +19,41 @@
+ #import "RTCVideoViewManager.h"
+ #import "WebRTCModule.h"
+ 
++/**
++ * RTCMTLVideoView skips any frame whose timeStampNs equals the last frame it
++ * drew. Remote tracks rendered with zero playout delay stamp every decoded
++ * frame with the same render time, so the view kept the first frame on screen
++ * while the decoder went on decoding. Restamp repeats so every frame is drawn.
++ */
++@interface RTCVideoViewFrameStamper : NSObject<RTCVideoRenderer>
++
++@property(nonatomic, weak) id<RTCVideoRenderer> target;
++
++@end
++
++@implementation RTCVideoViewFrameStamper {
++    int64_t _lastTimeStampNs;
++}
++
++- (void)setSize:(CGSize)size {
++    [self.target setSize:size];
++}
++
++- (void)renderFrame:(nullable RTCVideoFrame *)frame {
++    if (!frame) {
++        return;
++    }
++    int64_t timeStampNs = frame.timeStampNs;
++    if (timeStampNs <= _lastTimeStampNs) {
++        timeStampNs = _lastTimeStampNs + 1;
++        frame = [[RTCVideoFrame alloc] initWithBuffer:frame.buffer rotation:frame.rotation timeStampNs:timeStampNs];
++    }
++    _lastTimeStampNs = timeStampNs;
++    [self.target renderFrame:frame];
++}
++
++@end
++
+ /**
+  * Implements an equivalent of {@code HTMLVideoElement} i.e. Web's video
+  * element.
+@@ -53,6 +88,11 @@
+ @property(nonatomic, readonly) RTCMTLVideoView *videoView;
+ #endif
+ 
++/**
++ * The renderer added to {@link #videoTrack}; forwards to {@link #videoView}.
++ */
++@property(nonatomic, readonly) RTCVideoViewFrameStamper *frameStamper;
++
+ // Add a reference to the view manager
+ @property(nonatomic, weak) RTCVideoViewManager *viewManager;
+ 
+@@ -90,11 +130,11 @@
+     if (videoTrack) {
+         if (self.window) {
+             dispatch_async(_module.workerQueue, ^{
+-                [videoTrack addRenderer:self.videoView];
++                [videoTrack addRenderer:self.frameStamper];
+             });
+         } else {
+             dispatch_async(_module.workerQueue, ^{
+-                [videoTrack removeRenderer:self.videoView];
++                [videoTrack removeRenderer:self.frameStamper];
+             });
+         }
+     }
+@@ -116,6 +156,8 @@
+         RTCMTLVideoView *subview = [[RTCMTLVideoView alloc] initWithFrame:CGRectZero];
+         _videoView = subview;
+ #endif
++        _frameStamper = [[RTCVideoViewFrameStamper alloc] init];
++        _frameStamper.target = _videoView;
+         _objectFit = RTCVideoViewObjectFitCover;
+         [self addSubview:self.videoView];
+         self.videoView.delegate = self;
+@@ -248,7 +290,7 @@
+     if (oldValue != videoTrack) {
+         if (oldValue) {
+             dispatch_async(_module.workerQueue, ^{
+-                [oldValue removeRenderer:self.videoView];
++                [oldValue removeRenderer:self.frameStamper];
+             });
+         }
+ 
+@@ -292,7 +334,7 @@
+         // See "didMoveToWindow" above.
+         if (videoTrack && self.window) {
+             dispatch_async(_module.workerQueue, ^{
+-                [videoTrack addRenderer:self.videoView];
++                [videoTrack addRenderer:self.frameStamper];
+             });
+         }
+     }
