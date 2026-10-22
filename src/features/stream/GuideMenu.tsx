@@ -36,6 +36,8 @@ import { addListener, exportFrame, releaseFrame } from 'jetsona-input';
 
 import { useInputDevices } from '@/features/devices/useInputDevices';
 import { formatClock } from '@/features/library/format';
+import type { Direction } from '@/features/gamepad/focus';
+import { navDirection, REPEAT_DELAY_MS, REPEAT_INTERVAL_MS } from '@/features/gamepad/navigation';
 import { useNotifications } from '@/features/library/useNotifications';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { MappingProfilesPanel, type MappingSession } from '@/features/key-mapping/MappingProfilesPanel';
@@ -485,18 +487,65 @@ export function GuideMenu({
         return;
       }
 
-      // D-pad trên dock
-      if (event.button === 'left' || event.button === 'right') {
-        playUiSound('navigate');
-        const step = event.button === 'left' ? -1 : 1;
-        setDockFocus(Math.min(current.dockActions.length - 1, Math.max(0, current.dockFocus + step)));
-        current.closePopover();
-      } else if (event.button === 'a') {
+      if (event.button === 'a') {
         playUiSound('select');
         const act = current.dockActions[current.dockFocus];
         if (act) current.onSelectDockAction(act, current.dockFocus);
       }
     });
+  }, [open]);
+
+  // Trái/phải trên dock: đọc cả D-pad lẫn cần trái như màn chính (giữ để lặp).
+  // Chỉ nghe nút D-pad thì người quen dùng cần trái thấy menu "đơ".
+  useEffect(() => {
+    if (!open) return;
+    const directions = new Map<number, Direction | null>();
+    let held: Direction | null = null;
+    let repeat: ReturnType<typeof setTimeout> | undefined;
+
+    const step = (direction: Direction) => {
+      const current = stateRef.current;
+      if (current.popover?.id === 'mapping' || current.confirmExit) return;
+      if (direction !== 'left' && direction !== 'right') return;
+      const next = Math.min(current.dockActions.length - 1, Math.max(0, current.dockFocus + (direction === 'left' ? -1 : 1)));
+      if (next === current.dockFocus) return;
+      playUiSound('navigate');
+      // stateRef chỉ cập nhật sau render; ghi ngay để nhịp lặp kế tiếp đi tiếp từ ô mới.
+      current.dockFocus = next;
+      setDockFocus(next);
+      current.closePopover();
+    };
+    const hold = (next: Direction | null) => {
+      if (next === held) return;
+      held = next;
+      clearTimeout(repeat);
+      if (!next) return;
+      step(next);
+      const tick = () => {
+        if (held !== next) return;
+        step(next);
+        repeat = setTimeout(tick, REPEAT_INTERVAL_MS);
+      };
+      repeat = setTimeout(tick, REPEAT_DELAY_MS);
+    };
+
+    const offState = addListener('onGamepadState', (state) => {
+      directions.set(state.deviceId, navDirection(state, directions.get(state.deviceId) ?? null));
+      let next: Direction | null = null;
+      for (const direction of directions.values()) {
+        if (direction) { next = direction; break; }
+      }
+      hold(next);
+    });
+    const offDevices = addListener('onDevicesChanged', () => {
+      directions.clear();
+      hold(null);
+    });
+    return () => {
+      offState();
+      offDevices();
+      clearTimeout(repeat);
+    };
   }, [open]);
 
   if (!open) return null;
