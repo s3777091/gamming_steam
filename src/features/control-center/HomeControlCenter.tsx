@@ -7,10 +7,11 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, StyleSheet, View } from 'react-native';
-import { Bell, Gamepad2, Home, Play, Power, UserRound, X, type LucideIcon } from 'lucide-react-native';
+import { Bell, Gamepad2, Home, Keyboard, Play, Power, UserRound, X, type LucideIcon } from 'lucide-react-native';
 
 import { FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
+import { useVirtualKeyboardState } from '@/features/stream/VirtualKeyboard';
 import type { LocalDevice } from '@/features/devices/useInputDevices';
 import { formatClock } from '@/features/library/format';
 import type { AppNotification } from '@/features/library/types';
@@ -35,6 +36,7 @@ type DockItem = {
   icon: LucideIcon;
   popover?: PopoverId;
   badge?: number | string | null;
+  dot?: boolean;
   danger?: boolean;
   run?: () => void;
 };
@@ -65,6 +67,7 @@ export function HomeControlCenter({
   const styles = useStyles();
   const { s, insets } = useUi();
   const { reduceMotion } = useMotion();
+  const virtualKeyboard = useVirtualKeyboardState();
   const [mounted, setMounted] = useState(open);
   const [fade] = useState(() => new Animated.Value(0));
   const [clock, setClock] = useState(() => formatClock(new Date()));
@@ -143,6 +146,16 @@ export function HomeControlCenter({
     { id: 'home', label: 'Home', icon: Home, run: onClose },
     ...(game ? [{ id: 'game', label: `Tiếp tục ${game.title}`, icon: Gamepad2, run: () => onResume(game) }] : []),
     {
+      id: 'keyboard',
+      label: virtualKeyboard.open ? 'Bàn phím ảo (Đang bật)' : 'Bàn phím ảo',
+      icon: Keyboard,
+      dot: virtualKeyboard.open,
+      run: () => {
+        virtualKeyboard.toggle();
+        onClose();
+      },
+    },
+    {
       id: 'notifications',
       label: 'Thông báo',
       icon: Bell,
@@ -182,9 +195,9 @@ export function HomeControlCenter({
               onPress={() => onResume(game)}
               pressScale={0.98}
               accessibilityLabel={`Tiếp tục ${game.title}`}
-              style={[styles.gameCard, { width: s(360), height: s(176), borderRadius: s(22) }]}
+              style={[styles.gameCard, { width: s(360), height: s(176), borderRadius: s(22), overflow: 'visible' }]}
             >
-              {game.heroUrl ? <Img source={{ uri: game.heroUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
+              {game.heroUrl ? <Img source={{ uri: game.heroUrl }} style={[StyleSheet.absoluteFill, { borderRadius: s(22) }]} contentFit="cover" /> : null}
               <CardSurface shade radius={s(22)} />
               <View style={[styles.cardTag, { top: s(12), left: s(12), paddingHorizontal: s(8), paddingVertical: s(3), borderRadius: s(8), gap: s(5) }]}>
                 <View style={[styles.greenDot, { width: s(6), height: s(6), borderRadius: s(3) }]} />
@@ -264,7 +277,7 @@ export function HomeControlCenter({
                     <View style={styles.badge}>
                       <T size={8.5} weight="bold" color="#ffffff" tabular>{item.badge}</T>
                     </View>
-                  ) : item.id === 'game' ? (
+                  ) : item.id === 'game' || item.dot ? (
                     <View style={styles.liveDot} />
                   ) : null}
                 </Press>
@@ -291,7 +304,7 @@ export function HomeControlCenter({
           icon={popoverShown === 'devices' ? Gamepad2 : popoverShown === 'profile' ? UserRound : Bell}
           width={popoverShown === 'notifications' ? 360 : 320}
           action={popoverShown === 'notifications' && unreadCount > 0 ? (
-            <Press onPress={onMarkAllRead} hitSlop={8}>
+            <Press onPress={onMarkAllRead} hitSlop={8} style={{ paddingHorizontal: s(8), paddingVertical: s(4), borderRadius: s(10) }}>
               <T size={10} weight="semibold" color={colors.accentSoft}>Đánh dấu đã đọc</T>
             </Press>
           ) : null}

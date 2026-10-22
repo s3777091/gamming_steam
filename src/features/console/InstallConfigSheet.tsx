@@ -137,7 +137,7 @@ export function InstallConfigSheet({ download, imageUrl, notice, onAnswer, onClo
           </View>
 
           <T size={9.4} weight="semibold" color={colors.text3} tracking={0.06} style={{ marginTop: s(12), marginBottom: s(6) }}>NƠI CÀI ĐẶT</T>
-          <FocusScroll style={{ flexGrow: 0, maxHeight: s(150) }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: s(6) }}>
+          <FocusScroll style={{ flexGrow: 0, maxHeight: s(162), marginHorizontal: -s(6), marginVertical: -s(6) }} showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: s(6), padding: s(6) }}>
             {config.folders.map((entry) => (
               <FolderRow
                 key={entry.index}

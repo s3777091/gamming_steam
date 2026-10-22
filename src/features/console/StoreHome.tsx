@@ -149,7 +149,7 @@ const ShelfCard = memo(function ShelfCard({ item, previewing, onPreview, onOpen 
 
   return (
     <View>
-      <Press onPress={preview} onFocused={preview} autoFocus={previewing} focusRadius={s(previewing ? 20 : 12)} pressScale={0.98} accessibilityLabel={`Chọn ${item.name}`}>
+      <Press onPress={preview} onFocused={preview} autoFocus={previewing} focusRadius={s(previewing ? 20 : 12)} pressScale={0.98} accessibilityLabel={`Chọn ${item.name}`} style={{ marginBottom: previewing ? 0 : s(4) }}>
         <Animated.View
           style={[
             styles.card,
@@ -157,7 +157,7 @@ const ShelfCard = memo(function ShelfCard({ item, previewing, onPreview, onOpen 
               borderRadius: s(previewing ? 20 : 12),
               width: s(previewing ? PREVIEW.w : IDLE.w),
               height: s(previewing ? PREVIEW.h : IDLE.h),
-              marginBottom: previewing ? 0 : s(4),
+              marginBottom: 0,
               borderColor: previewing ? glass.cardBorderActive : glass.cardBorder,
               opacity: selection.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }),
               transform: [
@@ -167,7 +167,7 @@ const ShelfCard = memo(function ShelfCard({ item, previewing, onPreview, onOpen 
             },
           ]}
         >
-          <Img source={{ uri: item.largeImage }} style={StyleSheet.absoluteFill} contentFit="cover" />
+          <Img source={{ uri: item.largeImage }} style={[StyleSheet.absoluteFill, { borderRadius: s(12) }]} contentFit="cover" />
           <CardSurface selected={previewing} radius={s(previewing ? 20 : 12)} />
           {previewing ? (
             <>
@@ -228,9 +228,9 @@ const PromotionTile = memo(function PromotionTile({ promotion, onOpen }: { promo
   const styles = useStyles();
   const { s } = useUi();
   return (
-    <Press onPress={onOpen} pressScale={0.99} accessibilityLabel={`Xem khuyến mãi ${promotion.name}`} style={[styles.tile, { flex: 1.25, borderRadius: s(12) }]}>
-      <Img source={{ uri: promotion.image }} style={StyleSheet.absoluteFill} contentFit="cover" />
-      <LinearGradient colors={[alpha(colors.panelSolid, 0.94), alpha(colors.panelSolid, 0.48), alpha(colors.panelSolid, 0)]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
+    <Press onPress={onOpen} pressScale={0.99} accessibilityLabel={`Xem khuyến mãi ${promotion.name}`} style={[styles.tile, { flex: 1.25, borderRadius: s(12), overflow: 'visible' }]}>
+      <Img source={{ uri: promotion.image }} style={[StyleSheet.absoluteFill, { borderRadius: s(12) }]} contentFit="cover" />
+      <LinearGradient colors={[alpha(colors.panelSolid, 0.94), alpha(colors.panelSolid, 0.48), alpha(colors.panelSolid, 0)]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={[StyleSheet.absoluteFill, { borderRadius: s(12) }]} />
       <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, maxWidth: '72%', justifyContent: 'center', padding: s(10) }}>
         <T size={10.2} weight="semibold" leading={1.15} numberOfLines={2}>{promotion.name}</T>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(4), marginTop: s(4) }}>
@@ -253,10 +253,10 @@ const QuickDealTile = memo(function QuickDealTile({ item, previewing, onPreview 
       onFocused={preview}
       pressScale={0.99}
       accessibilityLabel={`Chọn ${item.name}`}
-      style={[styles.tile, { flex: 1, borderRadius: s(12), borderColor: previewing ? glass.cardBorderActive : glass.cardBorder }]}
+      style={[styles.tile, { flex: 1, borderRadius: s(12), borderColor: previewing ? glass.cardBorderActive : glass.cardBorder, overflow: 'visible' }]}
     >
-      <Img source={{ uri: item.largeImage }} style={StyleSheet.absoluteFill} contentFit="cover" />
-      <LinearGradient colors={[alpha(colors.panelSolid, 0.84), alpha(colors.panelSolid, 0.24), alpha(colors.panelSolid, 0)]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
+      <Img source={{ uri: item.largeImage }} style={[StyleSheet.absoluteFill, { borderRadius: s(12) }]} contentFit="cover" />
+      <LinearGradient colors={[alpha(colors.panelSolid, 0.84), alpha(colors.panelSolid, 0.24), alpha(colors.panelSolid, 0)]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={[StyleSheet.absoluteFill, { borderRadius: s(12) }]} />
       <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, maxWidth: '72%', justifyContent: 'center', padding: s(10) }}>
         <T size={9.3} weight="semibold" color="rgba(255,255,255,0.92)" numberOfLines={1}>{item.name}</T>
         <T size={8.6} weight="semibold" color={item.discounted ? colors.accentGlow : 'rgba(255,255,255,0.78)'} style={{ marginTop: s(4) }}>
@@ -302,7 +302,7 @@ export const StoreHome = memo(function StoreHome({ data, featured, preview, onPr
   }, [center]);
 
   return (
-    <View style={{ flex: 1, justifyContent: 'flex-end', overflow: 'hidden', paddingBottom: s(2), paddingTop: s(4) }}>
+    <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: s(2), paddingTop: s(4) }}>
       <View style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: s(6) }}>
         <StorePreview item={preview} />
       </View>

@@ -152,12 +152,12 @@ export default function LoginScreen() {
                   </View>
                 </View>
                 {error ? <T size={11.2} color="#fecaca" leading={1.5} style={{ marginTop: s(10) }}>{error}</T> : null}
-                <Press onPress={() => void signIn()} disabled={busy} style={[styles.submit, { marginTop: s(18), height: s(46), borderRadius: s(23) }]}>
+                <Press onPress={() => void signIn()} disabled={busy} style={[styles.submit, { marginTop: s(18), height: s(46), borderRadius: s(23), overflow: 'visible' }]}>
                   <LinearGradient
                     colors={['rgba(255,255,255,0.45)', 'rgba(255,255,255,0.05)', 'transparent']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
-                    style={[StyleSheet.absoluteFill, { height: '55%' }]}
+                    style={[StyleSheet.absoluteFill, { height: '55%', borderTopLeftRadius: s(23), borderTopRightRadius: s(23) }]}
                     pointerEvents="none"
                   />
                   {busy ? <ActivityIndicator color="#0a111c" /> : <T size={13.4} weight="bold" color="#0a111c">Đăng nhập</T>}

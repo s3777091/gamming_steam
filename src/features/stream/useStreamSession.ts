@@ -8,7 +8,7 @@
 //  - Cài đặt đọc theo loại màn hình (điện thoại / lớn) như bản web mới.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import { ensureClientDeviceId } from '@/lib/client-device';
 import { detectRegion } from '@/lib/detect-region';
@@ -454,6 +454,9 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
         );
         clientRef.current = activeClient;
         setClient(activeClient);
+        // Establish iOS routing before WebRTC starts its audio unit. ontrack
+        // only reports track metadata and can race audio-session activation.
+        if (Platform.OS === 'ios') startSpeakerRoute();
         activeClient.start();
         heartbeatTimer = setInterval(() => { void heartbeat(); }, 5_000);
       } catch (error) {
@@ -466,6 +469,7 @@ export function useStreamSession({ userId, attempt, onBackground, onSessionChang
     const appState = AppState.addEventListener('change', (next) => {
       if (next === 'background' && activeHandle && !disposed) {
         activeClient?.stop();
+        stopSpeakerRoute();
         setStreamFrameRate(0);
         activeClient = null;
         clientRef.current = null;

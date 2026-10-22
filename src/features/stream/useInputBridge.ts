@@ -22,6 +22,7 @@ import { GUIDE_BUTTON, listenGuideButton } from '@/features/gamepad/guideButton'
 import { webCodeForKeyCode, vkForWebCode } from '@/features/settings/keycodes';
 import { applyDeadzone, type HostShortcutAction, type InputSettings } from '@/lib/input-settings';
 import type { NativeMoonlightClient } from '@/lib/moonlight-native';
+import type { MappingRuntime } from '@/features/key-mapping/runtime';
 
 const MAX_SLOTS = 16;
 // Mọi cờ nút Moonlight mà tay cầm Android có thể báo (không gồm paddle/touchpad).
@@ -39,6 +40,7 @@ type Options = {
   guideOpen: boolean;
   onGuide: () => void;
   onShortcut: (action: HostShortcutAction) => void;
+  mapping?: MappingRuntime;
 };
 
 function swapFaceButtons(buttons: number): number {
@@ -64,7 +66,7 @@ function adjust(state: NativeGamepadState, settings: InputSettings) {
 
 const NEUTRAL = { buttons: 0, lt: 0, rt: 0, lx: 0, ly: 0, rx: 0, ry: 0 };
 
-export function useInputBridge({ client, inputReady, live, settingsRef, guideOpen, onGuide, onShortcut }: Options): {
+export function useInputBridge({ client, inputReady, live, settingsRef, guideOpen, onGuide, onShortcut, mapping }: Options): {
   nativeIdForSlot: (slot: number) => number | undefined;
 } {
   const { devices } = useInputDevices();
@@ -74,15 +76,18 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
   const guideOpenRef = useRef(guideOpen);
   const onGuideRef = useRef(onGuide);
   const onShortcutRef = useRef(onShortcut);
+  const mappingRef = useRef(mapping);
+  const mappedState = (state: NativeGamepadState) => adjust({ ...state, ...(mappingRef.current?.filter(state) ?? state) }, settingsRef.current);
 
   useEffect(() => {
+    mappingRef.current = mapping;
     clientRef.current = client;
     inputReadyRef.current = inputReady;
     liveRef.current = live;
     guideOpenRef.current = guideOpen;
     onGuideRef.current = onGuide;
     onShortcutRef.current = onShortcut;
-  }, [client, inputReady, live, guideOpen, onGuide, onShortcut]);
+  }, [client, inputReady, live, guideOpen, mapping, onGuide, onShortcut]);
 
   const slots = useRef(new Map<number, number>());
   const latest = useRef(new Map<number, NativeGamepadState>());
@@ -105,14 +110,15 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
     const last = latest.current.get(nativeId);
     target.sendControllerState(
       slot,
-      last && !guideOpenRef.current ? adjust(last, settingsRef.current) : NEUTRAL,
+      last && !guideOpenRef.current ? mappedState(last) : NEUTRAL,
     );
     // ViGEmBus cần 100-300ms để Windows nhận diện virtual device xusb, gửi lại state để game không bỏ sót
     const resend = () => {
+      if (target !== clientRef.current || !liveRef.current || !inputReadyRef.current || slots.current.get(nativeId) !== slot) return;
       const current = latest.current.get(nativeId);
       target.sendControllerState(
         slot,
-        current && !guideOpenRef.current ? adjust(current, settingsRef.current) : NEUTRAL,
+        current && !guideOpenRef.current ? mappedState(current) : NEUTRAL,
       );
     };
     setTimeout(resend, 150);
@@ -131,7 +137,7 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
     const settings = settingsRef.current;
     target.sendControllerState(
       slot,
-      !state || guideOpenRef.current ? NEUTRAL : adjust(state, settings),
+      !state || guideOpenRef.current ? NEUTRAL : adjust({ ...state, ...(mappingRef.current?.filter(state) ?? state) }, settings),
     );
   };
 
@@ -151,6 +157,7 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
     for (const [nativeId, slot] of Array.from(slots.current)) {
       const stillAttached = presentNativeIds.has(nativeId) || nativeDevices.some((d) => d.nativeId === nativeId && d.kind === 'controller');
       if (!stillAttached) {
+        mappingRef.current?.disconnect(nativeId);
         client.sendControllerRemove(slot);
         slots.current.delete(nativeId);
         latest.current.delete(nativeId);
@@ -174,7 +181,7 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
         const last = latest.current.get(nativeId);
         target.sendControllerState(
           slot,
-          last ? adjust(last, settingsRef.current) : NEUTRAL,
+          last ? mappedState(last) : NEUTRAL,
         );
       }
     }, 1000);
@@ -193,7 +200,11 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
     if (!live) return;
     const off = addListener('onGamepadState', (raw) => {
       // View / Select là nút mở menu của app: game trên PC không thấy nút này.
-      const state = raw.buttons & GUIDE_BUTTON ? { ...raw, buttons: raw.buttons & ~GUIDE_BUTTON } : raw;
+      const state = raw.buttons & GUIDE_BUTTON ? { ...raw, buttons: raw.buttons & ~(GUIDE_BUTTON | 0x0010) } : raw;
+      if (inputReadyRef.current && liveRef.current) {
+        if (raw.buttons & GUIDE_BUTTON) mappingRef.current?.setPaused(true);
+        mappingRef.current?.process(state.deviceId, state);
+      }
       latest.current.set(state.deviceId, state);
       sendPad(state.deviceId, state);
     });
@@ -220,7 +231,7 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
 
   // Bàn phím và chuột vật lý.
   useEffect(() => {
-    if (!live) return;
+    if (!live || guideOpen) return;
     const held = new Set<string>();
     let hostDown = false;
     const consumed = new Set<string>();
@@ -262,6 +273,7 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
     const offMouse = addListener('onMouse', (event) => {
       const target = clientRef.current;
       if (!target) return;
+      mappingRef.current?.cancel();
       const settings = settingsRef.current;
       if (event.type === 'move') {
         target.sendMouseMove(event.dx * settings.mouseSensitivity, event.dy * settings.mouseSensitivity);
@@ -283,7 +295,7 @@ export function useInputBridge({ client, inputReady, live, settingsRef, guideOpe
       held.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [live]);
+  }, [live, guideOpen]);
 
   // Chuột vật lý: pointer capture để có chuyển động tương đối, không kẹt mép màn.
   const hasMouse = devices.some((device) => device.kind === 'mouse');

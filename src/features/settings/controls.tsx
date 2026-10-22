@@ -560,7 +560,7 @@ export function ActionRow({
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 0.65 }}
             pointerEvents="none"
-            style={StyleSheet.absoluteFill}
+            style={[StyleSheet.absoluteFill, { borderRadius: s(14) }]}
           />
           {busy ? (
             <Animated.View
@@ -690,7 +690,7 @@ export function Keycap({
         shadowOpacity: 0.15,
         shadowRadius: 2,
         elevation: 1,
-        overflow: 'hidden',
+        overflow: 'visible',
       }}
     >
       <LinearGradient
@@ -698,7 +698,7 @@ export function Keycap({
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 0.7 }}
         pointerEvents="none"
-        style={StyleSheet.absoluteFill}
+        style={[StyleSheet.absoluteFill, { borderRadius: s(14) }]}
       />
       <T
         size={10.2}
@@ -763,7 +763,7 @@ export function PillButton({
         borderWidth: 1,
         borderColor: border,
         opacity: disabled ? 0.4 : 1,
-        overflow: 'hidden',
+        overflow: 'visible',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: tone === 'accent' ? 0.35 : 0.15,
@@ -776,7 +776,7 @@ export function PillButton({
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 0.8 }}
         pointerEvents="none"
-        style={StyleSheet.absoluteFill}
+        style={[StyleSheet.absoluteFill, { borderRadius: s(14) }]}
       />
       {typeof children === 'string' ? (
         <T size={10.4} weight="semibold" color={fg}>

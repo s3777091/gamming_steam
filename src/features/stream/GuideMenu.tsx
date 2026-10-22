@@ -20,8 +20,10 @@ import {
   Bell,
   Camera,
   Copy,
+  SlidersHorizontal,
   Gamepad2,
   Home,
+  Keyboard,
   LogOut,
   Power,
   Radio,
@@ -36,6 +38,7 @@ import { useInputDevices } from '@/features/devices/useInputDevices';
 import { formatClock } from '@/features/library/format';
 import { useNotifications } from '@/features/library/useNotifications';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
+import { MappingProfilesPanel, type MappingSession } from '@/features/key-mapping/MappingProfilesPanel';
 import { ControlPopover, type PopoverAnchor } from '@/features/control-center/ControlPopover';
 import { DevicesPanel, NotificationsPanel, ProfilePanel, UserAvatar } from '@/features/control-center/ControlCenterPanels';
 import type { PendingGameLaunch } from '@/lib/game-launch';
@@ -53,6 +56,7 @@ import { T } from '@/ui/Text';
 
 import type { BorderOrigin as StreamBorderOrigin } from './StreamLiveBorder';
 import type { WatchPartyState } from './useWatchPartyHost';
+import { useVirtualKeyboardState } from './VirtualKeyboard';
 
 export type RunningGame = {
   id: string;
@@ -65,7 +69,7 @@ export type RunningGame = {
   processCount: number;
 };
 
-type PopoverId = 'notifications' | 'devices' | 'profile';
+type PopoverId = 'notifications' | 'devices' | 'profile' | 'mapping';
 
 /** Game sắp thoát, để màn stream diễn hoạt cảnh thoát bằng đúng artwork của nó. */
 export type ExitingGame = { gameId: string | null; title: string; heroUrl: string | null; logoUrl: string | null };
@@ -96,6 +100,9 @@ export function GuideMenu({
   onReload,
   onExitGame,
   onStreamOrigin,
+  mapping,
+  onRunningGameChange,
+  retainFrame = false,
 }: {
   open: boolean;
   profile: { name: string; avatarUrl: string | null; email?: string | null } | null;
@@ -112,6 +119,9 @@ export function GuideMenu({
   onExitGame: (game: ExitingGame) => void;
   /** Toạ độ (trong cửa sổ) của nút Streaming lúc bấm — tâm của viền xanh. */
   onStreamOrigin?: (origin: StreamBorderOrigin) => void;
+  mapping: MappingSession;
+  onRunningGameChange: (gameId: string | null) => void;
+  retainFrame?: boolean;
 }) {
   const { colors, glass, material } = useTheme();
   const styles = useStyles();
@@ -119,6 +129,7 @@ export function GuideMenu({
   const fade = useMemo(() => new Animated.Value(0), []);
   const { devices } = useInputDevices();
   const { unreadCount, notifications, markAllAsRead } = useNotifications();
+  const virtualKeyboard = useVirtualKeyboardState();
 
   const [games, setGames] = useState<RunningGame[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -163,11 +174,12 @@ export function GuideMenu({
       const data = await response.json().catch(() => null) as { ok?: boolean; games?: RunningGame[]; error?: string } | null;
       if (response.ok && data?.ok && Array.isArray(data.games)) {
         setGames(data.games);
+        onRunningGameChange(data.games.find(game => game.active)?.id ?? null);
       }
     } catch {
       // Giữ im lặng, không spam toast lỗi làm phiền trải nghiệm
     }
-  }, []);
+  }, [onRunningGameChange]);
 
   const prevOpenRef = useRef(open);
   useEffect(() => {
@@ -178,9 +190,9 @@ export function GuideMenu({
     prevOpenRef.current = open;
     if (!open) {
       fade.setValue(0);
-      releaseFrame();
+      if (!retainFrame) releaseFrame();
     }
-  }, [fade, loadGames, open]);
+  }, [fade, loadGames, open, retainFrame]);
 
   const run = useCallback(async (key: string, task: () => Promise<void>, success?: string) => {
     if (busy) return;
@@ -317,6 +329,17 @@ export function GuideMenu({
       dot: true,
       run: handleClose,
     },
+    { id: 'mapping', label: 'Thiết lập nút', icon: SlidersHorizontal, popover: 'mapping', dot: Boolean(mapping.active) },
+    {
+      id: 'keyboard',
+      label: virtualKeyboard.open ? 'Bàn phím ảo (Đang bật)' : 'Bàn phím ảo',
+      icon: Keyboard,
+      dot: virtualKeyboard.open,
+      run: () => {
+        virtualKeyboard.toggle();
+        handleClose();
+      },
+    },
     {
       id: 'notifications',
       label: 'Thông báo',
@@ -364,7 +387,7 @@ export function GuideMenu({
       danger: true,
       run: () => setConfirmExit(true),
     },
-  ], [batteryPercent, devices.length, gameTitle, handleClose, onHome, rememberedHero, rememberedId, rememberedLogo, onReload, profile?.name, takeScreenshot, toggleStreaming, totalNotifs, watchParty.live]);
+  ], [mapping.active, virtualKeyboard, batteryPercent, devices.length, gameTitle, handleClose, onHome, rememberedHero, rememberedId, rememberedLogo, onReload, profile?.name, takeScreenshot, toggleStreaming, totalNotifs, watchParty.live]);
 
   const onSelectDockAction = useCallback((action: DockAction, index: number) => {
     setDockFocus(index);
@@ -412,6 +435,7 @@ export function GuideMenu({
     return addListener('onGamepadButton', (event) => {
       if (!event.down) return;
       const current = stateRef.current;
+      if (current.popover?.id === 'mapping') return;
 
       // Nút B: Quay lại / Đóng menu
       if (event.button === 'b') {
@@ -595,17 +619,19 @@ export function GuideMenu({
       <ControlPopover
         open={popover !== null}
         anchor={popover?.anchor ?? null}
-        title={popoverShown === 'devices' ? 'Thiết bị' : popoverShown === 'profile' ? 'Tài khoản' : 'Thông báo'}
-        icon={popoverShown === 'devices' ? Gamepad2 : popoverShown === 'profile' ? UserRound : Bell}
-        width={popoverShown === 'notifications' ? 360 : 320}
+        title={popoverShown === 'mapping' ? 'Thiết lập nút' : popoverShown === 'devices' ? 'Thiết bị' : popoverShown === 'profile' ? 'Tài khoản' : 'Thông báo'}
+        icon={popoverShown === 'mapping' ? SlidersHorizontal : popoverShown === 'devices' ? Gamepad2 : popoverShown === 'profile' ? UserRound : Bell}
+        width={popoverShown === 'mapping' ? 450 : popoverShown === 'notifications' ? 360 : 320}
         action={popoverShown === 'notifications' && unreadCount > 0 ? (
-          <Press onPress={() => void markAllAsRead()} hitSlop={8}>
+          <Press onPress={() => void markAllAsRead()} hitSlop={8} style={{ paddingHorizontal: s(8), paddingVertical: s(4), borderRadius: s(10) }}>
             <T size={10} weight="semibold" color={colors.accentSoft}>Đánh dấu đã đọc</T>
           </Press>
         ) : null}
         onClose={closePopover}
       >
-        {popoverShown === 'devices' ? (
+        {popoverShown === 'mapping' ? (
+          <MappingProfilesPanel open={open && popover?.id === 'mapping'} gameId={activeGame?.id ?? null} mapping={mapping} onNotice={setToastMessage} onClose={closePopover} />
+        ) : popoverShown === 'devices' ? (
           <DevicesPanel devices={devices} />
         ) : popoverShown === 'profile' ? (
           <ProfilePanel

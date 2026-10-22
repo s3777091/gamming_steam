@@ -197,7 +197,7 @@ function Button({
           width: '100%',
           paddingHorizontal: s(isPrimary || isSuccess ? 18 : 16),
           borderRadius: s(21),
-          gap: s(7),
+          gap: s(7), overflow: 'visible',
         },
         disabled && { opacity: 0.45 },
       ]}
@@ -210,7 +210,7 @@ function Button({
           left: 0,
           right: 0,
           height: StyleSheet.hairlineWidth,
-          backgroundColor: isPrimary ? 'rgba(255,255,255,0.6)' : isSuccess ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.18)',
+          backgroundColor: isPrimary ? 'rgba(255,255,255,0.6)' : isSuccess ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.18)', marginHorizontal: s(10),
         }}
         pointerEvents="none"
       />

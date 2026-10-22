@@ -245,7 +245,7 @@ function Bar({ label, value, signed }: { label: string; value: number; signed?: 
           backgroundColor: 'rgba(255, 255, 255, 0.08)',
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: 'rgba(255, 255, 255, 0.12)',
-          overflow: 'hidden',
+          overflow: 'visible',
         }}
       >
         <View
@@ -633,7 +633,7 @@ function KeyCapture({
         borderWidth: 1,
         borderColor: listening ? alpha(colors.accent, 0.45) : 'rgba(255, 255, 255, 0.18)',
         backgroundColor: listening ? alpha(colors.primary, 0.22) : 'rgba(255, 255, 255, 0.08)',
-        overflow: 'hidden',
+        overflow: 'visible',
       }}
     >
       <T

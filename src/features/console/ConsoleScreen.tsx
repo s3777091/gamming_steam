@@ -13,6 +13,7 @@ import { useSignedInUser } from '@/features/auth';
 import { resetFocusToTab } from '@/features/gamepad/focus';
 import { useBack, useGamepadTabs, useGuide } from '@/features/gamepad/hooks';
 import { HomeControlCenter } from '@/features/control-center/HomeControlCenter';
+import { VirtualKeyboard } from '@/features/stream/VirtualKeyboard';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useCaptureMode } from '@/features/gamepad/captureMode';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
@@ -322,6 +323,8 @@ export default function ConsoleScreen() {
 
   const openStoreGame = useCallback((item: SteamStoreItem) => {
     searchInputRef.current?.blur();
+    setPanel(null);
+    setMenuOpen(false);
     setSelectedPromotion(null);
     setSelectedStoreItem(item);
   }, []);
@@ -342,7 +345,7 @@ export default function ConsoleScreen() {
     setDeviceMenuOpen(false);
   }, [activeTab]);
 
-  const anyOverlay = Boolean(settingsCategory || selectedStoreItem || selectedPromotion || panel || menuOpen || storeSearchOpen || powerOpen || remoteMenuOpen || deviceMenuOpen || uninstallTarget || purchase.visible);
+  const anyOverlay = Boolean(settingsCategory || selectedStoreItem || selectedPromotion || panel || menuOpen || storeSearchOpen || powerOpen || remoteMenuOpen || deviceMenuOpen || uninstallTarget || purchase.visible || controlCenterOpen);
 
   // Nút B / Back: đóng lớp trên cùng trước. Các panel tự đăng ký Back riêng; ở đây
   // chỉ cần xử lý những lớp do màn này sở hữu (menu, ô tìm kiếm).
@@ -373,6 +376,15 @@ export default function ConsoleScreen() {
     setPanel('profile');
     void profile.load();
   };
+
+  const openControlCenter = useCallback(() => {
+    setMenuOpen(false);
+    setRemoteMenuOpen(false);
+    setDeviceMenuOpen(false);
+    setPanel(null);
+    setStoreSearchOpen(false);
+    setControlCenterOpen(true);
+  }, []);
 
   const openNotifications = () => {
     setMenuOpen(false);
@@ -681,6 +693,7 @@ export default function ConsoleScreen() {
           onTabChange={switchTab}
           steamProfile={library.steamProfile}
           onOpenProfile={openProfile}
+          onOpenControlCenter={openControlCenter}
           onOpenSettings={openSettings}
           onOpenNotifications={openNotifications}
           unreadCount={notifications.unreadCount}
@@ -900,6 +913,18 @@ export default function ConsoleScreen() {
           onResume={resumeGame}
           onClose={() => setControlCenterOpen(false)}
         />
+
+        {!controlCenterOpen ? (
+          <VirtualKeyboard
+            onLocalText={(ch) => {
+              if (!storeSearchOpen && activeTab === 'store') setStoreSearchOpen(true);
+              pressStoreKey(ch);
+            }}
+            onLocalBackspace={eraseStoreKey}
+            onLocalSubmit={submitStoreSearch}
+            onLocalEscape={() => setStoreSearchOpen(false)}
+          />
+        ) : null}
       </View>
     </GlassBlurProvider>
   );

@@ -36,7 +36,7 @@ export function PanelHeader({ title, subtitle, leading, icon: Icon, action, onCl
       {action}
       <Press onPress={onClose} sound="back" accessibilityLabel="Đóng"
         style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center',
-          backgroundColor: glass.control, borderWidth: 1, borderColor: glass.controlBorder, overflow: 'hidden' }}>
+          backgroundColor: glass.control, borderWidth: 1, borderColor: glass.controlBorder }}>
         <GlassBackdrop material="control" radius={s(16)} />
         <X size={s(15)} color={colors.text2} strokeWidth={1.8} />
       </Press>

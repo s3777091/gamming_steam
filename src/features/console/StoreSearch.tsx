@@ -62,7 +62,7 @@ export function StoreSearchField({ open, query, inputRef, onOpen, onQueryChange,
       style={[
         styles.field,
         {
-          height: fieldHeight,
+          height: fieldHeight, overflow: open ? 'hidden' : 'visible',
           borderRadius: fieldRadius,
           width: grow.interpolate({ inputRange: [0, 1], outputRange: [fieldHeight, openWidth] }),
           borderColor: grow.interpolate({
@@ -203,10 +203,10 @@ const SearchResultCard = memo(function SearchResultCard({ item, onOpen }: { item
   const open = useCallback(() => onOpen(item), [item, onOpen]);
   const cardWidth = Math.min(s(106), Math.max(s(86), width * 0.11));
   return (
-    <Press onPress={open} pressScale={0.97} accessibilityLabel={item.name} style={[styles.result, { width: cardWidth, borderRadius: s(14) }]}>
+    <Press onPress={open} pressScale={0.97} accessibilityLabel={item.name} style={[styles.result, { width: cardWidth, borderRadius: s(14), overflow: 'visible' }]}>
       <Img
         source={{ uri: item.portraitImage || item.smallImage || item.largeImage }}
-        style={StyleSheet.absoluteFill}
+        style={[StyleSheet.absoluteFill, { borderRadius: s(14) }]}
         contentFit="cover"
         recyclingKey={String(item.appId)}
       />
@@ -257,7 +257,7 @@ const SearchResults = memo(function SearchResults({ query, search, onOpenGame }:
   if (search.error) return <SearchMessage icon={WifiOff} title="Không thể tìm kiếm lúc này" detail={search.error} />;
   if (!search.results.length) return <SearchMessage icon={Search} title="Không tìm thấy game phù hợp" detail="Thử một tên ngắn hơn hoặc kiểm tra lại chính tả." />;
   return (
-    <FocusScroll horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: s(8), paddingHorizontal: s(2) }}>
+    <FocusScroll horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -s(4), marginVertical: -s(6) }} contentContainerStyle={{ gap: s(8), paddingHorizontal: s(6), paddingVertical: s(6) }}>
       {search.results.map((item) => <SearchResultCard key={item.appId} item={item} onOpen={onOpenGame} />)}
     </FocusScroll>
   );
@@ -280,7 +280,7 @@ function Key({ label, onPress, flex = 1, accent = false, disabled = false }: {
         {
           flex,
           height: s(31),
-          borderRadius: s(9),
+          borderRadius: s(9), overflow: 'visible',
           backgroundColor: accent
             ? (disabled ? 'rgba(255,255,255,0.1)' : colors.accent)
             : 'rgba(255,255,255,0.065)',
@@ -302,7 +302,7 @@ function Key({ label, onPress, flex = 1, accent = false, disabled = false }: {
           left: 0,
           right: 0,
           height: StyleSheet.hairlineWidth,
-          backgroundColor: 'rgba(255,255,255,0.22)',
+          backgroundColor: 'rgba(255,255,255,0.22)', marginHorizontal: s(3),
         }}
         pointerEvents="none"
       />
@@ -381,7 +381,7 @@ export function StoreSearchPanel({ query, search, onOpenGame, onKey, onErase, on
             {search.loading ? 'Đang tìm...' : trimmed.length >= 2 ? `${search.total} game` : ''}
           </T>
         </View>
-        <View style={{ flex: 1, overflow: 'hidden' }}>
+        <View style={{ flex: 1, overflow: 'visible' }}>
           <SearchResults query={trimmed} search={search} onOpenGame={onOpenGame} />
         </View>
       </View>

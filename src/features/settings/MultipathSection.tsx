@@ -241,7 +241,7 @@ export function MultipathSection() {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     setShowDisconnectConfirm((prev) => !prev);
                   }}
-                  style={styles.secondaryInteractiveRow}
+                  style={[styles.secondaryInteractiveRow, { paddingHorizontal: 8, paddingVertical: 6, marginHorizontal: -8, marginVertical: -6, borderRadius: 10 }]}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10), flex: 1 }}>
                     <View style={styles.secondaryIconBadge}>
@@ -573,7 +573,7 @@ export function MultipathSection() {
 
                     <Press
                       disabled={connecting}
-                      focusVariant="card"
+                      focusVariant="row"
                       focusRadius={s(8)}
                       pressScale={0.96}
                       onPress={() => void handleConnect()}
@@ -618,7 +618,7 @@ export function MultipathSection() {
                       {/* Icon con mắt bật/tắt mật khẩu */}
                       <Press
                         onPress={() => setShowPassword((prev) => !prev)}
-                        focusVariant="card"
+                        focusVariant="row"
                         focusRadius={s(14)}
                         pressScale={0.92}
                         style={styles.eyeBtn}
@@ -637,7 +637,7 @@ export function MultipathSection() {
                           (isManual && (!manualSsid.trim() || isManualConflict)) ||
                           (!isManual && !selectedWifi)
                         }
-                        focusVariant="card"
+                        focusVariant="row"
                         focusRadius={s(8)}
                         pressScale={0.96}
                         onPress={() => void handleConnect()}
@@ -671,7 +671,7 @@ export function MultipathSection() {
                       openCaptivePortal();
                     }}
                     focusVariant="row"
-                    style={styles.captivePortalLink}
+                    focusRadius={8} style={[styles.captivePortalLink, { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }]}
                   >
                     <Globe size={s(11)} color={appleColors.blue} />
                     <T size={10.2} color={appleColors.blue}>

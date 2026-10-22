@@ -88,9 +88,21 @@ export function Press({
     },
   });
 
-  const isAutoRow = box.w >= 160 && box.w / Math.max(1, box.h) >= 2.6 && box.h <= 76;
+  const flatStyle = StyleSheet.flatten(style);
+  const padH = Number(flatStyle?.paddingHorizontal ?? flatStyle?.paddingLeft ?? flatStyle?.padding ?? 0);
+  const isWideStrip = box.w >= 160 && box.w / Math.max(1, box.h) >= 2.6 && box.h <= 88;
+  const isAutoRow =
+    isWideStrip &&
+    box.h <= 76 &&
+    flatStyle?.borderRadius === undefined &&
+    focusRadius === undefined &&
+    padH >= 10;
   const isRow = focusVariant === 'row' || (focusVariant === 'auto' && isAutoRow);
-  const focusGrow = isRow ? 1 : Math.min(1.045, Math.max(1.01, 1 + FOCUS_GROW_DP / Math.max(1, box.w)));
+  const focusGrow = isRow
+    ? 1
+    : isWideStrip
+      ? 1.008
+      : Math.min(1.045, Math.max(1.01, 1 + FOCUS_GROW_DP / Math.max(1, box.w)));
   useEffect(() => {
     if (reduceMotion) {
       focusScale.setValue(1);
@@ -126,7 +138,6 @@ export function Press({
   }, [focusScale, scale]);
 
   const ringVariant = focusVariant === 'auto' ? (isRow ? 'row' : 'card') : focusVariant;
-  const flatStyle = StyleSheet.flatten(style);
   const radius =
     focusRadius ??
     (flatStyle?.borderRadius !== undefined
@@ -134,7 +145,7 @@ export function Press({
       : isRow
         ? 0
         : 12);
-  const isCompact = (box.w > 0 && box.w <= 54 && box.h <= 54) || radius <= 18;
+  const isCompact = (box.h > 0 && box.h <= 88) || (box.w > 0 && box.w <= 88) || radius <= 18;
   const ring = focused || ringShown ? (
     <FocusRing
       radius={radius}

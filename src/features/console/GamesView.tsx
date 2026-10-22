@@ -226,7 +226,7 @@ const GameCard = memo(function GameCard({ game, active, achievements, onSelect, 
   const percent = data?.supported && data.total ? Math.round(((data.unlocked || 0) / data.total) * 100) : null;
   return (
     <View ref={active ? cardRef : undefined} collapsable={false}>
-    <Press onPress={select} onFocused={select} focusRadius={s(active ? 20 : 16)} focusVariant="glassCard" pressScale={0.98} accessibilityLabel={game.title}>
+    <Press onPress={select} onFocused={select} focusRadius={s(active ? 20 : 16)} focusVariant="glassCard" pressScale={0.98} accessibilityLabel={game.title} style={{ marginBottom: active ? 0 : s(8) }}>
       <Animated.View
         style={[
           styles.card,
@@ -234,7 +234,7 @@ const GameCard = memo(function GameCard({ game, active, achievements, onSelect, 
             borderRadius: s(active ? 20 : 16),
             width: s(active ? ACTIVE.w : IDLE.w),
             height: s(active ? ACTIVE.h : IDLE.h),
-            marginBottom: active ? 0 : s(8),
+            marginBottom: 0,
             borderColor: active ? glass.cardBorderActive : glass.cardBorder,
             opacity: selection.interpolate({ inputRange: [0, 1], outputRange: [0.76, 1] }),
             transform: [

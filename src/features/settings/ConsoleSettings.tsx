@@ -34,6 +34,7 @@ import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 import { AppearancePage } from './AppearancePage';
+import { MappingLibrary } from '@/features/key-mapping/MappingLibrary';
 import { PillButton } from './controls';
 import { AudioPage, ControllerPage, DevicesPage, KeyboardPage, MousePage } from './DevicePages';
 import { GameBoosterPage } from './GameBoosterPage';
@@ -48,6 +49,7 @@ export type SettingsCategory =
   | 'latency'
   | 'network'
   | 'booster'
+  | 'mapping'
   | 'devices'
   | 'controller'
   | 'mouse'
@@ -75,6 +77,7 @@ const CATEGORIES: {
   section: SettingsSection;
   color: keyof SettingsTokens;
 }[] = [
+  { id: 'mapping', label: 'Thiết lập nút', detail: 'Button Mapping · profile, ảnh gameplay và macro', icon: Gamepad2, section: 'game', color: 'teal' },
   { id: 'quality', label: 'Chất lượng stream', detail: 'Chọn profile hợp với cách bạn chơi', icon: Sparkles, section: 'streaming', color: 'purple' },
   { id: 'video', label: 'Hình ảnh', detail: 'Độ phân giải, FPS, codec, bitrate và lớp phủ', icon: MonitorPlay, section: 'streaming', color: 'blue' },
   { id: 'latency', label: 'Độ trễ & độ mượt', detail: 'Bộ đệm, frame pacing và V-Sync', icon: Gauge, section: 'streaming', color: 'orange' },
@@ -270,7 +273,9 @@ export default function ConsoleSettings({
   let page: ReactNode;
   if (meta.section !== 'streaming') {
     page =
-      category === 'booster' ? (
+      category === 'mapping' ? (
+        <MappingLibrary />
+      ) : category === 'booster' ? (
         <GameBoosterPage notify={notify} />
       ) : category === 'appearance' ? (
         <AppearancePage />
