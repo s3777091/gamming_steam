@@ -78,8 +78,8 @@ export function useInputDevices() {
     setBluetooth(getBluetooth());
   }, []);
 
-  /** Đọc lại ngay (không xin quyền). Native chỉ báo khi cắm/rút, không báo khi pin tụt,
-   *  nên gọi lúc người dùng mở menu thiết bị để % pin là số mới nhất. */
+  /** Đọc lại ngay (không xin quyền). Native chỉ đọc lại pin khi tay cầm được bấm (tối đa
+   *  mỗi phút một lần), nên gọi lúc người dùng mở menu thiết bị để % pin là số mới nhất. */
   const resync = useCallback(() => {
     setDevices(getDevices().map(toLocal));
   }, []);

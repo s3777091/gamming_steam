@@ -25,9 +25,11 @@ public final class JetsonaInputModule: Module {
     mode: AVAudioSession.Mode,
     options: AVAudioSession.CategoryOptions
   )?
-  // iOS posts no notification when a controller's battery changes, and it often
-  // reads the level only some time after connect. Re-check while the app is open.
-  private var batteryTimer: Timer?
+  // iOS posts no notification (and no KVO) when a controller's battery changes,
+  // and it often reads the level only some time after connect. Instead of a timer,
+  // re-read on controller input at most once per interval: an idle app does nothing.
+  private static let batteryCheckInterval: CFTimeInterval = 60
+  private var lastBatteryCheck: CFTimeInterval = 0
   private var reportedBatteries: [Int: Float] = [:]
 
   // Game Controller and UIKit are always accessed on the main queue, including
@@ -181,9 +183,6 @@ public final class JetsonaInputModule: Module {
         self?.applySpeakerRoute()
       })
     }
-    batteryTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-      self?.checkBatteries()
-    }
     refreshDevices()
   }
 
@@ -194,8 +193,10 @@ public final class JetsonaInputModule: Module {
     return battery.batteryLevel
   }
 
-  private func checkBatteries() {
-    guard foreground, !controllers.isEmpty else { return }
+  private func checkBatteriesIfDue() {
+    let now = CACurrentMediaTime()
+    guard now - lastBatteryCheck >= Self.batteryCheckInterval else { return }
+    lastBatteryCheck = now
     if controllers.mapValues(batteryLevel) != reportedBatteries {
       sendEvent("onDevicesChanged", ["devices": devices()])
     }
@@ -225,7 +226,9 @@ public final class JetsonaInputModule: Module {
       controllers[key] = controller
       controller.handlerQueue = .main
       controller.extendedGamepad?.valueChangedHandler = { [weak self, weak controller] _, _ in
-        guard let self, let controller, self.foreground, self.mode != "off" else { return }
+        guard let self, let controller, self.foreground else { return }
+        self.checkBatteriesIfDue()
+        guard self.mode != "off" else { return }
         self.emitController(controller, id: key)
       }
     }
@@ -362,8 +365,6 @@ public final class JetsonaInputModule: Module {
     JetsonaInputViewController.current?.updateInputPolicy()
     observers.forEach(NotificationCenter.default.removeObserver)
     observers.removeAll()
-    batteryTimer?.invalidate()
-    batteryTimer = nil
     reportedBatteries.removeAll()
     controllers.values.forEach { unbind($0) }
     mice.values.forEach { unbind($0) }

@@ -32,6 +32,7 @@ import android.view.WindowManager
 import android.view.Window
 import androidx.core.view.WindowCompat
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.ConcurrentHashMap
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import expo.modules.kotlin.Promise
@@ -71,6 +72,13 @@ class JetsonaInputModule : Module(), InputSink {
   private var lastHoverY = Float.NaN
 
   private val devicesDirty = Runnable { emitDevices() }
+
+  // Android không báo cho app khi pin tay cầm tụt (listener pin của InputManager là
+  // API ẩn dành cho app hệ thống). Thay vì hẹn giờ, đọc lại pin khi người dùng bấm
+  // nút tay cầm, tối đa mỗi BATTERY_CHECK_MS một lần: app không dùng thì không tốn gì.
+  // getDevices (luồng JS) ghi, onKey (luồng UI) đọc.
+  private val reportedBatteries = ConcurrentHashMap<Int, Double>()
+  private var lastBatteryCheck = 0L
 
   private var lastFrame: Bitmap? = null
   private var previousAudioMode: Int? = null
@@ -231,6 +239,9 @@ class JetsonaInputModule : Module(), InputSink {
       addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
       addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
       addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED)
+      // Hằng số bị @hide nhưng broadcast vẫn gửi tới app có BLUETOOTH_CONNECT. Chỉ
+      // tay cầm báo pin qua Bluetooth (BLE Battery Service) mới phát sự kiện này.
+      addAction(ACTION_BLUETOOTH_BATTERY_LEVEL_CHANGED)
     }
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
       context.registerReceiver(bluetoothReceiver, filter, Context.RECEIVER_EXPORTED)
@@ -296,13 +307,27 @@ class JetsonaInputModule : Module(), InputSink {
     }
   }
 
+  private fun checkBatteriesIfDue() {
+    val now = SystemClock.uptimeMillis()
+    if (now - lastBatteryCheck < BATTERY_CHECK_MS) return
+    lastBatteryCheck = now
+    val changed = reportedBatteries.any { (id, reported) ->
+      val device = InputDevice.getDevice(id)
+      device != null && batteryOf(device) != reported
+    }
+    if (changed) scheduleDevices()
+  }
+
   private fun listDevices(): List<Map<String, Any?>> {
     val result = ArrayList<Map<String, Any?>>()
     val bonded = bondedNames()
+    reportedBatteries.clear()
     for (id in InputDevice.getDeviceIds()) {
       val device = InputDevice.getDevice(id) ?: continue
       if (device.isVirtual && !isGamepadDevice(device)) continue
       val kind = classify(device) ?: continue
+      val battery = batteryOf(device)
+      if (kind == "controller") reportedBatteries[id] = battery
       result += mapOf(
         "id" to "input:$id",
         "nativeId" to id,
@@ -312,7 +337,7 @@ class JetsonaInputModule : Module(), InputSink {
         "vendorId" to device.vendorId,
         "productId" to device.productId,
         "bluetooth" to bonded.contains(device.name),
-        "battery" to batteryOf(device),
+        "battery" to battery,
         "rumble" to (kind == "controller" && vibratorFor(id) != null),
         "connected" to true,
       )
@@ -582,6 +607,7 @@ class JetsonaInputModule : Module(), InputSink {
     // 1) Tay cầm
     val isGamepadButtonEvent = isPad && isGamepadKey(keyCode)
     if (isGamepadButtonEvent) {
+      if (down) checkBatteriesIfDue()
       val pad = pad(event.deviceId)
       val name = PadButton.nameOf(keyCode)
       val changed = pad.applyKey(keyCode, down)
@@ -909,6 +935,9 @@ class JetsonaInputModule : Module(), InputSink {
     private const val MODE_UI = "ui"
     private const val MODE_STREAM = "stream"
     private const val MIN_AXIS_INTERVAL_MS = 8L
+    private const val BATTERY_CHECK_MS = 60_000L
+    private const val ACTION_BLUETOOTH_BATTERY_LEVEL_CHANGED =
+      "android.bluetooth.device.action.BATTERY_LEVEL_CHANGED"
 
     // Bit buttonState của Android -> số nút của Moonlight.
     private val BUTTON_MAP = listOf(
