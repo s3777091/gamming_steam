@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useIsFocused } from 'expo-router';
 import { addListener, getDevices, type GamepadButtonName } from 'jetsona-input';
 import {
   ChevronDown, ChevronUp, ClipboardList, ClipboardPaste, Copy, Keyboard as KeyboardIcon, Languages, Minus,
@@ -573,6 +574,9 @@ export function VirtualKeyboard({
   const { s, width, height, insets } = useUi();
   const { open, minimized, dock, dragOffset, language, clips, setOpen, setMinimized } = useVirtualKeyboardState();
   const remote = client !== undefined;
+  // Màn chính vẫn mount bên dưới màn stream: chỉ bản bàn phím của màn đang hiện mới
+  // được nghe tay cầm / Back, kẻo bản local ẩn bấm trùng (vd. đóng bàn phím) khi đang remote.
+  const focused = useIsFocused();
 
   const [shift, setShift] = useState(false);
   const [caps, setCaps] = useState(false);
@@ -649,8 +653,8 @@ export function VirtualKeyboard({
   }, []);
 
   useEffect(() => {
-    if (!open) sendReleaseModifiers();
-  }, [open, sendReleaseModifiers]);
+    if (!open || !focused) sendReleaseModifiers();
+  }, [focused, open, sendReleaseModifiers]);
 
   useEffect(() => () => sendReleaseModifiers(), [sendReleaseModifiers]);
 
@@ -1045,7 +1049,7 @@ export function VirtualKeyboard({
 
   // Bàn phím đang bung thì nó giữ tay cầm: màn chính thôi di chuyển tiêu điểm bên dưới,
   // màn stream thôi gửi tay cầm sang game (xem keyboardHoldsPad ở StreamScreen).
-  const controllerActive = open && !minimized;
+  const controllerActive = open && !minimized && focused;
   useSuspendCursor(controllerActive);
   // Màn chính: B / nút Back hệ thống đi qua ngăn xếp Back. Màn stream: chỉ nút Back hệ thống.
   useBack(back, controllerActive);
@@ -1100,7 +1104,7 @@ export function VirtualKeyboard({
     historyScrollRef.current?.scrollTo({ y: Math.max(0, (historyIndex - 1) * historyRowH), animated: true });
   }, [historyIndex, historyOpen, historyRowH]);
 
-  if (!open) return null;
+  if (!open || !focused) return null;
 
   // Khi thu gọn: chỉ hiện viên thuốc nhỏ gọn ở góc để người dùng thấy toàn bộ màn hình
   // trong lúc tìm & chấm vào con trỏ chuột cần nhập.
