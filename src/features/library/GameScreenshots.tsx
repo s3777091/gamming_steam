@@ -83,11 +83,11 @@ export function GameScreenshots() {
               onPress={() => setViewing(shot)}
               pressScale={0.96}
               accessibilityLabel={`Xem ${shot.name}`}
-              style={[styles.thumb, { width: s(150), height: s(84), borderRadius: s(12) }]}
+              style={[styles.thumb, { width: s(150), height: s(84), borderRadius: s(12), overflow: 'visible' }]}
             >
               <Image
                 source={screenshotImageSource(shot.path, state.headers)}
-                style={StyleSheet.absoluteFill}
+                style={[StyleSheet.absoluteFill, { borderRadius: s(11) }]}
                 contentFit="cover"
                 cachePolicy="memory-disk"
                 transition={180}

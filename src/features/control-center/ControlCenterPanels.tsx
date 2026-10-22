@@ -14,9 +14,10 @@ import type { AppNotification } from '@/features/library/types';
 import { getBackendBaseUrl } from '@/lib/config';
 import { listGameScreenshots } from '@/lib/game-screenshots';
 import { resolveProfileAvatarUri } from '@/lib/profile-avatar';
-import { alpha, makeStyles, useTheme } from '@/theme';
+import { makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useMotion } from '@/ui/motion';
+import { MENU_GLASS } from '@/ui/menuGlass';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
@@ -63,7 +64,6 @@ function Stagger({ index, children }: { index: number; children: React.ReactNode
 // ------------------------------------------------------------------ thiết bị
 
 function BatteryRing({ device, index }: { device: LocalDevice; index: number }) {
-  const { glass, colors } = useTheme();
   const { s } = useUi();
   const { reduceMotion } = useMotion();
   const size = s(58);
@@ -96,7 +96,7 @@ function BatteryRing({ device, index }: { device: LocalDevice; index: number }) 
       <View style={{ width: s(74), alignItems: 'center' }}>
         <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
           <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
-            <Circle cx={size / 2} cy={size / 2} r={radius} stroke={glass.border} strokeWidth={stroke} fill={alpha(colors.bgDeep, 0.4)} />
+            <Circle cx={size / 2} cy={size / 2} r={radius} stroke={MENU_GLASS.border} strokeWidth={stroke} fill={MENU_GLASS.inset} />
             <AnimatedCircle
               cx={size / 2}
               cy={size / 2}
@@ -296,18 +296,18 @@ export function ProfilePanel({
   );
 }
 
-const useStyles = makeStyles(({ colors, glass }) => ({
+const useStyles = makeStyles(() => ({
   inset: {
-    backgroundColor: glass.surfaceThin,
+    backgroundColor: MENU_GLASS.inset,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: glass.borderSubtle,
+    borderColor: MENU_GLASS.border,
   },
   empty: {
     alignItems: 'center',
-    backgroundColor: glass.surfaceThin,
+    backgroundColor: MENU_GLASS.inset,
   },
   row: { flexDirection: 'row', alignItems: 'center' },
-  thumb: { overflow: 'hidden', backgroundColor: glass.surface },
+  thumb: { overflow: 'hidden', backgroundColor: MENU_GLASS.control },
   dot: { backgroundColor: APPLE_GREEN },
-  rowIcon: { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary },
+  rowIcon: { alignItems: 'center', justifyContent: 'center', backgroundColor: MENU_GLASS.controlActive },
 }));

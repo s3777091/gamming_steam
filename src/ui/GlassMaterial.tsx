@@ -1,14 +1,40 @@
-import { createContext, useContext, type ReactNode, type RefObject } from 'react';
+import { createContext, memo, useContext, type ReactNode, type RefObject } from 'react';
 import { Platform, StyleSheet, View, type View as NativeView } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '@/theme';
 import { MaterialTexture } from '@/theme/decor/MaterialTexture';
+import { MENU_GLASS } from './menuGlass';
 
 type GlassMaterial = 'control' | 'panel' | 'scrim';
 
 const GlassBlurTargetContext = createContext<RefObject<NativeView | null> | null>(null);
+
+/** Blur the shared static backdrop once per floating panel; child controls use sheen only. */
+export const MenuGlassBackdrop = memo(function MenuGlassBackdrop({ radius = 18, variant = 'panel', blur = true }: {
+  radius?: number;
+  variant?: 'panel' | 'control';
+  blur?: boolean;
+}) {
+  const target = useContext(GlassBlurTargetContext);
+  const blurred = blur && variant === 'panel' && (Platform.OS !== 'android' || Boolean(target));
+  const fill = variant === 'control' ? MENU_GLASS.control
+    : blurred ? MENU_GLASS.panelTint : MENU_GLASS.panelFallback;
+  return (
+    <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+      style={[StyleSheet.absoluteFill, { borderRadius: radius, overflow: 'hidden' }]}>
+      {blurred ? <BlurView
+        blurTarget={target ?? undefined}
+        blurMethod={Platform.OS === 'android' ? 'dimezisBlurViewSdk31Plus' : 'none'}
+        blurReductionFactor={4} intensity={30} tint="systemUltraThinMaterialDark"
+        style={StyleSheet.absoluteFill} /> : null}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: fill }]} />
+      <LinearGradient colors={['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.045)', 'rgba(255,255,255,0.015)']}
+        locations={[0, 0.4, 1]} start={{ x: 0, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} />
+    </View>
+  );
+});
 
 /**
  * Android: mỗi BlurView blur LẠI TOÀN BỘ target ở độ phân giải gốc mỗi frame, dù bản thân

@@ -3,13 +3,14 @@ import { View, StyleSheet } from 'react-native';
 import { X, type LucideIcon } from 'lucide-react-native';
 
 import { useTheme } from '@/theme';
-import { GlassBackdrop } from './GlassMaterial';
+import { GlassBackdrop, MenuGlassBackdrop } from './GlassMaterial';
+import { MENU_GLASS } from './menuGlass';
 import { Press } from './Press';
 import { useUi } from './scale';
 import { T } from './Text';
 
 /** Tiêu đề và nút đóng chung cho menu game, panel chi tiết và Control Center. */
-export function PanelHeader({ title, subtitle, leading, icon: Icon, action, onClose, divider = true }: {
+export function PanelHeader({ title, subtitle, leading, icon: Icon, action, onClose, divider = true, appearance = 'theme' }: {
   title: ReactNode;
   subtitle?: ReactNode;
   leading?: ReactNode;
@@ -17,16 +18,18 @@ export function PanelHeader({ title, subtitle, leading, icon: Icon, action, onCl
   action?: ReactNode;
   onClose: () => void;
   divider?: boolean;
+  appearance?: 'theme' | 'glass';
 }) {
   const { colors, glass } = useTheme();
   const { s } = useUi();
+  const neutral = appearance === 'glass';
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10), paddingHorizontal: s(16), paddingVertical: s(12),
-      borderBottomWidth: divider ? StyleSheet.hairlineWidth : 0, borderBottomColor: glass.borderSubtle }}>
+      borderBottomWidth: divider ? StyleSheet.hairlineWidth : 0, borderBottomColor: neutral ? MENU_GLASS.border : glass.borderSubtle }}>
       {leading ?? (Icon ? (
         <View style={{ width: s(30), height: s(30), borderRadius: s(9), alignItems: 'center', justifyContent: 'center',
-          backgroundColor: glass.surfaceHighlight, borderWidth: StyleSheet.hairlineWidth, borderColor: glass.borderAccent }}>
-          <Icon size={s(16)} color={colors.accentSoft} strokeWidth={1.9} />
+          backgroundColor: neutral ? MENU_GLASS.inset : glass.surfaceHighlight, borderWidth: StyleSheet.hairlineWidth, borderColor: neutral ? MENU_GLASS.border : glass.borderAccent }}>
+          <Icon size={s(16)} color={neutral ? MENU_GLASS.ink : colors.accentSoft} strokeWidth={1.9} />
         </View>
       ) : null)}
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -35,9 +38,10 @@ export function PanelHeader({ title, subtitle, leading, icon: Icon, action, onCl
       </View>
       {action}
       <Press onPress={onClose} sound="back" accessibilityLabel="Đóng"
+        focusVariant={neutral ? 'quiet' : 'auto'}
         style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center',
-          backgroundColor: glass.control, borderWidth: 1, borderColor: glass.controlBorder, overflow: 'hidden' }}>
-        <GlassBackdrop material="control" radius={s(16)} />
+          backgroundColor: neutral ? 'transparent' : glass.control, borderWidth: 1, borderColor: neutral ? MENU_GLASS.border : glass.controlBorder }}>
+        {neutral ? <MenuGlassBackdrop variant="control" radius={s(16)} /> : <GlassBackdrop material="control" radius={s(16)} />}
         <X size={s(15)} color={colors.text2} strokeWidth={1.8} />
       </Press>
     </View>

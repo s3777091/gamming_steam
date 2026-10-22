@@ -17,6 +17,8 @@ import { GlassBackdrop } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
+import { ConsoleAction } from './ConsoleControls';
+import { CONSOLE } from './consoleVisuals';
 
 const WAKE_SLOW_MS = 90_000;
 const WAKE_TIMEOUT_MS = 10 * 60_000;
@@ -91,9 +93,8 @@ export function PcPowerSheet({ onClose, onReady }: { onClose: () => void; onRead
         <Pressable style={StyleSheet.absoluteFill} onPress={() => { playUiSound('back'); onClose(); }} />
       </View>
       <View style={[styles.card, { width: Math.min(s(400), width - s(48)), borderRadius: s(24), padding: s(22) }]}>
-        <GlassBackdrop material="panel" intensity={36} radius={s(24)} />
 
-        <Press onPress={onClose} sound="back" accessibilityLabel="Đóng" style={[styles.close, { top: s(12), right: s(12), width: s(30), height: s(30), borderRadius: s(15) }]}>
+        <Press onPress={onClose} sound="back" focusVariant="quiet" accessibilityLabel="Đóng" style={[styles.close, { top: s(12), right: s(12), width: s(30), height: s(30), borderRadius: s(10) }]}>
           <X size={s(14)} color="rgba(255,255,255,0.75)" />
         </Press>
         <View style={{ alignItems: 'center' }}>
@@ -104,10 +105,8 @@ export function PcPowerSheet({ onClose, onReady }: { onClose: () => void; onRead
           <T size={16} weight="semibold" style={{ marginTop: s(14), textAlign: 'center' }}>{title}</T>
           <T size={11.4} color={phase === 'failed' ? '#fecaca' : colors.text3} leading={1.55} style={{ marginTop: s(6), textAlign: 'center' }}>{detail}</T>
           {phase === 'idle' || phase === 'failed' ? (
-            <Press onPress={() => void wake()} sound="confirm" style={[styles.button, { marginTop: s(18), height: s(42), paddingHorizontal: s(22), borderRadius: s(21), gap: s(8) }]}>
-              <Power size={s(15)} color="#0a111c" />
-              <T size={12.4} weight="semibold" color="#0a111c">{phase === 'failed' ? 'Thử bật lại' : 'Bật máy tính'}</T>
-            </Press>
+            <ConsoleAction label={phase === 'failed' ? 'Thử bật lại' : 'Bật máy tính'} onPress={() => void wake()} autoFocus
+              style={{ marginTop: s(18), alignSelf: 'center' }} icon={<Power size={s(18)} color={CONSOLE.ink} />} />
           ) : null}
         </View>
       </View>
@@ -116,12 +115,12 @@ export function PcPowerSheet({ onClose, onReady }: { onClose: () => void; onRead
   );
 }
 
-const useStyles = makeStyles(({ colors, glass }) => ({
+const useStyles = makeStyles(() => ({
   card: {
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: glass.panelBorder,
-    backgroundColor: glass.modal,
+    borderColor: CONSOLE.border,
+    backgroundColor: CONSOLE.panel,
     shadowColor: '#000',
     shadowOpacity: 0.45,
     shadowRadius: 32,
@@ -132,9 +131,9 @@ const useStyles = makeStyles(({ colors, glass }) => ({
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: glass.control,
+    backgroundColor: CONSOLE.control,
     borderWidth: 1,
-    borderColor: glass.controlBorder,
+    borderColor: CONSOLE.border,
   },
   badge: {
     alignItems: 'center',
@@ -144,18 +143,6 @@ const useStyles = makeStyles(({ colors, glass }) => ({
     shadowColor: '#000',
     shadowOpacity: 0.2,
     shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.white,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.4)',
-    shadowColor: '#fff',
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
     shadowOffset: { width: 0, height: 2 },
   },
 }));

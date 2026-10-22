@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Animated, Easing, FlatList, Platform, StyleSheet, View, type ListRenderItemInfo, type ScrollViewProps } from 'react-native';
 import { FocusScroll, useSceneActive } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,43 +12,31 @@ import type { SteamDownloads } from '@/features/library/useSteamDownloads';
 import { type GameDownload, type GameUninstall, downloadForApp, primaryDownload, uninstallForApp } from '@/lib/steam-downloads';
 import { shelfItemLayout } from '@/lib/game-shelf-layout';
 import { nearbyBackdropUrls } from '@/lib/backdrop-preloader';
-import { alpha, CardSurface, makeStyles, useTheme } from '@/theme';
+import { alpha, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { useBackdropPreload } from '@/ui/useBackdropPreload';
 import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
-import { SeasonPlayButton } from '@/ui/SeasonPlayButton';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 import { DownloadStatusLine, ProgressRing, downloadInProgress } from './DownloadViews';
 import type { FlightRect } from './DownloadFlight';
+import { CONSOLE, CONSOLE_CARD } from './consoleVisuals';
+import { ConsoleAction, ConsoleHints } from './ConsoleControls';
+import { useConsoleRailScroll } from './useConsoleRailScroll';
 
 const GameTitle = memo(function GameTitle({ game }: { game: PcGame }) {
-  const { s, width } = useUi();
-  const { reduceMotion } = useMotion();
+  const { s, width, height } = useUi();
   const [failedLogo, setFailedLogo] = useState<string | null>(null);
   const logoUrl = game.art?.logoUrl && game.art.logoUrl !== failedLogo ? game.art.logoUrl : null;
-  const [enter] = useState(() => new Animated.Value(0));
-  useEffect(() => {
-    const animation = Animated.timing(enter, { toValue: 1, duration: reduceMotion ? 0 : 420, easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false });
-    animation.start();
-    return () => animation.stop();
-  }, [enter, reduceMotion]);
-
-  const maxHeight = Math.min(s(128), s(120));
-  const maxWidth = Math.min(s(384), width * 0.4);
+  const maxHeight = Math.min(s(90), height * 0.17);
+  const maxWidth = Math.min(s(292), width * 0.34);
   const ratio = game.art?.logoWidth && game.art?.logoHeight ? game.art.logoWidth / game.art.logoHeight : 2.4;
   const logoWidth = Math.min(maxWidth, maxHeight * ratio);
 
   return (
-    <Animated.View
-      style={{
-        flexShrink: 1,
-        opacity: enter,
-        transform: [{ translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
-      }}
-    >
+    <View style={{ flexShrink: 1 }}>
       {logoUrl ? (
         <Img
           source={{ uri: logoUrl }}
@@ -56,91 +44,73 @@ const GameTitle = memo(function GameTitle({ game }: { game: PcGame }) {
           style={{ width: logoWidth, height: logoWidth / ratio }}
           contentFit="contain"
           contentPosition="left"
+          transition={0}
           onError={() => setFailedLogo(logoUrl)}
         />
       ) : (
-        <T size={Math.min(54, Math.max(32, width * 0.054 / 1.4))} weight="semibold" tracking={-0.055} leading={0.98} numberOfLines={1}>
+        <T size={Math.min(42, Math.max(28, width * 0.043 / 1.4))} weight="semibold" color={CONSOLE.ink} tracking={-0.04} leading={1.1} numberOfLines={2}>
           {game.title}
         </T>
       )}
-    </Animated.View>
+    </View>
   );
 });
 
-function PrimaryAction({ library, download, uninstall, canControl, onPlay, onInstall, onDownloadPress, reachable }: {
+function primaryActionState({ library, download, uninstall, reachable }: {
   library: PcLibrary;
   download: GameDownload | null;
   uninstall: GameUninstall | null;
-  canControl: boolean;
-  onPlay: () => void;
-  onInstall: () => void;
-  onDownloadPress: () => void;
   reachable: boolean;
 }) {
-  const styles = useStyles();
-  const { s } = useUi();
-  const { active: appActive, reduceMotion } = useMotion();
-  const sceneActive = useSceneActive();
   const { selected, launchingId, installingId } = library;
   const installed = selected?.installed !== false;
   // Đang tải: nút thành vòng tiến trình; bấm để tạm dừng/tiếp tục hoặc xem điều khoản.
   const tracking = reachable && !installed && downloadInProgress(download) ? download : null;
   const uninstalling = uninstall && uninstall.status !== 'failed' && uninstall.status !== 'uninstalled' ? uninstall : null;
   const label = uninstalling ? uninstalling.label : tracking ? tracking.label
-    : !reachable ? 'Mở máy tính' : installed ? (launchingId ? 'Đang mở' : 'Play') : installingId ? 'Đang mở Steam' : 'Cài đặt';
-  const [pulse] = useState(() => new Animated.Value(1));
+    : !reachable ? 'Mở máy tính' : installed ? (launchingId ? 'Đang mở' : 'Chơi') : installingId ? 'Đang mở Steam' : 'Cài đặt';
   const busy = Boolean(launchingId || installingId || library.uninstallingId || uninstalling)
     || Boolean(tracking && ['preparing', 'working', 'queued', 'installed'].includes(tracking.status));
-  useEffect(() => {
-    if (!busy || !appActive || !sceneActive || reduceMotion) { pulse.setValue(1); return; }
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 0.55, duration: 600, useNativeDriver: true, isInteraction: false }),
-      Animated.timing(pulse, { toValue: 1, duration: 600, useNativeDriver: true, isInteraction: false }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, [appActive, busy, pulse, reduceMotion, sceneActive]);
+  return { installed, tracking, uninstalling, label, disabled: tracking ? false : busy };
+}
 
-  const size = s(44);
+function PrimaryAction({ action, canControl, reachable, onPress }: {
+  action: ReturnType<typeof primaryActionState>;
+  canControl: boolean;
+  reachable: boolean;
+  onPress: () => void;
+}) {
+  const { s } = useUi();
+  const { installed, tracking, uninstalling, label, disabled } = action;
   return (
-    <SeasonPlayButton
-      size={size}
-      seasonal={reachable && installed && !tracking && !uninstalling}
-      onPress={tracking ? onDownloadPress : !reachable || installed ? onPlay : onInstall}
-      sound="confirm"
-      disabled={tracking ? false : busy}
+    <ConsoleAction
+      label={label}
+      onPress={onPress}
+      disabled={disabled}
       autoFocus
-      accessibilityLabel={label}
-      style={[styles.play, { width: size, height: size, borderRadius: size / 2 }]}
-    >
-      {(ink) => (
-        <>
-          {uninstalling ? <ProgressRing size={size} percent={uninstalling.progress} /> : tracking ? <ProgressRing size={size} percent={tracking.percent} /> : null}
-          <Animated.View style={{ opacity: pulse }}>
+      icon={<View style={{ width: s(26), height: s(26), alignItems: 'center', justifyContent: 'center' }}>
+          {uninstalling ? <ProgressRing size={s(26)} percent={uninstalling.progress} /> : tracking ? <ProgressRing size={s(26)} percent={tracking.percent} /> : null}
             {uninstalling ? (
-              <Trash2 size={s(16)} color={ink} />
+              <Trash2 size={s(14)} color={CONSOLE.ink} />
             ) : tracking ? (
-              tracking.status === 'eula' ? <FileText size={s(17)} color={ink} />
-                : tracking.status === 'config' ? <HardDrive size={s(17)} color={ink} />
-                : tracking.status === 'downloading' && canControl ? <Pause size={s(16)} color={ink} fill={ink} />
-                  : <Download size={s(16)} color={ink} />
+              tracking.status === 'eula' ? <FileText size={s(13)} color={CONSOLE.ink} />
+                : tracking.status === 'config' ? <HardDrive size={s(13)} color={CONSOLE.ink} />
+                : tracking.status === 'downloading' && canControl ? <Pause size={s(12)} color={CONSOLE.ink} fill={CONSOLE.ink} />
+                  : <Download size={s(13)} color={CONSOLE.ink} />
             ) : !reachable ? (
-              <Monitor size={s(18)} color={ink} />
+              <Monitor size={s(18)} color={CONSOLE.ink} />
             ) : installed ? (
-              <Play size={s(18)} color={ink} fill={ink} style={{ marginLeft: s(2) }} />
+              <Play size={s(17)} color={CONSOLE.ink} fill={CONSOLE.ink} style={{ marginLeft: s(2) }} />
             ) : (
-              <Download size={s(18)} color={ink} />
+              <Download size={s(18)} color={CONSOLE.ink} />
             )}
-          </Animated.View>
-        </>
-      )}
-    </SeasonPlayButton>
+      </View>}
+    />
   );
 }
 
 /** Nút (…) cạnh Play: mở bảng tùy chọn game phong cách Console. */
 function GameMoreButton({ active, onPress }: { active: boolean; onPress: () => void }) {
-  const { glass } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const size = s(44);
@@ -148,14 +118,15 @@ function GameMoreButton({ active, onPress }: { active: boolean; onPress: () => v
     <Press
       onPress={onPress}
       accessibilityLabel="Tùy chọn game"
+      focusVariant="quiet"
       style={[
         styles.more,
         {
           width: size,
           height: size,
-          borderRadius: size / 2,
-          borderColor: active ? glass.controlBorderActive : glass.controlBorder,
-          backgroundColor: active ? glass.controlActive : glass.control,
+          borderRadius: s(12),
+          borderColor: active ? CONSOLE.selectedBorder : CONSOLE.border,
+          backgroundColor: CONSOLE.control,
         },
       ]}
     >
@@ -164,12 +135,11 @@ function GameMoreButton({ active, onPress }: { active: boolean; onPress: () => v
   );
 }
 
-// Thẻ đang chọn 288x112, thẻ thường 88x88 (khung thiết kế 932x430).
-const ACTIVE = { w: 288, h: 112 };
-const IDLE = { w: 88, h: 88 };
+// Every thumbnail shares a 16:9 footprint; selection only scales its artwork 5%.
+const CARD = { w: CONSOLE_CARD.width, h: CONSOLE_CARD.height };
 const GAP = 12;
 // Vạch đứng ngăn game đã cài (bên trái) với game chưa cài (bên phải).
-const DIVIDER = { w: 1.5, h: 88 };
+const DIVIDER = { w: 1, h: 48 };
 
 // Keep gamepad scroll ancestry intact inside FlatList's virtualized cells.
 function renderFocusRail(props: ScrollViewProps) {
@@ -179,26 +149,24 @@ function renderFocusRail(props: ScrollViewProps) {
 const gameKey = (game: PcGame) => game.id;
 
 function ShelfDivider() {
-  const { colors } = useTheme();
   const { s } = useUi();
   return (
     <LinearGradient
       pointerEvents="none"
-      colors={['rgba(255,255,255,0)', alpha(colors.accent, 0.65), 'rgba(255,255,255,0)']}
-      style={{ width: s(DIVIDER.w), height: s(DIVIDER.h), marginBottom: s(8), borderRadius: s(DIVIDER.w) }}
+      colors={['transparent', CONSOLE.border, 'transparent']}
+      style={{ width: s(DIVIDER.w), height: s(DIVIDER.h), borderRadius: s(DIVIDER.w) }}
     />
   );
 }
 
-const GameCard = memo(function GameCard({ game, active, achievements, onSelect, cardRef }: {
+const GameCard = memo(function GameCard({ game, active, onSelect, onActivate, cardRef }: {
   game: PcGame;
   active: boolean;
-  achievements: PcLibrary['achievements']['data'];
   onSelect: (id: string) => void;
+  onActivate: () => void;
   /** Gắn vào thẻ đang chọn: điểm xuất phát của hiệu ứng thẻ bay vào thông báo. */
   cardRef: RefObject<View | null>;
 }) {
-  const { glass } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const select = useCallback(() => onSelect(game.id), [game.id, onSelect]);
@@ -209,12 +177,11 @@ const GameCard = memo(function GameCard({ game, active, achievements, onSelect, 
     const changed = previousActive.current !== active;
     previousActive.current = active;
     if (reduceMotion) { selection.setValue(active ? 1 : 0); return; }
-    if (!changed) return;
-    const animation = Animated.spring(selection, {
+    if (!changed) { selection.setValue(active ? 1 : 0); return; }
+    const animation = Animated.timing(selection, {
       toValue: active ? 1 : 0,
-      stiffness: 260,
-      damping: 26,
-      mass: 0.72,
+      duration: CONSOLE.focusMs,
+      easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
       isInteraction: false,
     });
@@ -222,40 +189,37 @@ const GameCard = memo(function GameCard({ game, active, achievements, onSelect, 
     return () => animation.stop();
   }, [active, reduceMotion, selection]);
 
-  const data = achievements;
-  const percent = data?.supported && data.total ? Math.round(((data.unlocked || 0) / data.total) * 100) : null;
+  const [failedArt, setFailedArt] = useState<string | null>(null);
+  const artwork = game.artworkUrl && game.artworkUrl !== failedArt ? game.artworkUrl : null;
   return (
-    <View ref={active ? cardRef : undefined} collapsable={false}>
-    <Press onPress={select} onFocused={select} focusRadius={s(active ? 20 : 16)} focusVariant="glassCard" pressScale={0.98} accessibilityLabel={game.title}>
       <Animated.View
+        ref={active ? cardRef : undefined}
+        collapsable={false}
         style={[
-          styles.card,
           {
-            borderRadius: s(active ? 20 : 16),
-            width: s(active ? ACTIVE.w : IDLE.w),
-            height: s(active ? ACTIVE.h : IDLE.h),
-            marginBottom: active ? 0 : s(8),
-            borderColor: active ? glass.cardBorderActive : glass.cardBorder,
-            opacity: selection.interpolate({ inputRange: [0, 1], outputRange: [0.76, 1] }),
+            width: s(CARD.w), height: s(CARD.h),
             transform: [
-              { scale: selection.interpolate({ inputRange: [0, 1], outputRange: [0.985, 1] }) },
-              { translateY: selection.interpolate({ inputRange: [0, 1], outputRange: [s(2), 0] }) },
+              { scale: selection.interpolate({ inputRange: [0, 1], outputRange: [1, 1.05] }) },
             ],
           },
         ]}
       >
-        {game.artworkUrl ? <Img source={{ uri: game.artworkUrl }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
-        <CardSurface selected={active} radius={s(active ? 20 : 16)} />
-        {active && data?.supported ? (
-          <View style={[styles.trophy, { right: s(10), bottom: s(10), borderRadius: s(12), paddingHorizontal: s(10), paddingVertical: s(6), gap: s(8) }]}>
-            <T size={10.9} weight="bold" color="#ffffff" tabular>{percent}%</T>
-            <Trophy size={s(14)} color="#ffffff" strokeWidth={1.8} />
-            <T size={10.9} weight="semibold" color="rgba(255,255,255,0.9)" tabular>{data.unlocked}/{data.total}</T>
-          </View>
-        ) : null}
+        <Press onPress={active ? onActivate : select} onFocused={select} onFocus={select}
+          focusRadius={s(10)} focusVariant="quiet" focusScale={1} pressScale={0.98}
+          accessibilityLabel={game.title} accessibilityState={{ selected: active }}
+          accessibilityHint={active ? 'Nhấn để chơi hoặc cài đặt game' : 'Nhấn để chọn game'}
+          style={{ width: '100%', height: '100%', borderRadius: s(10) }}>
+          <Animated.View style={[styles.card, { width: '100%', height: '100%', borderRadius: s(10),
+            borderColor: active ? CONSOLE.selectedBorder : CONSOLE.border,
+            opacity: selection.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }) }]}>
+            {artwork ? <Img source={{ uri: artwork }} style={StyleSheet.absoluteFill} contentFit="cover" transition={0} onError={() => setFailedArt(artwork)} /> : (
+              <View style={{ flex: 1, justifyContent: 'flex-end', padding: s(10) }}>
+                <T size={12} weight="semibold" color={CONSOLE.ink} numberOfLines={2}>{game.title}</T>
+              </View>
+            )}
+          </Animated.View>
+        </Press>
       </Animated.View>
-    </Press>
-    </View>
   );
 });
 
@@ -278,8 +242,21 @@ export const GamesView = memo(function GamesView({ library, downloads, reachable
   const styles = useStyles();
   const router = useRouter();
   const { s } = useUi();
+  const { active: appActive, reduceMotion } = useMotion();
+  const sceneActive = useSceneActive();
+  const [details] = useState(() => new Animated.Value(1));
   const activeCard = useRef<View>(null);
   const { games, selected, error, installOpenedId } = library;
+  const selectedId = selected?.id;
+  useLayoutEffect(() => {
+    details.setValue(reduceMotion || !appActive || !sceneActive ? 1 : 0);
+    const animation = Animated.timing(details, {
+      toValue: 1, duration: reduceMotion || !appActive || !sceneActive ? 0 : CONSOLE.infoMs,
+      easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [appActive, details, reduceMotion, sceneActive, selectedId]);
   const selectedAppId = isSteamAppId(selected?.steamAppId) ? Number(selected.steamAppId) : null;
   const tracked = downloadForApp(downloads.state, selectedAppId);
   const trackedUninstall = uninstallForApp(downloads.state, selectedAppId);
@@ -321,21 +298,36 @@ export const GamesView = memo(function GamesView({ library, downloads, reachable
     else if (download.status === 'downloading') downloads.pause(download.appid);
     else if (download.status === 'paused') downloads.resume(download.appid);
   };
+  const action = primaryActionState({ library, download, uninstall, reachable });
+  const activateSelected = () => {
+    if (action.disabled) return;
+    if (action.tracking) onDownloadPress();
+    else if (!reachable || action.installed) onPlay();
+    else void install();
+  };
+  const activateRef = useRef(activateSelected);
+  useLayoutEffect(() => { activateRef.current = activateSelected; });
+  const activateFromShelf = useCallback(() => activateRef.current(), []);
+  const achievements = library.achievements.data;
+  const achievementText = achievements?.supported && achievements.total
+    ? `${achievements.unlocked ?? 0}/${achievements.total} thành tích · ${Math.round(((achievements.unlocked ?? 0) / achievements.total) * 100)}%`
+    : null;
+  const metadata = selected?.genres?.length ? selected.genres.slice(0, 3).join(' · ')
+    : [selected?.source, selected?.installed === false ? 'Chưa cài đặt' : 'Đã cài đặt'].filter(Boolean).join(' · ');
 
   return (
     <View style={{ flex: 1 }}>
-      <View pointerEvents="box-none" style={{ flex: 1, justifyContent: 'flex-end', paddingBottom: s(16), paddingTop: s(8), zIndex: 40 }}>
-        <View pointerEvents="box-none" style={{ flexDirection: 'row', alignItems: 'flex-end', gap: s(28) }}>
+      <FocusScroll style={{ flex: 1, zIndex: 40 }} showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end', paddingBottom: s(10), paddingTop: s(8), paddingHorizontal: s(10) }}>
+        <Animated.View pointerEvents="box-none" style={{ alignItems: 'flex-start', gap: s(10), opacity: details,
+          transform: [{ translateY: details.interpolate({ inputRange: [0, 1], outputRange: [reduceMotion ? 0 : s(8), 0] }) }] }}>
           {selected ? <GameTitle game={selected} /> : null}
+          {selected ? <T size={11} color={CONSOLE.muted} numberOfLines={1} style={{ maxWidth: s(380) }}>{metadata}</T> : null}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10), zIndex: 40 }}>
             <PrimaryAction
-              library={library}
-              download={download}
-              uninstall={uninstall}
+              action={action}
               canControl={downloads.canControl}
-              onPlay={onPlay}
-              onInstall={() => void install()}
-              onDownloadPress={onDownloadPress}
+              onPress={activateSelected}
               reachable={reachable}
             />
             {selected ? (
@@ -345,7 +337,13 @@ export const GamesView = memo(function GamesView({ library, downloads, reachable
               />
             ) : null}
           </View>
-        </View>
+          {achievementText && !error && !showDownload && !uninstall ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(7) }}>
+              <Trophy size={s(13)} color={CONSOLE.muted} strokeWidth={1.7} />
+              <T size={10} color={CONSOLE.muted} tabular>{achievementText}</T>
+            </View>
+          ) : null}
+        </Animated.View>
 
         {error ? (
           <View style={[styles.error, { marginTop: s(10), maxWidth: s(480), borderRadius: s(12), paddingHorizontal: s(12), paddingVertical: s(6) }]}>
@@ -398,31 +396,34 @@ export const GamesView = memo(function GamesView({ library, downloads, reachable
             </View>
           </View>
         ) : null}
-      </View>
+      </FocusScroll>
 
       <GameShelf
         games={games}
         selectedId={selected?.id ?? null}
-        selectedAchievements={library.achievements.data}
         activeCard={activeCard}
         onSelectGame={onSelectGame}
+        onActivate={activateFromShelf}
       />
+      <ConsoleHints actionLabel={action.tracking ? 'Quản lý tải' : !reachable ? 'Mở PC' : action.installed ? 'Chơi' : 'Cài đặt'} />
     </View>
   );
 });
 
 /** Download progress never invalidates the virtualized game shelf. */
-const GameShelf = memo(function GameShelf({ games, selectedId, selectedAchievements, activeCard, onSelectGame }: {
+const GameShelf = memo(function GameShelf({ games, selectedId, activeCard, onSelectGame, onActivate }: {
   games: PcGame[];
   selectedId: string | null;
-  selectedAchievements: PcLibrary['achievements']['data'];
   activeCard: RefObject<View | null>;
   onSelectGame: (id: string) => void;
+  onActivate: () => void;
 }) {
   const { s, width, insets } = useUi();
   const estimatedRailWidth = Math.max(100, width - (s(44) + insets.left + insets.right));
   const rail = useRef<FlatList<PcGame>>(null);
   const railWidth = useRef(estimatedRailWidth);
+  const scrollTo = useCallback((offset: number) => rail.current?.scrollToOffset({ offset, animated: false }), []);
+  const { center: scrollCenter, stop: stopScroll, onScroll } = useConsoleRailScroll(scrollTo);
   // Game đã cài đứng trước, game chưa cài đứng sau vạch ngăn; thứ tự trong mỗi nhóm giữ nguyên.
   const shelf = useMemo(() => {
     const installed = games.filter((game) => game.installed !== false);
@@ -435,24 +436,24 @@ const GameShelf = memo(function GameShelf({ games, selectedId, selectedAchieveme
   const preloadUrls = useMemo(() => nearbyBackdropUrls(heroUrls, selectedIndex), [heroUrls, selectedIndex]);
   useBackdropPreload(preloadUrls);
   const metrics = useMemo(() => ({
-    idleWidth: s(IDLE.w), activeWidth: s(ACTIVE.w), gap: s(GAP), dividerWidth: s(DIVIDER.w), padding: s(10),
+    idleWidth: s(CARD.w), activeWidth: s(CARD.w), gap: s(GAP), dividerWidth: s(DIVIDER.w), padding: s(10),
   }), [s]);
   const dividerIndex = shelf.hasDivider ? shelf.installedCount : null;
   const getItemLayout = useCallback((_data: ArrayLike<PcGame> | null | undefined, index: number) => (
     shelfItemLayout(index, selectedIndex, dividerIndex, metrics)
   ), [dividerIndex, metrics, selectedIndex]);
   const renderGame = useCallback(({ item: game, index }: ListRenderItemInfo<PcGame>) => (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: metrics.gap, marginRight: metrics.gap }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: metrics.gap, marginRight: metrics.gap }}>
       {index === dividerIndex ? <ShelfDivider /> : null}
       <GameCard
         game={game}
         active={game.id === selectedId}
-        achievements={game.id === selectedId ? selectedAchievements : null}
         onSelect={onSelectGame}
+        onActivate={onActivate}
         cardRef={activeCard}
       />
     </View>
-  ), [activeCard, dividerIndex, metrics.gap, onSelectGame, selectedId, selectedAchievements]);
+  ), [activeCard, dividerIndex, metrics.gap, onSelectGame, onActivate, selectedId]);
 
   const getSelectedScrollX = useCallback((rWidth: number) => {
     const cell = shelfItemLayout(selectedIndex, selectedIndex, dividerIndex, metrics);
@@ -463,13 +464,11 @@ const GameShelf = memo(function GameShelf({ games, selectedId, selectedAchieveme
   // Vị trí thẻ đang chọn tính được từ kích thước đã biết, không cần đo layout.
   const centerSelected = useCallback((animated: boolean) => {
     const currentW = railWidth.current > 0 ? railWidth.current : estimatedRailWidth;
-    const x = getSelectedScrollX(currentW);
-    rail.current?.scrollToOffset({ offset: x, animated });
-  }, [estimatedRailWidth, getSelectedScrollX]);
+    scrollCenter(getSelectedScrollX(currentW), animated);
+  }, [estimatedRailWidth, getSelectedScrollX, scrollCenter]);
 
-  const initialScrollX = useMemo(() => {
-    return getSelectedScrollX(estimatedRailWidth);
-  }, [estimatedRailWidth, getSelectedScrollX]);
+  // contentOffset is initial-only: updating it on selection would jump ahead of the animation.
+  const [initialScrollX] = useState(() => getSelectedScrollX(estimatedRailWidth));
 
   const mounted = useRef(false);
   useEffect(() => {
@@ -478,8 +477,8 @@ const GameShelf = memo(function GameShelf({ games, selectedId, selectedAchieveme
       return;
     }
     const frame = requestAnimationFrame(() => centerSelected(true));
-    return () => cancelAnimationFrame(frame);
-  }, [selectedId, games.length, shelf.installedCount, centerSelected]);
+    return () => { cancelAnimationFrame(frame); stopScroll(); };
+  }, [selectedId, games.length, shelf.installedCount, centerSelected, stopScroll]);
 
   return (
       <FlatList
@@ -494,10 +493,13 @@ const GameShelf = memo(function GameShelf({ games, selectedId, selectedAchieveme
         maxToRenderPerBatch={8}
         windowSize={5}
         removeClippedSubviews={false}
-        ListFooterComponent={<View style={{ width: metrics.activeWidth }} />}
+        ListFooterComponent={<View style={{ width: estimatedRailWidth / 2 }} />}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentOffset={{ x: initialScrollX, y: 0 }}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        onScrollBeginDrag={stopScroll}
         onLayout={(event) => {
           const w = event.nativeEvent.layout.width;
           if (w > 0) {
@@ -508,8 +510,8 @@ const GameShelf = memo(function GameShelf({ games, selectedId, selectedAchieveme
             }
           }
         }}
-        style={{ flexGrow: 0, height: s(142) }}
-        contentContainerStyle={{ alignItems: 'flex-end', paddingHorizontal: s(10), paddingTop: s(10), paddingBottom: s(12) }}
+        style={{ flexGrow: 0, height: s(CONSOLE_CARD.railHeight) }}
+        contentContainerStyle={{ alignItems: 'center', paddingHorizontal: s(10), paddingVertical: s(12) }}
         decelerationRate="fast"
         accessibilityRole="list"
       />
@@ -517,29 +519,12 @@ const GameShelf = memo(function GameShelf({ games, selectedId, selectedAchieveme
 });
 
 const useStyles = makeStyles(({ colors, glass }) => ({
-  play: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary,
-    borderWidth: 1.5,
-    borderColor: glass.controlBorderActive,
-    shadowColor: colors.primaryHover,
-    shadowOpacity: 0.55,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
-  },
   more: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: glass.controlBorder,
     backgroundColor: glass.surface,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
   },
   uninstallTrack: { width: '100%', overflow: 'hidden', backgroundColor: glass.controlActive },
   card: {
@@ -558,19 +543,6 @@ const useStyles = makeStyles(({ colors, glass }) => ({
       },
       default: {},
     }),
-  },
-  trophy: {
-    position: 'absolute',
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: glass.controlBorder,
-    backgroundColor: alpha(colors.panelSolid, 0.7),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
   },
   error: {
     borderWidth: 1,

@@ -1,7 +1,7 @@
 // Stream settings use the shared dark grouped controls.
 
 import { useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 import { Check, RadioTower, Sparkles } from 'lucide-react-native';
 import { getDisplayInfo } from 'jetsona-input';
 
@@ -18,7 +18,6 @@ import {
   streamSettingsCopy,
   type NetworkResult,
 } from '@/lib/stream-settings-ui';
-import { useTheme } from '@/theme';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -28,11 +27,12 @@ import { MultipathSection } from './MultipathSection';
 import { ActionRow, ChoiceRow, InfoRow, rowStyle, SettingsGroup, SliderRow, ToggleRow } from './controls';
 import type { Notify, StreamSettingsDraft } from './useStreamSettingsDraft';
 import { useSettingsRestore } from './SettingsRestore';
+import { useSettingsColors } from './SettingsSurface';
 
 type PageProps = { draft: StreamSettingsDraft; settings: StreamSettings };
 
 function DeviceStreamRecommendation({ draft, settings }: PageProps) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const [panel] = useState(() => {
     const display = clientDisplayGeometry();
     const native = getDisplayInfo();
@@ -64,7 +64,7 @@ function DeviceStreamRecommendation({ draft, settings }: PageProps) {
 }
 
 export function QualityPage({ draft, settings }: PageProps) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const copy = streamSettingsCopy(draft.deviceClass);
   useSettingsRestore(draft.restoreDefaults, {
@@ -92,7 +92,7 @@ export function QualityPage({ draft, settings }: PageProps) {
               focusVariant="row"
               accessibilityRole="radio"
               accessibilityState={{ checked: active }}
-              style={rowStyle(s, { minHeight: s(50) })}
+              style={rowStyle(s)}
             >
               <View style={{ flex: 1, minWidth: 0 }}>
                 <T
@@ -271,40 +271,8 @@ export function LatencyPage({ draft, settings }: PageProps) {
   );
 }
 
-function MetricCard({ label, value, unit }: { label: string; value: string; unit: string }) {
-  const { settings: appleColors } = useTheme();
-  const { s } = useUi();
-  return (
-    <View
-      style={{
-        flex: 1,
-        minWidth: 0,
-        borderRadius: s(12),
-        backgroundColor: appleColors.card,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: appleColors.cardBorder,
-        paddingHorizontal: s(12),
-        paddingVertical: s(10),
-        overflow: 'hidden',
-      }}
-    >
-      <T size={9.4} weight="semibold" color={appleColors.textSecondary} tracking={0.06}>
-        {label.toUpperCase()}
-      </T>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: s(3), marginTop: s(4) }}>
-        <T size={17} weight="bold" color="#FFFFFF" tabular>
-          {value}
-        </T>
-        <T size={9.8} color={appleColors.textTertiary}>
-          {unit}
-        </T>
-      </View>
-    </View>
-  );
-}
-
 export function NetworkPage({ draft, settings, notify }: PageProps & { notify: Notify }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<NetworkResult | null>(null);
@@ -312,6 +280,7 @@ export function NetworkPage({ draft, settings, notify }: PageProps & { notify: N
   const runTest = async () => {
     if (testing) return;
     setTesting(true);
+    setResult(null);
     try {
       setResult(await measureNetwork(draft.deviceClass));
     } catch (error) {
@@ -325,9 +294,9 @@ export function NetworkPage({ draft, settings, notify }: PageProps & { notify: N
 
   return (
     <>
-      <SettingsGroup title="Vị trí máy chủ">
+      <MultipathSection connectionHeader={
         <InfoRow
-          label="Khu vực đang xem"
+          label="Khu vực máy chủ"
           value={
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
               <T size={14}>{region.flag}</T>
@@ -337,35 +306,26 @@ export function NetworkPage({ draft, settings, notify }: PageProps & { notify: N
             </View>
           }
         />
-      </SettingsGroup>
- 
-      <MultipathSection />
+      } />
 
       <SettingsGroup
-        title="Kiểm tra kết nối"
-        footer="Đo ping, jitter, tỷ lệ mất gói (packet loss) và băng thông khả dụng."
+        title="Chẩn đoán"
+        footer={result ? 'Kết quả đo tới máy chủ ứng dụng; chất lượng trong game có thể khác.' : undefined}
       >
         <ActionRow
           icon={RadioTower}
-          iconBg={appleColors.blue}
+          iconBg={appleColors.accent}
           tone="accent"
           busy={testing}
           label={testing ? 'Đang đo kết nối…' : result ? 'Kiểm tra lại' : 'Kiểm tra mạng'}
-          detail="Đánh giá chất lượng đường truyền tới máy chủ"
+          detail="Đo ping, jitter và packet loss"
           onPress={() => void runTest()}
         />
+        {result ? <InfoRow label="Ping" value={`${result.ping.toFixed(0)} ms`} /> : null}
+        {result ? <InfoRow label="Jitter" value={`${result.jitter.toFixed(1)} ms`} /> : null}
+        {result ? <InfoRow label="Mất gói" value={`${result.loss.toFixed(1)}%`} /> : null}
+        {result ? <InfoRow label="Băng thông" value={`${result.bandwidth.toFixed(0)} Mbps`} /> : null}
       </SettingsGroup>
-
-      {result ? (
-        <View style={{ marginTop: s(16) }}>
-          <View style={{ flexDirection: 'row', gap: s(8) }}>
-            <MetricCard label="Ping" value={result.ping.toFixed(0)} unit="ms" />
-            <MetricCard label="Jitter" value={result.jitter.toFixed(1)} unit="ms" />
-            <MetricCard label="Mất gói" value={result.loss.toFixed(1)} unit="%" />
-            <MetricCard label="Băng thông" value={result.bandwidth.toFixed(0)} unit="Mbps" />
-          </View>
-        </View>
-      ) : null}
     </>
   );
 }

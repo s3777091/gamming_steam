@@ -11,7 +11,8 @@ import type { LucideIcon } from 'lucide-react-native';
 import { useMotion } from '@/ui/motion';
 import { useUi } from '@/ui/scale';
 import { makeStyles } from '@/theme';
-import { GlassBackdrop } from '@/ui/GlassMaterial';
+import { MenuGlassBackdrop } from '@/ui/GlassMaterial';
+import { MENU_GLASS } from '@/ui/menuGlass';
 import { PanelHeader } from '@/ui/PanelHeader';
 
 /** Khung của nút neo, toạ độ trong cửa sổ (measureInWindow). */
@@ -24,6 +25,7 @@ export function ControlPopover({
   icon: Icon,
   action,
   width = 340,
+  blur = true,
   onClose,
   children,
 }: {
@@ -34,6 +36,8 @@ export function ControlPopover({
   /** Nút phụ nhỏ ở góc phải tiêu đề (ví dụ "Đánh dấu đã đọc"). */
   action?: ReactNode;
   width?: number;
+  /** A frozen, already blurred stream frame needs no additional native blur. */
+  blur?: boolean;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -47,9 +51,10 @@ export function ControlPopover({
   useEffect(() => {
     if (!mounted) return;
     if (open) {
-      const animation = reduceMotion
-        ? Animated.timing(progress, { toValue: 1, duration: 0, useNativeDriver: true })
-        : Animated.spring(progress, { toValue: 1, stiffness: 340, damping: 26, mass: 0.9, useNativeDriver: true });
+      const animation = Animated.timing(progress, {
+        toValue: 1, duration: reduceMotion ? 0 : MENU_GLASS.openMs,
+        easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false,
+      });
       animation.start();
       return () => animation.stop();
     }
@@ -85,7 +90,7 @@ export function ControlPopover({
 
   return (
     <View style={[StyleSheet.absoluteFill, styles.layer]} pointerEvents={open ? 'box-none' : 'none'}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Đóng" />
+      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} focusable={false} accessibilityLabel="Đóng" />
       <Animated.View
         accessibilityViewIsModal
         style={[
@@ -102,8 +107,8 @@ export function ControlPopover({
           },
         ]}
       >
-        <GlassBackdrop material="panel" radius={s(22)} />
-        <PanelHeader title={title} icon={Icon} action={action} onClose={onClose} />
+        <MenuGlassBackdrop radius={s(22)} blur={blur} />
+        <PanelHeader title={title} icon={Icon} action={action} onClose={onClose} appearance="glass" />
         <View style={{ paddingHorizontal: s(12), paddingBottom: s(12) }}>{children}</View>
 
         <View
@@ -124,26 +129,26 @@ export function ControlPopover({
   );
 }
 
-const useStyles = makeStyles(({ glass, colors }) => ({
+const useStyles = makeStyles(() => ({
   // Trên dock (zIndex 30) để popover và lớp chạm-ra-ngoài-để-đóng luôn nằm trên cùng.
   layer: { zIndex: 60, elevation: 60 },
   card: {
     position: 'absolute',
-    backgroundColor: glass.panel,
+    backgroundColor: 'transparent',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: glass.panelBorder,
+    borderColor: MENU_GLASS.border,
     shadowColor: '#000',
     shadowOpacity: 0.45,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 18 },
-    elevation: 24,
+    elevation: 0,
   },
   caret: {
     position: 'absolute',
     transform: [{ rotate: '45deg' }],
-    backgroundColor: colors.panelSolid,
+    backgroundColor: MENU_GLASS.panelFallback,
     borderRightWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: glass.panelBorder,
+    borderColor: MENU_GLASS.border,
   },
 }));

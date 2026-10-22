@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState
 import { Animated, Easing } from 'react-native';
 import { RefreshCw } from 'lucide-react-native';
 
-import { useTheme } from '@/theme';
+import { useSettingsColors } from './SettingsSurface';
 import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
@@ -48,7 +48,7 @@ export function useSettingsRestore(
 }
 
 export function SettingsRestoreButton({ action, notify }: { action: SettingsRestoreAction; notify: Notify }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const { reduceMotion } = useMotion();
   const [enter] = useState(() => new Animated.Value(reduceMotion ? 1 : 0));
@@ -115,9 +115,9 @@ export function SettingsRestoreButton({ action, notify }: { action: SettingsRest
         pressScale={0.92}
         hitSlop={s(4)}
         style={{
-          width: s(32), height: s(32), borderRadius: s(16),
-          backgroundColor: 'rgba(255, 255, 255, 0.08)',
-          borderWidth: 1,
+          width: s(44), height: s(44), borderRadius: s(10),
+          backgroundColor: 'transparent',
+          borderWidth: armed ? 1 : 0,
           borderColor: armed ? appleColors.orange : 'rgba(255, 255, 255, 0.16)',
           alignItems: 'center', justifyContent: 'center',
           opacity: action.disabled || busy ? 0.4 : 1,

@@ -19,6 +19,12 @@ public final class JetsonaInputModule: Module {
   private var players: [Int: any CHHapticPatternPlayer] = [:]
   private var speakerRouteActive = false
   private var speakerOverridden = false
+  private var applyingSpeakerRoute = false
+  private var previousAudioConfiguration: (
+    category: AVAudioSession.Category,
+    mode: AVAudioSession.Mode,
+    options: AVAudioSession.CategoryOptions
+  )?
   // iOS posts no notification when a controller's battery changes, and it often
   // reads the level only some time after connect. Re-check while the app is open.
   private var batteryTimer: Timer?
@@ -82,6 +88,10 @@ public final class JetsonaInputModule: Module {
     Function("openWifiSettings") { self.main { self.openSettings() } }
     Function("startSpeakerRoute") {
       self.main {
+        if !self.speakerRouteActive {
+          let audio = AVAudioSession.sharedInstance()
+          self.previousAudioConfiguration = (audio.category, audio.mode, audio.categoryOptions)
+        }
         self.speakerRouteActive = true
         self.applySpeakerRoute()
       }
@@ -104,16 +114,29 @@ public final class JetsonaInputModule: Module {
     return result
   }
 
-  // onAudioReady can arrive before WebRTC activates its voice-chat route.
-  // Keep the request alive and retry on route changes instead of checking once.
+  // The loading video's expo-video player can replace WebRTC's audio category
+  // while it starts/stops. Repair the session even when the output is already a
+  // speaker: overriding the receiver alone leaves the audio unit misconfigured.
   private func applySpeakerRoute() {
-    guard speakerRouteActive, foreground else { return }
+    guard speakerRouteActive, foreground, !applyingSpeakerRoute else { return }
+    applyingSpeakerRoute = true
+    defer { applyingSpeakerRoute = false }
     let audio = AVAudioSession.sharedInstance()
-    // Only replace the built-in receiver; preserve the user's external output.
-    guard audio.currentRoute.outputs.contains(where: { $0.portType == .builtInReceiver }) else { return }
+    let options: AVAudioSession.CategoryOptions = [
+      .defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP, .mixWithOthers
+    ]
     do {
-      try audio.overrideOutputAudioPort(.speaker)
-      speakerOverridden = true
+      // WebRTC M124 uses Voice Processing I/O even for receive-only streams,
+      // so it still requires playAndRecord. Let WebRTC own session activation.
+      if audio.category != .playAndRecord || audio.mode != .videoChat || audio.categoryOptions != options {
+        try audio.setCategory(.playAndRecord, mode: .videoChat, options: options)
+      }
+      // The default route keeps headphones/Bluetooth; only force a receiver
+      // that iOS has selected despite defaultToSpeaker onto the loudspeaker.
+      if audio.currentRoute.outputs.contains(where: { $0.portType == .builtInReceiver }) {
+        try audio.overrideOutputAudioPort(.speaker)
+        speakerOverridden = true
+      }
     } catch {
       NSLog("[JetsonaAudio] Speaker route failed: %@", error.localizedDescription)
     }
@@ -125,6 +148,14 @@ public final class JetsonaInputModule: Module {
     if speakerOverridden {
       try? AVAudioSession.sharedInstance().overrideOutputAudioPort(.none)
       speakerOverridden = false
+    }
+    if let previous = previousAudioConfiguration {
+      previousAudioConfiguration = nil
+      do {
+        try AVAudioSession.sharedInstance().setCategory(previous.category, mode: previous.mode, options: previous.options)
+      } catch {
+        NSLog("[JetsonaAudio] Audio session restore failed: %@", error.localizedDescription)
+      }
     }
   }
 

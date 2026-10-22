@@ -67,7 +67,7 @@ function ActionItem({
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: glass.borderSubtle,
         opacity: disabled ? 0.5 : 1,
-        overflow: 'hidden',
+        overflow: 'visible',
       }}
     >
       {/* Specular top sheen */}
@@ -78,7 +78,7 @@ function ActionItem({
           left: 0,
           right: 0,
           height: StyleSheet.hairlineWidth,
-          backgroundColor: glass.borderSpecular,
+          backgroundColor: glass.borderSpecular, marginHorizontal: s(6),
         }}
         pointerEvents="none"
       />

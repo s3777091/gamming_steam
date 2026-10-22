@@ -20,8 +20,10 @@ import {
   Bell,
   Camera,
   Copy,
+  SlidersHorizontal,
   Gamepad2,
   Home,
+  Keyboard,
   LogOut,
   Power,
   Radio,
@@ -36,6 +38,7 @@ import { useInputDevices } from '@/features/devices/useInputDevices';
 import { formatClock } from '@/features/library/format';
 import { useNotifications } from '@/features/library/useNotifications';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
+import { MappingProfilesPanel, type MappingSession } from '@/features/key-mapping/MappingProfilesPanel';
 import { ControlPopover, type PopoverAnchor } from '@/features/control-center/ControlPopover';
 import { DevicesPanel, NotificationsPanel, ProfilePanel, UserAvatar } from '@/features/control-center/ControlCenterPanels';
 import type { PendingGameLaunch } from '@/lib/game-launch';
@@ -44,15 +47,18 @@ import { uploadGameScreenshot } from '@/lib/game-screenshots';
 import { PC_ROUTES, pcFetch } from '@/lib/pc-api';
 import { rememberStreamGame } from '@/lib/stream-resume';
 import { LinearGradient } from 'expo-linear-gradient';
-import { alpha, glassShadow, glassShadowSubtle, makeStyles, useTheme } from '@/theme';
+import { glassShadow, glassShadowSubtle, makeStyles, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
-import { GlassBackdrop } from '@/ui/GlassMaterial';
+import { MenuGlassBackdrop } from '@/ui/GlassMaterial';
+import { MENU_GLASS } from '@/ui/menuGlass';
+import { useMotion } from '@/ui/motion';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 import type { BorderOrigin as StreamBorderOrigin } from './StreamLiveBorder';
 import type { WatchPartyState } from './useWatchPartyHost';
+import { useVirtualKeyboardState } from './VirtualKeyboard';
 
 export type RunningGame = {
   id: string;
@@ -65,7 +71,7 @@ export type RunningGame = {
   processCount: number;
 };
 
-type PopoverId = 'notifications' | 'devices' | 'profile';
+type PopoverId = 'notifications' | 'devices' | 'profile' | 'mapping';
 
 /** Game sắp thoát, để màn stream diễn hoạt cảnh thoát bằng đúng artwork của nó. */
 export type ExitingGame = { gameId: string | null; title: string; heroUrl: string | null; logoUrl: string | null };
@@ -96,6 +102,9 @@ export function GuideMenu({
   onReload,
   onExitGame,
   onStreamOrigin,
+  mapping,
+  onRunningGameChange,
+  retainFrame = false,
 }: {
   open: boolean;
   profile: { name: string; avatarUrl: string | null; email?: string | null } | null;
@@ -112,20 +121,32 @@ export function GuideMenu({
   onExitGame: (game: ExitingGame) => void;
   /** Toạ độ (trong cửa sổ) của nút Streaming lúc bấm — tâm của viền xanh. */
   onStreamOrigin?: (origin: StreamBorderOrigin) => void;
+  mapping: MappingSession;
+  onRunningGameChange: (gameId: string | null) => void;
+  retainFrame?: boolean;
 }) {
-  const { colors, glass, material } = useTheme();
+  const { colors } = useTheme();
   const styles = useStyles();
   const { s, insets } = useUi();
+  const { reduceMotion } = useMotion();
   const fade = useMemo(() => new Animated.Value(0), []);
   const { devices } = useInputDevices();
   const { unreadCount, notifications, markAllAsRead } = useNotifications();
+  const virtualKeyboard = useVirtualKeyboardState();
 
   const [games, setGames] = useState<RunningGame[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [shot, setShot] = useState<string | null>(null);
+  const [guideFrame, setGuideFrame] = useState<{ open: boolean; uri: string | null }>({ open, uri: null });
   const [confirmExit, setConfirmExit] = useState(false);
   const [timeStr, setTimeStr] = useState(() => formatClock(new Date()));
+  // A frame belongs to one opening; release its URI before the next opening paints.
+  if (guideFrame.open !== open) {
+    setGuideFrame({ open, uri: null });
+    if (open) setTimeStr(formatClock(new Date()));
+  }
+  const guideBackdrop = open && hasFrame && guideFrame.open === open ? guideFrame.uri : null;
 
   // D-pad điều hướng trên dock.
   const [dockFocus, setDockFocus] = useState(0);
@@ -144,11 +165,23 @@ export function GuideMenu({
 
   // Cập nhật đồng hồ thời gian thực
   useEffect(() => {
+    if (!open) return;
     const timer = setInterval(() => {
       setTimeStr(formatClock(new Date()));
     }, 10000);
     return () => clearInterval(timer);
-  }, []);
+  }, [open]);
+
+  // Reuse the frame already captured before opening Guide. Blur this small image
+  // once, instead of sampling a live video surface behind every glass control.
+  useEffect(() => {
+    if (!open || !hasFrame) return;
+    let cancelled = false;
+    void exportFrame(960).then((base64) => {
+      if (!cancelled && base64) setGuideFrame({ open: true, uri: `data:image/png;base64,${base64}` });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [hasFrame, open]);
 
   // Tự ẩn toast phản hồi sau 2.5s
   useEffect(() => {
@@ -163,24 +196,31 @@ export function GuideMenu({
       const data = await response.json().catch(() => null) as { ok?: boolean; games?: RunningGame[]; error?: string } | null;
       if (response.ok && data?.ok && Array.isArray(data.games)) {
         setGames(data.games);
+        onRunningGameChange(data.games.find(game => game.active)?.id ?? null);
       }
     } catch {
       // Giữ im lặng, không spam toast lỗi làm phiền trải nghiệm
     }
-  }, []);
+  }, [onRunningGameChange]);
 
   const prevOpenRef = useRef(open);
   useEffect(() => {
     if (open && !prevOpenRef.current) {
       void loadGames();
-      Animated.timing(fade, { toValue: 1, duration: 180, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
     }
     prevOpenRef.current = open;
+    let animation: Animated.CompositeAnimation | null = null;
+    if (open) {
+      animation = Animated.timing(fade, { toValue: 1, duration: reduceMotion ? 0 : MENU_GLASS.openMs,
+        easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false });
+      animation.start();
+    }
     if (!open) {
       fade.setValue(0);
-      releaseFrame();
+      if (!retainFrame) releaseFrame();
     }
-  }, [fade, loadGames, open]);
+    return () => animation?.stop();
+  }, [fade, loadGames, open, reduceMotion, retainFrame]);
 
   const run = useCallback(async (key: string, task: () => Promise<void>, success?: string) => {
     if (busy) return;
@@ -317,6 +357,17 @@ export function GuideMenu({
       dot: true,
       run: handleClose,
     },
+    { id: 'mapping', label: 'Thiết lập nút', icon: SlidersHorizontal, popover: 'mapping', dot: Boolean(mapping.active) },
+    {
+      id: 'keyboard',
+      label: virtualKeyboard.open ? 'Bàn phím ảo (Đang bật)' : 'Bàn phím ảo',
+      icon: Keyboard,
+      dot: virtualKeyboard.open,
+      run: () => {
+        virtualKeyboard.toggle();
+        handleClose();
+      },
+    },
     {
       id: 'notifications',
       label: 'Thông báo',
@@ -364,7 +415,7 @@ export function GuideMenu({
       danger: true,
       run: () => setConfirmExit(true),
     },
-  ], [batteryPercent, devices.length, gameTitle, handleClose, onHome, rememberedHero, rememberedId, rememberedLogo, onReload, profile?.name, takeScreenshot, toggleStreaming, totalNotifs, watchParty.live]);
+  ], [mapping.active, virtualKeyboard, batteryPercent, devices.length, gameTitle, handleClose, onHome, rememberedHero, rememberedId, rememberedLogo, onReload, profile?.name, takeScreenshot, toggleStreaming, totalNotifs, watchParty.live]);
 
   const onSelectDockAction = useCallback((action: DockAction, index: number) => {
     setDockFocus(index);
@@ -412,6 +463,7 @@ export function GuideMenu({
     return addListener('onGamepadButton', (event) => {
       if (!event.down) return;
       const current = stateRef.current;
+      if (current.popover?.id === 'mapping') return;
 
       // Nút B: Quay lại / Đóng menu
       if (event.button === 'b') {
@@ -452,12 +504,13 @@ export function GuideMenu({
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.root, { opacity: fade }]} accessibilityViewIsModal>
-      {/* Lớp kính mờ cao cấp PS5 */}
-      <GlassBackdrop material="scrim" />
+      {guideBackdrop ? <Img source={guideBackdrop} style={StyleSheet.absoluteFill} contentFit="cover"
+        blurRadius={s(14)} cachePolicy="none" transition={reduceMotion ? 0 : 120} accessible={false} /> : null}
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: MENU_GLASS.scrim }]} />
 
       {/* Gradient chuyển bóng tinh tế */}
       <LinearGradient
-        colors={[alpha(colors.bgDeep, 0.82), alpha(colors.bgDeep, 0.25), alpha(colors.bgDeep, 0.88)]}
+        colors={['rgba(0,0,0,0.18)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.42)']}
         locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFill}
       />
@@ -465,12 +518,13 @@ export function GuideMenu({
       {/* 1. GÓC TRÊN PHẢI: Nút đóng */}
       <View style={[styles.topBar, { top: insets.top + s(10), right: insets.right + s(24), gap: s(6) }]}>
         {/* Nút đóng menu */}
-        <Press
+        <Press focusVariant="quiet"
           onPress={handleClose}
           sound="back"
           accessibilityLabel="Đóng menu tiếp tục chơi"
           style={[styles.closeBtn, { width: s(32), height: s(32), borderRadius: s(16) }]}
         >
+          <MenuGlassBackdrop variant="control" radius={s(16)} />
           <X size={s(15)} color="rgba(255,255,255,0.65)" />
         </Press>
       </View>
@@ -480,7 +534,7 @@ export function GuideMenu({
         {/* Nhãn tooltip nổi bật hiển thị khi hover / chọn icon (không làm phình to thanh dock) */}
         {focusedAction ? (
           <View style={styles.dockTooltipWrap}>
-            <GlassBackdrop material="panel" />
+            <MenuGlassBackdrop variant="control" radius={s(12)} />
             <T size={11} weight="semibold" color="#ffffff">
               {focusedAction.label}
               {focusedAction.badge ? ` (${focusedAction.badge})` : ''}
@@ -489,13 +543,7 @@ export function GuideMenu({
         ) : null}
 
         <View style={[styles.dockBar, { borderRadius: s(22), padding: s(5) }]}>
-          <GlassBackdrop material="panel" />
-          <LinearGradient
-            colors={material.controlSheen}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, zIndex: 3 }}
-          />
+          <MenuGlassBackdrop radius={s(22)} blur={guideBackdrop === null} />
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: s(4), alignItems: 'center' }}>
             {dockActions.map((action, index) => {
@@ -515,7 +563,7 @@ export function GuideMenu({
                     else dockNodes.delete(action.id);
                   }}
                 >
-                  <Press
+                  <Press focusVariant="quiet"
                     disabled={Boolean(busy)}
                     onPress={() => onSelectDockAction(action, index)}
                     pressScale={0.92}
@@ -527,17 +575,17 @@ export function GuideMenu({
                         height: s(38),
                         borderRadius: s(13),
                         backgroundColor: lit
-                          ? (action.danger ? 'rgba(239,68,68,0.25)' : glass.controlActive)
+                          ? (action.danger ? 'rgba(239,68,68,0.18)' : MENU_GLASS.controlActive)
                           : 'transparent',
                         borderWidth: isFocused ? 1.5 : 0,
-                        borderColor: action.danger ? 'rgba(248,113,113,0.8)' : glass.controlBorderActive,
+                        borderColor: action.danger ? 'rgba(248,113,113,0.8)' : MENU_GLASS.borderActive,
                       },
                     ]}
                   >
                     {busy === action.id ? (
                       <ActivityIndicator size="small" color="#ffffff" />
                     ) : action.id === 'game' ? (
-                      <View style={[styles.dockGameTile, { width: s(30), height: s(30), borderRadius: s(9), borderColor: isFocused ? glass.controlBorderActive : glass.controlBorder }]}>
+                      <View style={[styles.dockGameTile, { width: s(30), height: s(30), borderRadius: s(9), borderColor: isFocused ? MENU_GLASS.borderActive : MENU_GLASS.border }]}>
                         {gameArtwork ? (
                           <Img source={{ uri: gameArtwork }} style={StyleSheet.absoluteFill} contentFit="cover" />
                         ) : (
@@ -594,18 +642,21 @@ export function GuideMenu({
       {/* Popover kiểu Apple bung ra từ nút Thông báo / Thiết bị / Tài khoản */}
       <ControlPopover
         open={popover !== null}
+        blur={guideBackdrop === null}
         anchor={popover?.anchor ?? null}
-        title={popoverShown === 'devices' ? 'Thiết bị' : popoverShown === 'profile' ? 'Tài khoản' : 'Thông báo'}
-        icon={popoverShown === 'devices' ? Gamepad2 : popoverShown === 'profile' ? UserRound : Bell}
-        width={popoverShown === 'notifications' ? 360 : 320}
+        title={popoverShown === 'mapping' ? 'Thiết lập nút' : popoverShown === 'devices' ? 'Thiết bị' : popoverShown === 'profile' ? 'Tài khoản' : 'Thông báo'}
+        icon={popoverShown === 'mapping' ? SlidersHorizontal : popoverShown === 'devices' ? Gamepad2 : popoverShown === 'profile' ? UserRound : Bell}
+        width={popoverShown === 'mapping' ? 450 : popoverShown === 'notifications' ? 360 : 320}
         action={popoverShown === 'notifications' && unreadCount > 0 ? (
-          <Press onPress={() => void markAllAsRead()} hitSlop={8}>
+          <Press focusVariant="quiet" onPress={() => void markAllAsRead()} hitSlop={8} style={{ paddingHorizontal: s(8), paddingVertical: s(4), borderRadius: s(10) }}>
             <T size={10} weight="semibold" color={colors.accentSoft}>Đánh dấu đã đọc</T>
           </Press>
         ) : null}
         onClose={closePopover}
       >
-        {popoverShown === 'devices' ? (
+        {popoverShown === 'mapping' ? (
+          <MappingProfilesPanel open={open && popover?.id === 'mapping'} gameId={activeGame?.id ?? null} mapping={mapping} onNotice={setToastMessage} onClose={closePopover} />
+        ) : popoverShown === 'devices' ? (
           <DevicesPanel devices={devices} />
         ) : popoverShown === 'profile' ? (
           <ProfilePanel
@@ -622,7 +673,7 @@ export function GuideMenu({
       {/* Toast phản hồi hành động nhẹ nhàng, không tạo noise */}
       {toastMessage || status ? (
         <View pointerEvents="none" style={[styles.toastFloating, { bottom: s(86) + insets.bottom }]}>
-          <GlassBackdrop material="panel" />
+          <MenuGlassBackdrop variant="control" radius={s(14)} />
           <T size={11.5} weight="medium" color="rgba(255,255,255,0.88)">
             {toastMessage || status}
           </T>
@@ -632,16 +683,16 @@ export function GuideMenu({
       {/* MODAL XEM VÀ SAO CHÉP ẢNH CHỤP */}
       {shot ? (
         <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
-          <GlassBackdrop material="panel" />
           <View style={[styles.modalCard, { maxWidth: s(600), borderRadius: s(22) }]}>
+            <MenuGlassBackdrop radius={s(22)} blur={guideBackdrop === null} />
             <Img source={{ uri: `data:image/png;base64,${shot}` }} style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' }} contentFit="contain" />
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: s(14) }}>
               <T size={11} color="rgba(255,255,255,0.6)">Ảnh đã chụp từ màn hình stream</T>
               <View style={{ flexDirection: 'row', gap: s(8) }}>
-                <Press onPress={() => setShot(null)} sound="back" style={[styles.modalBtnSec, { height: s(36), borderRadius: s(12), paddingHorizontal: s(14) }]}>
+                <Press focusVariant="quiet" onPress={() => setShot(null)} sound="back" style={[styles.modalBtnSec, { height: s(36), borderRadius: s(12), paddingHorizontal: s(14) }]}>
                   <T size={11} color="rgba(255,255,255,0.7)">Đóng</T>
                 </Press>
-                <Press
+                <Press focusVariant="quiet"
                   onPress={() => void run('copy', async () => { await Clipboard.setImageAsync(shot); }, 'Đã chép ảnh vào clipboard.')}
                   style={[styles.modalBtnPri, { height: s(36), borderRadius: s(12), paddingHorizontal: s(14) }]}
                 >
@@ -657,8 +708,8 @@ export function GuideMenu({
       {/* MODAL XÁC NHẬN THOÁT GAME */}
       {confirmExit ? (
         <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
-          <GlassBackdrop material="panel" />
           <View style={[styles.modalCard, { maxWidth: s(380), alignItems: 'center', padding: s(22), borderRadius: s(22) }]}>
+            <MenuGlassBackdrop radius={s(22)} blur={guideBackdrop === null} />
             <View style={[styles.dangerIconCircle, { width: s(48), height: s(48), borderRadius: s(24) }]}>
               <LogOut size={s(20)} color="#f87171" />
             </View>
@@ -669,10 +720,10 @@ export function GuideMenu({
               Phiên chơi trên PC sẽ đóng lại và đưa bạn trở về kệ game.
             </T>
             <View style={{ flexDirection: 'row', gap: s(10), marginTop: s(18) }}>
-              <Press onPress={() => setConfirmExit(false)} style={[styles.modalBtnSec, { height: s(38), borderRadius: s(12), paddingHorizontal: s(16) }]}>
+              <Press focusVariant="quiet" onPress={() => setConfirmExit(false)} style={[styles.modalBtnSec, { height: s(38), borderRadius: s(12), paddingHorizontal: s(16) }]}>
                 <T size={11.5} weight="semibold" color="rgba(255,255,255,0.7)">Hủy</T>
               </Press>
-              <Press onPress={exitGame} style={[styles.dangerBtnPri, { height: s(38), borderRadius: s(12), paddingHorizontal: s(16) }]}>
+              <Press focusVariant="quiet" onPress={exitGame} style={[styles.dangerBtnPri, { height: s(38), borderRadius: s(12), paddingHorizontal: s(16) }]}>
                 <LogOut size={s(13)} color="#ffffff" />
                 <T size={11.5} weight="bold" color="#ffffff">Thoát game</T>
               </Press>
@@ -684,9 +735,9 @@ export function GuideMenu({
   );
 }
 
-const useStyles = makeStyles(({ glass, colors }) => ({
+const useStyles = makeStyles(() => ({
   root: {
-    backgroundColor: alpha(colors.bgDeep, 0.82),
+    backgroundColor: 'transparent',
     zIndex: 160,
     elevation: 160,
   },
@@ -698,9 +749,9 @@ const useStyles = makeStyles(({ glass, colors }) => ({
   closeBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: glass.control,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: glass.controlBorder,
+    borderColor: MENU_GLASS.border,
   },
   dockWrapper: {
     position: 'absolute',
@@ -714,19 +765,21 @@ const useStyles = makeStyles(({ glass, colors }) => ({
     paddingVertical: 3.5,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: glass.panel,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: glass.controlBorder,
+    borderColor: MENU_GLASS.border,
     ...glassShadowSubtle,
+    elevation: 0,
   },
   dockBar: {
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: glass.controlBorder,
-    backgroundColor: glass.panel,
+    borderColor: MENU_GLASS.border,
+    backgroundColor: 'transparent',
     ...glassShadow,
+    elevation: 0,
   },
   dockIconBtn: {
     alignItems: 'center',
@@ -734,14 +787,14 @@ const useStyles = makeStyles(({ glass, colors }) => ({
   },
   dockDivider: {
     width: StyleSheet.hairlineWidth,
-    backgroundColor: glass.controlActive,
+    backgroundColor: MENU_GLASS.border,
   },
   dockGameTile: {
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    backgroundColor: glass.control,
+    backgroundColor: MENU_GLASS.control,
   },
   dockBadge: {
     position: 'absolute',
@@ -752,7 +805,7 @@ const useStyles = makeStyles(({ glass, colors }) => ({
     borderRadius: 8.5,
     backgroundColor: '#ef4444',
     borderWidth: 1.2,
-    borderColor: glass.controlBorderActive,
+    borderColor: MENU_GLASS.borderActive,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
@@ -772,42 +825,44 @@ const useStyles = makeStyles(({ glass, colors }) => ({
     paddingVertical: 7,
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: glass.panel,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: glass.controlBorder,
+    borderColor: MENU_GLASS.border,
     ...glassShadowSubtle,
+    elevation: 0,
     zIndex: 40,
   },
   modalOverlay: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: alpha(colors.bgDeep, 0.75),
+    backgroundColor: MENU_GLASS.scrim,
     zIndex: 100,
     padding: 20,
   },
   modalCard: {
     width: '100%',
     overflow: 'hidden',
-    backgroundColor: glass.modal,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: glass.controlBorder,
+    borderColor: MENU_GLASS.border,
     ...glassShadow,
+    elevation: 0,
   },
   modalBtnSec: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: glass.control,
+    backgroundColor: MENU_GLASS.control,
     borderWidth: 1,
-    borderColor: glass.controlBorder,
+    borderColor: MENU_GLASS.border,
   },
   modalBtnPri: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: colors.primary,
+    backgroundColor: MENU_GLASS.controlActive,
     borderWidth: 1,
-    borderColor: glass.controlBorder,
+    borderColor: MENU_GLASS.borderActive,
   },
   dangerIconCircle: {
     alignItems: 'center',
@@ -823,6 +878,6 @@ const useStyles = makeStyles(({ glass, colors }) => ({
     gap: 6,
     backgroundColor: 'rgba(239,68,68,0.88)',
     borderWidth: 1,
-    borderColor: glass.controlBorder,
+    borderColor: MENU_GLASS.border,
   },
 }));

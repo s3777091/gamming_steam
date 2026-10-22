@@ -13,6 +13,7 @@ import { useSignedInUser } from '@/features/auth';
 import { resetFocusToTab } from '@/features/gamepad/focus';
 import { useBack, useGamepadTabs, useGuide } from '@/features/gamepad/hooks';
 import { HomeControlCenter } from '@/features/control-center/HomeControlCenter';
+import { VirtualKeyboard } from '@/features/stream/VirtualKeyboard';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useCaptureMode } from '@/features/gamepad/captureMode';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
@@ -41,7 +42,7 @@ import {
 } from '@/lib/stream-resume';
 import { type GameDownload, allDownloads, downloadForApp, isDownloadActive, uninstallForApp } from '@/lib/steam-downloads';
 import { type PurchaseOffer, type PurchaseTarget, purchaseKind } from '@/lib/steam-purchase';
-import { makeStyles, ThemeDecor } from '@/theme';
+import { makeStyles } from '@/theme';
 import { useUi } from '@/ui/scale';
 import { GlassBackdrop, GlassBlurProvider } from '@/ui/GlassMaterial';
 import { Press } from '@/ui/Press';
@@ -64,6 +65,7 @@ import { StoreSearchField, StoreSearchPanel } from './StoreSearch';
 import { UninstallSheet } from './UninstallSheet';
 import { GameOptionsModal } from './GameOptionsModal';
 import { ConsoleTabTransition } from './ConsoleTabTransition';
+import { CONSOLE } from './consoleVisuals';
 import { T } from '@/ui/Text';
 
 function ToastNotification({
@@ -322,6 +324,8 @@ export default function ConsoleScreen() {
 
   const openStoreGame = useCallback((item: SteamStoreItem) => {
     searchInputRef.current?.blur();
+    setPanel(null);
+    setMenuOpen(false);
     setSelectedPromotion(null);
     setSelectedStoreItem(item);
   }, []);
@@ -342,7 +346,7 @@ export default function ConsoleScreen() {
     setDeviceMenuOpen(false);
   }, [activeTab]);
 
-  const anyOverlay = Boolean(settingsCategory || selectedStoreItem || selectedPromotion || panel || menuOpen || storeSearchOpen || powerOpen || remoteMenuOpen || deviceMenuOpen || uninstallTarget || purchase.visible);
+  const anyOverlay = Boolean(settingsCategory || selectedStoreItem || selectedPromotion || panel || menuOpen || storeSearchOpen || powerOpen || remoteMenuOpen || deviceMenuOpen || uninstallTarget || purchase.visible || controlCenterOpen);
 
   // Nút B / Back: đóng lớp trên cùng trước. Các panel tự đăng ký Back riêng; ở đây
   // chỉ cần xử lý những lớp do màn này sở hữu (menu, ô tìm kiếm).
@@ -373,6 +377,15 @@ export default function ConsoleScreen() {
     setPanel('profile');
     void profile.load();
   };
+
+  const openControlCenter = useCallback(() => {
+    setMenuOpen(false);
+    setRemoteMenuOpen(false);
+    setDeviceMenuOpen(false);
+    setPanel(null);
+    setStoreSearchOpen(false);
+    setControlCenterOpen(true);
+  }, []);
 
   const openNotifications = () => {
     setMenuOpen(false);
@@ -641,12 +654,9 @@ export default function ConsoleScreen() {
     <GlassBlurProvider targetRef={blurTargetRef}>
       <View ref={rootRef} collapsable={false} style={styles.root}>
         <BlurTargetView ref={blurTargetRef} style={StyleSheet.absoluteFill}>
-          <LibraryBackdrop url={backdropUrl} fallbackUrl={activeTab === 'store' ? storeBackdropFallback : activeTab === 'games' ? selected?.artworkUrl : null} store={activeTab === 'store'} />
+          <LibraryBackdrop url={backdropUrl} fallbackUrl={activeTab === 'store' ? storeBackdropFallback : activeTab === 'games' ? selected?.artworkUrl : null} />
           <PcWallpaper visible={activeTab === 'pc'} />
         </BlurTargetView>
-        {/* Đặt ngoài BlurTargetView: lớp này chuyển động mỗi frame, nếu nằm trong target thì
-            mọi ô kính mờ trên Android phải blur lại liên tục và cả app bị giật. */}
-        <ThemeDecor scenery paused={pathname !== '/' || Boolean(settingsCategory)} />
 
         <View
           style={[styles.contentFrame, {
@@ -657,7 +667,7 @@ export default function ConsoleScreen() {
           }]}
           pointerEvents="box-none"
         >
-          <View style={{ height: s(48) }} />
+          <View style={{ height: s(44) }} />
           <ConsoleTabTransition
             activeTab={activeTab}
             renderTab={renderTab}
@@ -681,6 +691,7 @@ export default function ConsoleScreen() {
           onTabChange={switchTab}
           steamProfile={library.steamProfile}
           onOpenProfile={openProfile}
+          onOpenControlCenter={openControlCenter}
           onOpenSettings={openSettings}
           onOpenNotifications={openNotifications}
           unreadCount={notifications.unreadCount}
@@ -900,13 +911,25 @@ export default function ConsoleScreen() {
           onResume={resumeGame}
           onClose={() => setControlCenterOpen(false)}
         />
+
+        {!controlCenterOpen ? (
+          <VirtualKeyboard
+            onLocalText={(ch) => {
+              if (!storeSearchOpen && activeTab === 'store') setStoreSearchOpen(true);
+              pressStoreKey(ch);
+            }}
+            onLocalBackspace={eraseStoreKey}
+            onLocalSubmit={submitStoreSearch}
+            onLocalEscape={() => setStoreSearchOpen(false)}
+          />
+        ) : null}
       </View>
     </GlassBlurProvider>
   );
 }
 
-const useStyles = makeStyles(({ colors }) => ({
-  root: { flex: 1, overflow: 'hidden', backgroundColor: colors.bg },
+const useStyles = makeStyles(() => ({
+  root: { flex: 1, overflow: 'hidden', backgroundColor: CONSOLE.background },
   contentFrame: { flex: 1 },
   headerFrame: { position: 'absolute', zIndex: 30, elevation: 30 },
 }));
