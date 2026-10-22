@@ -7,14 +7,13 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, StyleSheet, View } from 'react-native';
-import { Bell, Gamepad2, Home, Keyboard, Play, Power, UserRound, type LucideIcon } from 'lucide-react-native';
+import { Gamepad2, Home, Keyboard, Play, Power, UserRound, type LucideIcon } from 'lucide-react-native';
 
 import { FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
 import { useVirtualKeyboardState } from '@/features/stream/VirtualKeyboard';
 import type { LocalDevice } from '@/features/devices/useInputDevices';
 import { formatClock } from '@/features/library/format';
-import type { AppNotification } from '@/features/library/types';
 import { PC_ROUTES, pcPostJson } from '@/lib/pc-api';
 import { forgetStreamGame, type ResumableGame } from '@/lib/stream-resume';
 import { HeaderAccent, makeStyles, useTheme } from '@/theme';
@@ -26,10 +25,11 @@ import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
-import { DevicesPanel, NotificationsPanel, ProfilePanel, UserAvatar } from './ControlCenterPanels';
+import { DevicesPanel, ProfilePanel, UserAvatar } from './ControlCenterPanels';
 import { ControlPopover, type PopoverAnchor } from './ControlPopover';
 
-type PopoverId = 'notifications' | 'devices' | 'profile';
+// Thông báo chỉ nằm ở chuông trên thanh tiêu đề, Control Center không lặp lại nó.
+type PopoverId = 'devices' | 'profile';
 
 type DockItem = {
   id: string;
@@ -47,9 +47,6 @@ export function HomeControlCenter({
   game,
   profile,
   devices,
-  notifications,
-  unreadCount,
-  onMarkAllRead,
   onResume,
   onClose,
 }: {
@@ -57,9 +54,6 @@ export function HomeControlCenter({
   game: ResumableGame | null;
   profile: { name: string; avatarUrl: string | null; email: string | null };
   devices: LocalDevice[];
-  notifications: AppNotification[];
-  unreadCount: number;
-  onMarkAllRead: () => void;
   /** Nối lại stream vào game đang chạy trên PC. */
   onResume: (game: ResumableGame) => void;
   onClose: () => void;
@@ -156,13 +150,6 @@ export function HomeControlCenter({
         virtualKeyboard.toggle();
         onClose();
       },
-    },
-    {
-      id: 'notifications',
-      label: 'Thông báo',
-      icon: Bell,
-      popover: 'notifications' as const,
-      badge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : null,
     },
     { id: 'devices', label: 'Thiết bị', icon: Gamepad2, popover: 'devices' as const, badge: devices.length > 0 ? devices.length : null },
     { id: 'profile', label: profile.name, icon: UserRound, popover: 'profile' as const },
@@ -292,19 +279,12 @@ export function HomeControlCenter({
         <ControlPopover
           open={popover !== null}
           anchor={popover?.anchor ?? null}
-          title={popoverShown === 'devices' ? 'Thiết bị' : popoverShown === 'profile' ? 'Tài khoản' : 'Thông báo'}
-          icon={popoverShown === 'devices' ? Gamepad2 : popoverShown === 'profile' ? UserRound : Bell}
-          width={popoverShown === 'notifications' ? 360 : 320}
-          action={popoverShown === 'notifications' && unreadCount > 0 ? (
-            <Press focusVariant="quiet" onPress={onMarkAllRead} hitSlop={8} style={{ paddingHorizontal: s(8), paddingVertical: s(4), borderRadius: s(10) }}>
-              <T size={10} weight="semibold" color={colors.accentSoft}>Đánh dấu đã đọc</T>
-            </Press>
-          ) : null}
+          title={popoverShown === 'profile' ? 'Tài khoản' : 'Thiết bị'}
+          icon={popoverShown === 'profile' ? UserRound : Gamepad2}
+          width={320}
           onClose={() => setPopover(null)}
         >
-          {popoverShown === 'devices' ? (
-            <DevicesPanel devices={devices} />
-          ) : popoverShown === 'profile' ? (
+          {popoverShown === 'profile' ? (
             <ProfilePanel
               name={profile.name}
               email={profile.email}
@@ -312,7 +292,7 @@ export function HomeControlCenter({
               status={game ? `Đang chạy ${game.title} trên PC` : 'Đã đăng nhập'}
             />
           ) : (
-            <NotificationsPanel notifications={notifications} />
+            <DevicesPanel devices={devices} />
           )}
         </ControlPopover>
       </FocusLayer>

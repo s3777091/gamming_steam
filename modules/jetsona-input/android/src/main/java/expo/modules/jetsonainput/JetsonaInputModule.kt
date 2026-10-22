@@ -27,6 +27,8 @@ import android.view.MotionEvent
 import android.util.Base64
 import android.util.DisplayMetrics
 import android.view.PixelCopy
+import android.view.SurfaceView
+import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.Window
@@ -179,8 +181,9 @@ class JetsonaInputModule : Module(), InputSink {
       setStreamWifiLock(fps.isFinite() && fps > 0.0)
     }
 
-    // Chụp khung hình đang hiện trên cửa sổ (kể cả video RTCView) bằng PixelCopy.
-    // Tách hai bước: grabFrame giữ bitmap NGAY (trước khi menu che), exportFrame
+    // Chụp khung hình game bằng PixelCopy: lấy thẳng từ surface video của RTCView
+    // (SurfaceView không nằm trong ảnh của cửa sổ, chụp cửa sổ chỉ ra ô đen), không
+    // có video thì chụp cả cửa sổ. Tách hai bước: grabFrame giữ bitmap NGAY (trước khi menu che), exportFrame
     // nén PNG khi người dùng thật sự cần ảnh.
     AsyncFunction("grabFrame") { promise: Promise -> grabFrame(promise) }
     AsyncFunction("exportFrame") { maxWidth: Int, promise: Promise -> exportFrame(maxWidth, promise) }
@@ -517,23 +520,59 @@ class JetsonaInputModule : Module(), InputSink {
         promise.resolve(false)
         return@runOnUiThread
       }
-      val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-      try {
-        PixelCopy.request(activity.window, bitmap, { result ->
-          if (result == PixelCopy.SUCCESS) {
-            lastFrame?.recycle()
-            lastFrame = bitmap
-            promise.resolve(true)
-          } else {
-            bitmap.recycle()
-            promise.resolve(false)
-          }
-        }, main)
-      } catch (_: IllegalArgumentException) {
-        bitmap.recycle()
-        promise.resolve(false)
+      val video = largestSurfaceView(view)
+      if (video != null) {
+        copyFrame(Bitmap.createBitmap(video.width, video.height, Bitmap.Config.ARGB_8888), promise,
+          { bitmap, listener -> PixelCopy.request(video, bitmap, listener, main) },
+          { copyWindow(activity.window, view, promise) })
+      } else {
+        copyWindow(activity.window, view, promise)
       }
     }
+  }
+
+  private fun copyWindow(window: Window, view: View, promise: Promise) {
+    copyFrame(Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888), promise,
+      { bitmap, listener -> PixelCopy.request(window, bitmap, listener, main) },
+      { promise.resolve(false) })
+  }
+
+  /** Giữ bitmap vừa chụp làm khung hình hiện tại; hỏng thì gọi `onFailure`. */
+  private fun copyFrame(
+    bitmap: Bitmap,
+    promise: Promise,
+    request: (Bitmap, PixelCopy.OnPixelCopyFinishedListener) -> Unit,
+    onFailure: () -> Unit,
+  ) {
+    try {
+      request(bitmap) { result ->
+        if (result == PixelCopy.SUCCESS) {
+          lastFrame?.recycle()
+          lastFrame = bitmap
+          promise.resolve(true)
+        } else {
+          bitmap.recycle()
+          onFailure()
+        }
+      }
+    } catch (_: IllegalArgumentException) {
+      bitmap.recycle()
+      onFailure()
+    }
+  }
+
+  /** SurfaceView lớn nhất đang hiển thị: surface video của RTCView khi đang stream. */
+  private fun largestSurfaceView(root: View): SurfaceView? {
+    var best: SurfaceView? = null
+    fun visit(view: View) {
+      if (!view.isShown) return
+      if (view is SurfaceView && view.width > 0 && view.height > 0 && view.holder.surface?.isValid == true) {
+        if (best == null || view.width * view.height > best!!.width * best!!.height) best = view
+      }
+      if (view is ViewGroup) for (i in 0 until view.childCount) visit(view.getChildAt(i))
+    }
+    visit(root)
+    return best
   }
 
   private fun exportFrame(maxWidth: Int, promise: Promise) {

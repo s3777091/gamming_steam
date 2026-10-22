@@ -923,9 +923,6 @@ export default function ConsoleScreen() {
           game={resumable}
           profile={{ name: appProfile.displayName, avatarUrl: appProfile.avatarUrl, email: appProfile.email }}
           devices={inputDevices.devices}
-          notifications={notifications.notifications}
-          unreadCount={notifications.unreadCount}
-          onMarkAllRead={() => void notifications.markAllAsRead()}
           onResume={resumeGame}
           onClose={() => setControlCenterOpen(false)}
         />

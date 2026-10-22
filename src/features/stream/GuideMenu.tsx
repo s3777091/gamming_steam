@@ -20,7 +20,6 @@ import {
   View,
 } from 'react-native';
 import {
-  Bell,
   Camera,
   Copy,
   SlidersHorizontal,
@@ -31,21 +30,22 @@ import {
   Power,
   Radio,
   RotateCw,
+  Save,
   UserRound,
   X,
   type LucideIcon,
 } from 'lucide-react-native';
 import { addListener, exportFrame, releaseFrame } from 'jetsona-input';
 
+import { DownloadFlight, type Flight, type FlightRect } from '@/features/console/DownloadFlight';
 import { useInputDevices } from '@/features/devices/useInputDevices';
 import { formatClock } from '@/features/library/format';
 import { activateFocus, deactivateFocus, ensureFocusActive, FocusLayer, moveFocus, type Direction } from '@/features/gamepad/focus';
 import { navDirection, REPEAT_DELAY_MS, REPEAT_INTERVAL_MS } from '@/features/gamepad/navigation';
-import { useNotifications } from '@/features/library/useNotifications';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { MappingProfilesPanel, type MappingSession } from '@/features/key-mapping/MappingProfilesPanel';
 import { ControlPopover, type PopoverAnchor } from '@/features/control-center/ControlPopover';
-import { DevicesPanel, NotificationsPanel, ProfilePanel, UserAvatar } from '@/features/control-center/ControlCenterPanels';
+import { DevicesPanel, ProfilePanel, UserAvatar } from '@/features/control-center/ControlCenterPanels';
 import type { PendingGameLaunch } from '@/lib/game-launch';
 import { WATCH_PARTY_ENABLED, WATCH_PARTY_LOCKED_MESSAGE } from '@/lib/feature-flags';
 import { uploadGameScreenshot } from '@/lib/game-screenshots';
@@ -77,7 +77,8 @@ export type RunningGame = {
   processCount: number;
 };
 
-type PopoverId = 'notifications' | 'devices' | 'profile' | 'mapping';
+// Thông báo chỉ nằm ở chuông trên thanh tiêu đề ngoài app, menu Guide không lặp lại nó.
+type PopoverId = 'devices' | 'profile' | 'mapping';
 
 /** Game sắp thoát, để màn stream diễn hoạt cảnh thoát bằng đúng artwork của nó. */
 export type ExitingGame = { gameId: string | null; title: string; heroUrl: string | null; logoUrl: string | null };
@@ -95,6 +96,13 @@ type DockAction = {
   run?: () => void;
 };
 
+function measureRect(node: View | null): Promise<FlightRect | null> {
+  return new Promise((resolve) => {
+    if (!node) { resolve(null); return; }
+    node.measureInWindow((x, y, w, h) => resolve(w > 0 && h > 0 ? { x, y, w, h } : null));
+  });
+}
+
 export function GuideMenu({
   open,
   profile,
@@ -102,7 +110,6 @@ export function GuideMenu({
   status,
   watchParty,
   launch,
-  notificationCount: notificationCountProp,
   onClose,
   onHome,
   onReload,
@@ -119,7 +126,6 @@ export function GuideMenu({
   status?: string | null;
   watchParty: WatchPartyState;
   launch?: PendingGameLaunch | null;
-  notificationCount?: number;
   onClose: () => void;
   onHome: () => void;
   onReload: () => void;
@@ -138,7 +144,6 @@ export function GuideMenu({
   const { reduceMotion } = useMotion();
   const fade = useMemo(() => new Animated.Value(0), []);
   const { devices } = useInputDevices();
-  const { unreadCount, notifications, markAllAsRead } = useNotifications();
   const virtualKeyboard = useVirtualKeyboardState();
 
   const [games, setGames] = useState<RunningGame[]>([]);
@@ -246,24 +251,54 @@ export function GuideMenu({
     }
   }, [busy]);
 
+  // Chụp chỉ mở ảnh xem trước; Sao chép và Lưu là hai nút riêng bên cạnh ảnh.
   const takeScreenshot = useCallback(() => void run('shot', async () => {
     if (!hasFrame) throw new Error('Khung hình chưa sẵn sàng để chụp.');
     const base64 = await exportFrame(1920);
     if (!base64) throw new Error('Không mã hóa được ảnh chụp.');
     setShot(base64);
-    const copied = await Clipboard.setImageAsync(base64).then(() => true, () => false);
+  }), [hasFrame, run]);
+
+  // Lưu: ảnh gập lại, chờ PC nhận rồi bay vào avatar trên dock (nơi mở Ảnh chụp game),
+  // như thẻ game bay vào chuông khi bấm Tải. Lưu hỏng thì ảnh mở lại để thử lần nữa.
+  const [flight, setFlight] = useState<Flight | null>(null);
+  const [saving, setSaving] = useState(false);
+  const flightSeq = useRef(0);
+  const failedShot = useRef<string | null>(null);
+  const flightLayerRef = useRef<View>(null);
+  const shotFrameRef = useRef<View>(null);
+  const saveShot = useCallback(() => {
+    const base64 = shot;
+    if (!base64 || saving) return;
+    setSaving(true);
     // Lưu vào D:\jetsona\storage\Images\Ảnh chụp game để xem lại trong hồ sơ.
     const title = games.find((g) => g.active)?.title || launch?.title || 'Jetsona';
-    try {
-      await uploadGameScreenshot(base64, title);
-      setToastMessage(copied
-        ? 'Đã lưu vào Ảnh chụp game và chép vào clipboard.'
-        : 'Đã lưu vào Ảnh chụp game trên máy tính.');
-    } catch (error) {
-      const reason = (error as Error).message || 'Không lưu được ảnh lên máy tính.';
-      setToastMessage(copied ? `Đã chép vào clipboard. ${reason}` : reason);
-    }
-  }), [games, hasFrame, launch?.title, run]);
+    const upload = uploadGameScreenshot(base64, title)
+      .then(() => null, (error: Error) => error.message || 'Không lưu được ảnh lên máy tính.');
+    const preview = guideBackdrop ?? `data:image/png;base64,${base64}`;
+    void Promise.all([
+      measureRect(flightLayerRef.current), measureRect(shotFrameRef.current), measureRect(dockNodes.get('profile') ?? null),
+    ]).then(async ([origin, from, to]) => {
+      const key = (flightSeq.current += 1);
+      const flew = Boolean(origin && from && to);
+      if (origin && from && to) {
+        const local = (rect: FlightRect) => ({ x: rect.x - origin.x, y: rect.y - origin.y, w: rect.w, h: rect.h });
+        setFlight({ key, imageUrl: preview, from: local(from), to: local(to), result: null });
+        setShot(null);
+      }
+      const error = await upload;
+      setSaving(false);
+      setToastMessage(error ?? 'Đã lưu vào Ảnh chụp game.');
+      if (!flew) return;
+      if (error) failedShot.current = base64;
+      setFlight((current) => (current?.key === key ? { ...current, result: error ? 'fail' : 'ok' } : current));
+    });
+  }, [dockNodes, games, guideBackdrop, launch?.title, saving, shot]);
+  const endFlight = useCallback(() => {
+    setFlight(null);
+    if (failedShot.current) setShot(failedShot.current);
+    failedShot.current = null;
+  }, []);
 
   const toggleStreaming = useCallback(() => {
     if (!WATCH_PARTY_ENABLED) {
@@ -301,11 +336,6 @@ export function GuideMenu({
       logoUrl: launch?.logoUrl ?? null,
     });
   }, [games, launch, onExitGame]);
-
-  // Tính số lượng thông báo chính xác
-  const totalNotifs = notificationCountProp !== undefined
-    ? notificationCountProp
-    : (unreadCount > 0 ? unreadCount : notifications.length);
 
   // Thông tin game đang hiển thị
   const activeGame = games.find((g) => g.active) ?? null;
@@ -380,13 +410,6 @@ export function GuideMenu({
       },
     },
     {
-      id: 'notifications',
-      label: 'Thông báo',
-      icon: Bell,
-      popover: 'notifications',
-      badge: totalNotifs > 0 ? (totalNotifs > 99 ? '99+' : totalNotifs) : null,
-    },
-    {
       id: 'stream',
       label: 'Streaming',
       icon: Radio,
@@ -426,7 +449,7 @@ export function GuideMenu({
       danger: true,
       run: () => setConfirmExit(true),
     },
-  ], [mapping.active, virtualKeyboard, batteryPercent, devices.length, gameTitle, handleClose, onHome, rememberedHero, rememberedId, rememberedLogo, onReload, profile?.name, takeScreenshot, toggleStreaming, totalNotifs, watchParty.live]);
+  ], [mapping.active, virtualKeyboard, batteryPercent, devices.length, gameTitle, handleClose, onHome, rememberedHero, rememberedId, rememberedLogo, onReload, profile?.name, takeScreenshot, toggleStreaming, watchParty.live]);
 
   const onSelectDockAction = useCallback((action: DockAction, index: number) => {
     setDockFocus(index);
@@ -730,28 +753,22 @@ export function GuideMenu({
         </View>
       </View>
 
-      {/* Popover kiểu Apple bung ra từ nút Thông báo / Thiết bị / Tài khoản */}
+      {/* Popover kiểu Apple bung ra từ nút Thiết lập nút / Thiết bị / Tài khoản */}
       <ControlPopover
         open={popover !== null}
         trapFocus
         blur={guideBackdrop === null}
         anchor={popover?.anchor ?? null}
-        title={popoverShown === 'mapping' ? 'Thiết lập nút' : popoverShown === 'devices' ? 'Thiết bị' : popoverShown === 'profile' ? 'Tài khoản' : 'Thông báo'}
-        icon={popoverShown === 'mapping' ? SlidersHorizontal : popoverShown === 'devices' ? Gamepad2 : popoverShown === 'profile' ? UserRound : Bell}
-        width={popoverShown === 'mapping' ? 450 : popoverShown === 'notifications' ? 360 : 320}
-        action={popoverShown === 'notifications' && unreadCount > 0 ? (
-          <Press focusVariant="quiet" onPress={() => void markAllAsRead()} hitSlop={8} style={{ paddingHorizontal: s(8), paddingVertical: s(4), borderRadius: s(10) }}>
-            <T size={10} weight="semibold" color={colors.accentSoft}>Đánh dấu đã đọc</T>
-          </Press>
-        ) : popoverShown === 'mapping' ? (
+        title={popoverShown === 'mapping' ? 'Thiết lập nút' : popoverShown === 'profile' ? 'Tài khoản' : 'Thiết bị'}
+        icon={popoverShown === 'mapping' ? SlidersHorizontal : popoverShown === 'profile' ? UserRound : Gamepad2}
+        width={popoverShown === 'mapping' ? 450 : 320}
+        action={popoverShown === 'mapping' ? (
           <PanelIconButton icon={RotateCw} label="Tải lại profile" appearance="glass" onPress={() => setMappingReload((n) => n + 1)} />
         ) : null}
         onClose={closePopover}
       >
         {popoverShown === 'mapping' ? (
           <MappingProfilesPanel open={open && popover?.id === 'mapping'} gameId={activeGame?.id ?? null} mapping={mapping} reloadToken={mappingReload} onNotice={setToastMessage} onClose={closePopover} />
-        ) : popoverShown === 'devices' ? (
-          <DevicesPanel devices={devices} />
         ) : popoverShown === 'profile' ? (
           <ProfilePanel
             name={profile?.name || 'Người dùng'}
@@ -760,7 +777,7 @@ export function GuideMenu({
             status={watchParty.live ? 'Đang điều khiển PC · đang streaming' : 'Đang điều khiển PC'}
           />
         ) : (
-          <NotificationsPanel notifications={notifications} />
+          <DevicesPanel devices={devices} />
         )}
       </ControlPopover>
 
@@ -779,14 +796,15 @@ export function GuideMenu({
         <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
           <FocusLayer>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: s(10) }}>
-              <View style={[styles.shotFrame, { width: shotHeight * shotAspect, height: shotHeight, borderRadius: s(18) }]}>
+              <View ref={shotFrameRef} collapsable={false} style={[styles.shotFrame, { width: shotHeight * shotAspect, height: shotHeight, borderRadius: s(18) }]}>
                 <Img source={shotPreview} style={StyleSheet.absoluteFill} contentFit="cover"
                   cachePolicy="none" transition={0} accessibilityLabel="Ảnh vừa chụp" />
               </View>
               <View style={{ gap: s(8) }}>
                 <PanelIconButton icon={X} label="Đóng ảnh chụp" sound="back" appearance="glass" onPress={() => setShot(null)} />
-                <PanelIconButton icon={Copy} label="Sao chép ảnh" appearance="glass" autoFocus disabled={busy === 'copy'}
+                <PanelIconButton icon={Copy} label="Sao chép ảnh" appearance="glass" disabled={busy === 'copy'}
                   onPress={() => void run('copy', async () => { await Clipboard.setImageAsync(shot); }, 'Đã chép ảnh vào clipboard.')} />
+                <PanelIconButton icon={Save} label="Lưu vào Ảnh chụp game" appearance="glass" autoFocus disabled={saving} onPress={saveShot} />
               </View>
             </View>
           </FocusLayer>
@@ -822,6 +840,11 @@ export function GuideMenu({
           </FocusLayer>
         </View>
       ) : null}
+
+      {/* Ảnh vừa lưu bay vào avatar trên dock; toạ độ tính theo gốc của lớp này. */}
+      <View ref={flightLayerRef} collapsable={false} pointerEvents="none" style={[StyleSheet.absoluteFill, styles.flightLayer]}>
+        {flight ? <DownloadFlight key={flight.key} flight={flight} onDone={endFlight} /> : null}
+      </View>
       </FocusLayer>
     </Animated.View>
   );
@@ -941,6 +964,7 @@ const useStyles = makeStyles(({ glass }) => ({
     ...glassShadow,
     elevation: 0,
   },
+  flightLayer: { zIndex: 120, elevation: 120 },
   shotFrame: {
     overflow: 'hidden',
     backgroundColor: '#000',

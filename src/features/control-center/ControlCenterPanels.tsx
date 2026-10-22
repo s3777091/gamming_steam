@@ -1,16 +1,15 @@
 // Nội dung các popover của Control Center: Thiết bị (vòng pin kiểu widget Pin
-// của iOS), Thông báo và Tài khoản (tài khoản đăng nhập app, không phải Steam).
+// của iOS) và Tài khoản (tài khoản đăng nhập app, không phải Steam).
 
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { Bell, Camera, Check, Gamepad2, Tag, Trash2, Sparkles } from 'lucide-react-native';
+import { Camera, Gamepad2 } from 'lucide-react-native';
 
 import { batteryPercent } from '@/features/devices/battery';
 import { KIND_ICONS } from '@/features/devices/kindIcons';
 import { DEVICE_KIND_ORDER, KIND_LABEL, type LocalDevice } from '@/features/devices/useInputDevices';
-import type { AppNotification } from '@/features/library/types';
 import { getBackendBaseUrl } from '@/lib/config';
 import { listGameScreenshots } from '@/lib/game-screenshots';
 import { resolveProfileAvatarUri } from '@/lib/profile-avatar';
@@ -150,64 +149,6 @@ export function DevicesPanel({ devices }: { devices: LocalDevice[] }) {
   );
 }
 
-// ------------------------------------------------------------------ thông báo
-
-function notificationLine(item: AppNotification, accent: string): { kind: string; title: string; detail: string; image: string | null; Icon: typeof Bell; tint: string } {
-  if (item.type === 'discount') {
-    return { kind: 'Ưu đãi', title: item.gameTitle, detail: `Giảm ${item.discountPercent}% trên Steam`, image: item.imageUrl, Icon: Tag, tint: '#34c759' };
-  }
-  if (item.type === 'update') {
-    return { kind: 'Cập nhật', title: item.gameTitle, detail: item.title, image: item.gameImageUrl, Icon: Sparkles, tint: accent };
-  }
-  return { kind: 'Đã gỡ', title: item.gameTitle, detail: item.message || 'Đã gỡ khỏi máy tính', image: item.gameImageUrl ?? null, Icon: Trash2, tint: '#ff9f0a' };
-}
-
-export function NotificationsPanel({ notifications }: { notifications: AppNotification[] }) {
-  const { colors } = useTheme();
-  const styles = useStyles();
-  const { s } = useUi();
-  const shown = notifications.slice(0, 4);
-  if (shown.length === 0) {
-    return (
-      <Stagger index={0}>
-        <View style={[styles.empty, { paddingVertical: s(16), borderRadius: s(14), gap: s(6) }]}>
-          <Check size={s(20)} color="rgba(255,255,255,0.4)" />
-          <T size={11} color="rgba(255,255,255,0.6)">Không có thông báo mới</T>
-        </View>
-      </Stagger>
-    );
-  }
-  return (
-    <View style={{ gap: s(6) }}>
-      {shown.map((item, index) => {
-        const line = notificationLine(item, colors.accentSoft);
-        return (
-          <Stagger key={item.id} index={index}>
-            <View style={[styles.inset, styles.row, { padding: s(8), gap: s(10), borderRadius: s(14) }]}>
-              <View style={[styles.thumb, { width: s(58), height: s(28), borderRadius: s(7) }]}>
-                {line.image ? <Img source={{ uri: line.image }} style={StyleSheet.absoluteFill} contentFit="cover" /> : null}
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <View style={[styles.row, { gap: s(4) }]}>
-                  <line.Icon size={s(9)} color={line.tint} strokeWidth={2.4} />
-                  <T size={9} weight="semibold" color={line.tint}>{line.kind}</T>
-                </View>
-                <T size={11} weight="semibold" color="#ffffff" numberOfLines={1} style={{ marginTop: s(1) }}>{line.title}</T>
-                <T size={9.5} color="rgba(255,255,255,0.55)" numberOfLines={1}>{line.detail}</T>
-              </View>
-            </View>
-          </Stagger>
-        );
-      })}
-      {notifications.length > shown.length ? (
-        <T size={9.5} color="rgba(255,255,255,0.4)" style={{ textAlign: 'center', marginTop: s(2) }}>
-          +{notifications.length - shown.length} thông báo khác
-        </T>
-      ) : null}
-    </View>
-  );
-}
-
 // ------------------------------------------------------------------ tài khoản
 
 /** Avatar tài khoản app: ảnh nếu có, không thì chữ cái đầu trên nền gradient. */
@@ -308,7 +249,6 @@ const useStyles = makeStyles(({ glass }) => ({
     backgroundColor: menuGlassFrom(glass).inset,
   },
   row: { flexDirection: 'row', alignItems: 'center' },
-  thumb: { overflow: 'hidden', backgroundColor: menuGlassFrom(glass).control },
   dot: { backgroundColor: APPLE_GREEN },
   rowIcon: { alignItems: 'center', justifyContent: 'center', backgroundColor: menuGlassFrom(glass).controlActive },
 }));
