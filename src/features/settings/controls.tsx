@@ -3,18 +3,19 @@
 
 import Slider from '@react-native-community/slider';
 import React, { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { ActivityIndicator, Animated, Easing, StyleSheet, View } from 'react-native';
 import { Check, ChevronRight, Loader, type LucideIcon } from 'lucide-react-native';
 
 import { useFocusable } from '@/features/gamepad/focus';
 import { playUiSound, type UiSound } from '@/features/sound/UiSoundProvider';
-import { alpha, MaterialTexture, useTheme } from '@/theme';
+import { alpha, useTheme } from '@/theme';
 import { FocusRing } from '@/ui/FocusRing';
 import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
+import { SettingsDisclosure } from './SettingsDisclosure';
+import { SETTINGS_LAYOUT, useSettingsColors } from './SettingsSurface';
 
 export function SettingsGroup({
   title,
@@ -25,14 +26,14 @@ export function SettingsGroup({
   footer?: string;
   children: ReactNode;
 }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const rawItems = React.Children.toArray(children);
   const items = rawItems.filter(Boolean);
   if (!items.length) return null;
 
   return (
-    <View style={{ marginTop: s(20) }}>
+    <View style={{ marginTop: SETTINGS_LAYOUT.sectionSpacing }}>
       {title ? (
         <T
           size={11.2}
@@ -40,22 +41,22 @@ export function SettingsGroup({
           color={appleColors.textSecondary}
           leading={1.5}
           accessibilityRole="header"
-          style={{ marginBottom: s(10), paddingHorizontal: s(16) }}
+          tracking={0.06}
+          style={{ marginBottom: s(8), paddingHorizontal: s(16) }}
         >
-          {title}
+          {title.toLocaleUpperCase('vi')}
         </T>
       ) : null}
 
       <View
         style={{
           backgroundColor: appleColors.card,
-          borderRadius: s(16),
+          borderRadius: SETTINGS_LAYOUT.radius,
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: appleColors.cardBorder,
           overflow: 'hidden',
         }}
       >
-        <MaterialTexture />
         {items.map((child, index) => (
           <View key={index}>
             {index > 0 ? (
@@ -95,12 +96,12 @@ export function RowText({
   detail?: ReactNode;
   labelColor?: string;
 }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   return (
     <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
       {typeof label === 'string' ? (
-        <T size={13.2} weight="regular" color={labelColor ?? appleColors.text} numberOfLines={1}>
+        <T size={13.2} weight="regular" color={labelColor ?? appleColors.text}>
           {label}
         </T>
       ) : (
@@ -122,10 +123,10 @@ export function RowText({
 
 export function rowStyle(s: (n: number) => number, extra?: object) {
   return {
-    minHeight: s(46),
+    minHeight: SETTINGS_LAYOUT.rowHeight,
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
-    gap: s(12),
+    gap: s(10),
     paddingHorizontal: s(16),
     paddingVertical: s(8),
     backgroundColor: 'transparent',
@@ -134,14 +135,10 @@ export function rowStyle(s: (n: number) => number, extra?: object) {
 }
 
 /**
- * Công tắc UISwitch chuẩn Apple (như được khoanh đỏ trong ảnh mẫu):
- * - Rộng 46dp, cao 26dp, bo tròn dạng viên thuốc.
- * - Bật: xanh lá Apple #34C759 với viền sáng và đổ bóng dịu.
- * - Tắt: xám mờ Apple.
- * - Nút tròn trắng tinh, đổ bóng chuẩn iOS.
+ * Compact switch using the current settings accent and device motion preference.
  */
 export function Switch({ checked }: { checked: boolean }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const { reduceMotion } = useMotion();
   const [slide] = useState(() => new Animated.Value(checked ? 1 : 0));
@@ -149,7 +146,7 @@ export function Switch({ checked }: { checked: boolean }) {
   useEffect(() => {
     const animation = Animated.timing(slide, {
       toValue: checked ? 1 : 0,
-      duration: reduceMotion ? 0 : 180,
+      duration: reduceMotion ? 0 : 150,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
       isInteraction: false,
@@ -170,38 +167,18 @@ export function Switch({ checked }: { checked: boolean }) {
         width: trackWidth,
         height: trackHeight,
         borderRadius: trackHeight / 2,
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.20)',
+        backgroundColor: appleColors.switchOff,
         justifyContent: 'center',
         paddingHorizontal: thumbPadding,
-        shadowColor: '#34c759',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: checked ? 0.45 : 0,
-        shadowRadius: 8,
-        elevation: checked ? 4 : 0,
       }}
     >
       <Animated.View
         pointerEvents="none"
         style={[StyleSheet.absoluteFill, {
           borderRadius: trackHeight / 2,
-          backgroundColor: appleColors.green,
-          borderWidth: 1,
-          borderColor: 'rgba(52, 199, 89, 0.65)',
+          backgroundColor: appleColors.accent,
           opacity: slide,
         }]}
-      />
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: trackHeight / 4,
-          right: trackHeight / 4,
-          height: 1,
-          backgroundColor: 'rgba(255, 255, 255, 0.28)',
-        }}
       />
       <Animated.View
         style={{
@@ -219,9 +196,9 @@ export function Switch({ checked }: { checked: boolean }) {
           ],
           shadowColor: '#000000',
           shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.35,
-          shadowRadius: 4,
-          elevation: 3,
+          shadowOpacity: 0.16,
+          shadowRadius: 2,
+          elevation: 1,
         }}
       />
     </Animated.View>
@@ -246,6 +223,7 @@ export function ToggleRow({
       pressScale={0.995}
       focusVariant="row"
       accessibilityRole="switch"
+      accessibilityLabel={label}
       accessibilityState={{ checked }}
       style={rowStyle(s)}
     >
@@ -261,7 +239,7 @@ export type ChoiceOption<T extends string> = {
   description?: string;
 };
 
-/** Hàng lựa chọn kiểu iOS: bấm để mở danh sách dạng inline với dấu tích xanh #007AFF. */
+/** Inline choices share the active accent and a short expand/collapse transition. */
 export function ChoiceRow<V extends string>({
   label,
   value,
@@ -273,7 +251,7 @@ export function ChoiceRow<V extends string>({
   options: ChoiceOption<V>[];
   onChange: (value: V) => void;
 }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const [open, setOpen] = useState(false);
   const selected = options.find((option) => option.value === value) ?? options[0];
@@ -288,8 +266,8 @@ export function ChoiceRow<V extends string>({
         style={rowStyle(s)}
       >
         <RowText label={label} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
-          <T size={12.6} color={appleColors.textTertiary}>
+        <View style={{ maxWidth: '52%', flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
+          <T size={12.6} color={appleColors.textTertiary} style={{ flexShrink: 1, textAlign: 'right' }}>
             {selected?.label}
           </T>
           <ChevronRight
@@ -299,7 +277,7 @@ export function ChoiceRow<V extends string>({
           />
         </View>
       </Press>
-      {open ? (
+      <SettingsDisclosure open={open}>
         <View
           style={{
             backgroundColor: appleColors.inset,
@@ -329,8 +307,9 @@ export function ChoiceRow<V extends string>({
                   focusVariant="row"
                   accessibilityRole="radio"
                   accessibilityState={{ checked: active }}
+                  focusable={open}
                   style={{
-                    minHeight: s(40),
+                    minHeight: s(44),
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: s(12),
@@ -364,7 +343,7 @@ export function ChoiceRow<V extends string>({
             );
           })}
         </View>
-      ) : null}
+      </SettingsDisclosure>
     </View>
   );
 }
@@ -388,7 +367,7 @@ export function SliderRow({
   format: (value: number) => string;
   onChange: (value: number) => void;
 }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s, width } = useUi();
   const [previousValue, setPreviousValue] = useState(value);
   const [local, setLocal] = useState(value);
@@ -495,23 +474,9 @@ export function ActionRow({
   iconColor?: string;
   sound?: UiSound | false;
 }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
-  const [spin] = useState(() => new Animated.Value(0));
-
-  useEffect(() => {
-    if (!busy) return;
-    const loop = Animated.loop(
-      Animated.timing(spin, {
-        toValue: 1,
-        duration: 900,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [busy, spin]);
+  const { reduceMotion } = useMotion();
 
   const bg =
     iconBg ??
@@ -520,7 +485,7 @@ export function ActionRow({
       : tone === 'danger'
         ? appleColors.red
         : '#8E8E93');
-  const fg = iconColor ?? '#FFFFFF';
+  const fg = iconColor ?? bg;
   const labelColor =
     tone === 'danger'
       ? appleColors.red
@@ -533,6 +498,7 @@ export function ActionRow({
       onPress={onPress}
       sound={sound}
       disabled={disabled || busy}
+      accessibilityState={{ busy }}
       pressScale={0.995}
       focusVariant="row"
       style={rowStyle(s, { opacity: disabled ? 0.4 : 1 })}
@@ -540,50 +506,19 @@ export function ActionRow({
       {Icon ? (
         <View
           style={{
-            width: s(28),
-            height: s(28),
-            borderRadius: s(8),
+            width: s(24),
+            height: s(24),
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: bg,
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: 'rgba(255, 255, 255, 0.35)',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.25,
-            shadowRadius: 2,
-            overflow: 'hidden',
           }}
         >
-          <LinearGradient
-            colors={['rgba(255, 255, 255, 0.32)', 'transparent']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 0.65 }}
-            pointerEvents="none"
-            style={StyleSheet.absoluteFill}
-          />
-          {busy ? (
-            <Animated.View
-              style={{
-                transform: [
-                  {
-                    rotate: spin.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0deg', '360deg'],
-                    }),
-                  },
-                ],
-              }}
-            >
-              <Loader size={s(15)} color={fg} />
-            </Animated.View>
-          ) : (
-            <Icon size={s(15)} color={fg} strokeWidth={2.2} />
-          )}
+          <Icon size={s(17)} color={fg} strokeWidth={1.8} />
         </View>
       ) : null}
       <RowText label={label} detail={detail} labelColor={labelColor} />
-      {trailing ?? <ChevronRight size={s(15)} color={appleColors.chevron} />}
+      {busy ? reduceMotion ? <Loader size={s(16)} color={appleColors.accent} />
+        : <ActivityIndicator size="small" color={appleColors.accent} />
+        : trailing ?? <ChevronRight size={s(15)} color={appleColors.chevron} />}
     </Press>
   );
 }
@@ -597,14 +532,14 @@ export function InfoRow({
   detail?: string;
   value: ReactNode;
 }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   return (
     <View style={rowStyle(s)}>
       <RowText label={label} detail={detail} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8) }}>
+      <View style={{ maxWidth: '54%', flexShrink: 1, alignItems: 'flex-end' }}>
         {typeof value === 'string' ? (
-          <T size={12.4} color={appleColors.textTertiary}>
+          <T size={12.4} color={appleColors.textTertiary} style={{ textAlign: 'right' }}>
             {value}
           </T>
         ) : (
@@ -639,7 +574,7 @@ export function ConfirmActionRow({
   iconBg?: string;
   iconColor?: string;
 }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const [armed, setArmed] = useState(false);
   return (
     <ActionRow
@@ -671,7 +606,8 @@ export function Keycap({
   children: ReactNode;
   accent?: boolean;
 }) {
-  const { colors, settings: appleColors } = useTheme();
+  const { colors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   return (
     <View
@@ -685,21 +621,9 @@ export function Keycap({
         borderWidth: 1,
         borderColor: accent ? alpha(colors.accent, 0.45) : 'rgba(255, 255, 255, 0.18)',
         backgroundColor: accent ? alpha(colors.primary, 0.22) : 'rgba(255, 255, 255, 0.08)',
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.15,
-        shadowRadius: 2,
-        elevation: 1,
-        overflow: 'hidden',
+        overflow: 'visible',
       }}
     >
-      <LinearGradient
-        colors={['rgba(255, 255, 255, 0.20)', 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 0.7 }}
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-      />
       <T
         size={10.2}
         weight="semibold"
@@ -752,9 +676,9 @@ export function PillButton({
       accessibilityLabel={label}
       pressScale={0.97}
       style={{
-        height: s(28),
+        minHeight: s(44),
         paddingHorizontal: s(12),
-        borderRadius: s(14),
+        borderRadius: s(8),
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
@@ -763,21 +687,9 @@ export function PillButton({
         borderWidth: 1,
         borderColor: border,
         opacity: disabled ? 0.4 : 1,
-        overflow: 'hidden',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: tone === 'accent' ? 0.35 : 0.15,
-        shadowRadius: 4,
-        elevation: 2,
+        overflow: 'visible',
       }}
     >
-      <LinearGradient
-        colors={['rgba(255, 255, 255, 0.22)', 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 0.8 }}
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-      />
       {typeof children === 'string' ? (
         <T size={10.4} weight="semibold" color={fg}>
           {children}

@@ -76,6 +76,9 @@ export type StoreDetailItem = {
   storeUrl: string;
   genres?: string[];
   logo?: { url: string; width: number; height: number } | null;
+  originalPrice?: number | null;
+  finalPrice?: number | null;
+  currency?: string | null;
 };
 
 export type DetailSheet =

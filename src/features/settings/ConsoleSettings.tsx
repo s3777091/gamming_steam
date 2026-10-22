@@ -1,17 +1,14 @@
-// Màn hình Cài đặt theo ngôn ngữ thiết kế Apple Liquid Glass (iOS 26 / Console Glass):
-// Bố cục chia hai cột Master - Detail: Kính mờ quang học (GlassBackdrop / BlurView),
-// nền cực quang chất lỏng (Liquid Ambient Aurora), viền phản quang specular rim,
-// icon squircle kính đa sắc và nút đóng viên thuốc kính nổi bật.
+// Compact settings with fixed density, flat theme surfaces and a handheld drawer.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Animated, Easing, Platform, StyleSheet, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { ActivityIndicator, Animated, Easing, Modal, Platform, Pressable, StyleSheet, View, type ScrollView } from 'react-native';
 import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import {
   Check,
   Gamepad2,
   Gauge,
   Keyboard,
+  Menu,
   Monitor,
   MonitorPlay,
   Mouse,
@@ -26,14 +23,15 @@ import {
 } from 'lucide-react-native';
 
 import { useBack } from '@/features/gamepad/hooks';
-import { alpha, type SettingsTokens, ThemeDecor, useTheme } from '@/theme';
-import { GlassBackdrop, GlassBlurProvider } from '@/ui/GlassMaterial';
-import { Img } from '@/ui/Img';
+import { type SettingsTokens } from '@/theme';
+import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 import { AppearancePage } from './AppearancePage';
+import { MappingLibrary } from '@/features/key-mapping/MappingLibrary';
+import { mappingColors } from '@/features/key-mapping/MappingUi';
 import { PillButton } from './controls';
 import { AudioPage, ControllerPage, DevicesPage, KeyboardPage, MousePage } from './DevicePages';
 import { GameBoosterPage } from './GameBoosterPage';
@@ -41,6 +39,7 @@ import { LatencyPage, NetworkPage, QualityPage, VideoPage } from './StreamPages'
 import { useInputSettings } from './useInputSettings';
 import { useStreamSettingsDraft } from './useStreamSettingsDraft';
 import { SettingsRestoreButton, SettingsRestoreContext, type SettingsRestoreAction } from './SettingsRestore';
+import { SETTINGS_LAYOUT, SettingsSurface, useSettingsColors } from './SettingsSurface';
 
 export type SettingsCategory =
   | 'quality'
@@ -48,6 +47,7 @@ export type SettingsCategory =
   | 'latency'
   | 'network'
   | 'booster'
+  | 'mapping'
   | 'devices'
   | 'controller'
   | 'mouse'
@@ -75,10 +75,11 @@ const CATEGORIES: {
   section: SettingsSection;
   color: keyof SettingsTokens;
 }[] = [
+  { id: 'mapping', label: 'Thiết lập nút', detail: 'Tạo và quản lý profile nút cho từng game', icon: Gamepad2, section: 'game', color: 'teal' },
   { id: 'quality', label: 'Chất lượng stream', detail: 'Chọn profile hợp với cách bạn chơi', icon: Sparkles, section: 'streaming', color: 'purple' },
   { id: 'video', label: 'Hình ảnh', detail: 'Độ phân giải, FPS, codec, bitrate và lớp phủ', icon: MonitorPlay, section: 'streaming', color: 'blue' },
   { id: 'latency', label: 'Độ trễ & độ mượt', detail: 'Bộ đệm, frame pacing và V-Sync', icon: Gauge, section: 'streaming', color: 'orange' },
-  { id: 'network', label: 'Mạng', detail: 'Khu vực và kiểm tra đường truyền', icon: Wifi, section: 'streaming', color: 'blue' },
+  { id: 'network', label: 'Mạng', detail: 'Quản lý kết nối và chất lượng streaming', icon: Wifi, section: 'streaming', color: 'orange' },
   { id: 'booster', label: 'Game Booster', detail: 'Máy tính tự tối ưu khi bấm Play: Auto, Cao, Cân bằng, Tiết kiệm', icon: Rocket, section: 'game', color: 'red' },
   { id: 'devices', label: 'Thiết bị', detail: 'Thiết bị đang nối với máy này', icon: Monitor, section: 'devices', color: 'gray' },
   { id: 'controller', label: 'Tay cầm', detail: 'Bố cục nút, rung và vùng chết', icon: Gamepad2, section: 'devices', color: 'red' },
@@ -89,7 +90,7 @@ const CATEGORIES: {
 ];
 
 function SaveStatus({ saving, saved, failed }: { saving: boolean; saved: boolean; failed: boolean }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   if (!saving && !saved && !failed) return null;
   return (
@@ -128,79 +129,62 @@ function SaveStatus({ saving, saved, failed }: { saving: boolean; saved: boolean
   );
 }
 
-/**
- * Mục sidebar. Hai trạng thái phải nhìn khác nhau ngay lập tức:
- * - Đã chọn: kính hổ phách ấm (nền + viền ấm, chữ đậm).
- * - Tay cầm đang trỏ vào: viền trắng sắc của FocusRing, không tô màu.
- */
+/** The active accent is separate from the white gamepad focus ring. */
 function NavItem({
   entry,
   active,
   onPress,
+  onLayout,
 }: {
   entry: (typeof CATEGORIES)[number];
   active: boolean;
   onPress: () => void;
+  onLayout: (y: number) => void;
 }) {
-  const { material, settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
+  const { reduceMotion } = useMotion();
+  const [hover] = useState(() => new Animated.Value(0));
+  useEffect(() => () => hover.stopAnimation(), [hover]);
+  const setHover = (toValue: number) => {
+    Animated.timing(hover, {
+      toValue, duration: reduceMotion ? 0 : 120, useNativeDriver: true, isInteraction: false,
+    }).start();
+  };
   const Icon = entry.icon;
   return (
     <Press
       onPress={onPress}
       autoFocus={active}
-      pressScale={0.985}
+      pressScale={1}
+      accessibilityRole="tab"
       accessibilityState={{ selected: active }}
+      onLayout={(event) => onLayout(event.nativeEvent.layout.y)}
+      onHoverIn={() => setHover(1)}
+      onHoverOut={() => setHover(0)}
       style={{
-        height: s(42),
+        height: SETTINGS_LAYOUT.navHeight,
         flexDirection: 'row',
         alignItems: 'center',
         gap: s(10),
         paddingHorizontal: s(10),
-        borderRadius: s(12),
-        marginVertical: s(2),
+        borderRadius: s(8),
+        marginVertical: s(1),
         backgroundColor: active ? appleColors.selectedBg : 'transparent',
-        borderWidth: 1,
-        borderColor: active ? appleColors.selectedBorder : 'transparent',
       }}
     >
-      {active ? (
-        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: s(12), overflow: 'hidden' }]}>
-          <LinearGradient
-            colors={material.controlSheen}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <LinearGradient
-            colors={material.rim}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1 }}
-          />
-        </View>
-      ) : null}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, {
+        borderRadius: s(8), backgroundColor: appleColors.pressedBg, opacity: hover,
+      }]} />
       <View
         style={{
-          width: s(28),
-          height: s(28),
-          borderRadius: s(8),
+          width: s(24),
+          height: s(24),
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: appleColors[entry.color],
-          borderWidth: StyleSheet.hairlineWidth,
-          borderColor: 'rgba(255, 255, 255, 0.40)',
-          overflow: 'hidden',
         }}
       >
-        <LinearGradient
-          colors={['rgba(255, 255, 255, 0.35)', 'rgba(255, 255, 255, 0)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 0.7 }}
-          pointerEvents="none"
-          style={StyleSheet.absoluteFill}
-        />
-        <Icon size={s(15)} color="#FFFFFF" strokeWidth={2.2} />
+        <Icon size={s(17)} color={appleColors[entry.color]} strokeWidth={1.8} />
       </View>
       <T
         size={13}
@@ -215,36 +199,166 @@ function NavItem({
   );
 }
 
-export default function ConsoleSettings({
-  initialCategory = 'quality',
-  backdropUrl,
-  onClose,
-}: {
+function SettingsSidebar({ category, onSelect, onDismiss }: {
+  category: SettingsCategory;
+  onSelect: (category: SettingsCategory) => void;
+  onDismiss?: () => void;
+}) {
+  const colors = useSettingsColors();
+  const { insets } = useUi();
+  const { reduceMotion } = useMotion();
+  const [positions, setPositions] = useState<Partial<Record<SettingsCategory, number>>>({});
+  const [indicator] = useState(() => new Animated.Value(0));
+  const positioned = useRef(false);
+  const target = positions[category];
+
+  useEffect(() => {
+    if (target === undefined) return;
+    if (reduceMotion || !positioned.current) {
+      indicator.setValue(target + 12);
+      positioned.current = true;
+      return;
+    }
+    const animation = Animated.timing(indicator, {
+      toValue: target + 12, duration: 200, easing: Easing.out(Easing.cubic),
+      useNativeDriver: true, isInteraction: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [indicator, reduceMotion, target]);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.sidebarBg }}>
+      <View style={{ height: 56 + insets.top, paddingTop: insets.top, paddingHorizontal: 20,
+        flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: colors.cardBorder }}>
+        <T size={17} weight="bold" style={{ flex: 1 }}>Cài đặt</T>
+        {onDismiss ? <Press onPress={onDismiss} sound="back" accessibilityLabel="Đóng danh mục cài đặt"
+          style={styles.iconButton}><X size={18} color={colors.textSecondary} /></Press> : null}
+      </View>
+      <FocusScroll showsVerticalScrollIndicator={false} style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 12, paddingBottom: 20 + insets.bottom }}>
+        <View>
+          <Animated.View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0,
+            width: 3, height: 22, borderRadius: 2, backgroundColor: colors.accent,
+            zIndex: 1, opacity: target === undefined ? 0 : 1, transform: [{ translateY: indicator }] }} />
+          {SECTIONS.flatMap((section, index) => [
+            <T key={section.id} size={9.6} weight="semibold" color={colors.textSecondary} tracking={0.08}
+              style={{ paddingHorizontal: 10, marginTop: index > 0 ? 16 : 0, marginBottom: 6 }}>
+              {section.label}
+            </T>,
+            ...CATEGORIES.filter((entry) => entry.section === section.id).map((entry) => (
+              <NavItem key={entry.id} entry={entry} active={entry.id === category}
+                onPress={() => onSelect(entry.id)}
+                onLayout={(y) => setPositions((current) => current[entry.id] === y
+                  ? current : { ...current, [entry.id]: y })} />
+            )),
+          ])}
+        </View>
+      </FocusScroll>
+    </View>
+  );
+}
+
+function SettingsPage({ children, fill = false }: { children: ReactNode; fill?: boolean }) {
+  const { reduceMotion } = useMotion();
+  const [progress] = useState(() => new Animated.Value(reduceMotion ? 1 : 0));
+  useEffect(() => {
+    const animation = Animated.timing(progress, {
+      toValue: 1, duration: reduceMotion ? 0 : 180, easing: Easing.out(Easing.cubic),
+      useNativeDriver: true, isInteraction: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [progress, reduceMotion]);
+  return <Animated.View style={{ flex: fill ? 1 : undefined, opacity: progress,
+    transform: [{ translateY: reduceMotion ? 0 : progress.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) }] }}>
+    {children}
+  </Animated.View>;
+}
+
+function SettingsDrawer({ category, onSelect, onClose }: {
+  category: SettingsCategory; onSelect: (category: SettingsCategory) => void; onClose: () => void;
+}) {
+  const { width, insets } = useUi();
+  const colors = useSettingsColors();
+  const { reduceMotion } = useMotion();
+  const [progress] = useState(() => new Animated.Value(reduceMotion ? 1 : 0));
+  useBack(onClose);
+  useEffect(() => {
+    const animation = Animated.timing(progress, {
+      toValue: 1, duration: reduceMotion ? 0 : 180, easing: Easing.out(Easing.cubic),
+      useNativeDriver: true, isInteraction: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [progress, reduceMotion]);
+  return <Modal transparent animationType="none" visible onRequestClose={onClose}
+    supportedOrientations={['portrait', 'landscape']} statusBarTranslucent navigationBarTranslucent>
+    <FocusLayer>
+      <View style={{ flex: 1 }}>
+        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: progress, backgroundColor: 'rgba(0,0,0,0.6)' }]} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessible={false} focusable={false} />
+        <Animated.View accessibilityViewIsModal style={{ flex: 1,
+          width: Math.min(SETTINGS_LAYOUT.sidebarWidth + insets.left, width - 48),
+          transform: [{ translateX: reduceMotion ? 0 : progress.interpolate({ inputRange: [0, 1], outputRange: [-SETTINGS_LAYOUT.sidebarWidth, 0] }) }] }}>
+          <View style={{ flex: 1, paddingLeft: insets.left, backgroundColor: colors.sidebarBg }}>
+            <SettingsSidebar category={category} onSelect={onSelect} onDismiss={onClose} />
+          </View>
+        </Animated.View>
+      </View>
+    </FocusLayer>
+  </Modal>;
+}
+
+type SettingsProps = {
   initialCategory?: SettingsCategory;
   backdropUrl?: string | null;
   onClose: () => void;
-}) {
-  const { material, settings: appleColors, colors, glass } = useTheme();
-  const { s, width, insets } = useUi();
+};
+
+export default function ConsoleSettings({ initialCategory = 'quality', ...props }: SettingsProps) {
   const [category, setCategory] = useState<SettingsCategory>(initialCategory);
+  return <SettingsSurface network={category === 'network'}>
+    <SettingsContent {...props} category={category} onCategoryChange={setCategory} />
+  </SettingsSurface>;
+}
+
+function SettingsContent({ category, onCategoryChange, onClose }: Omit<SettingsProps, 'initialCategory'> & {
+  category: SettingsCategory; onCategoryChange: (category: SettingsCategory) => void;
+}) {
+  const appleColors = useSettingsColors();
+  const { s, width, insets, tablet } = useUi();
+  const { reduceMotion } = useMotion();
+  const inlineSidebar = width >= 900 && (tablet || Platform.OS === 'web');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [restore, setRestore] = useState<SettingsRestoreAction | null>(null);
   const restoreContext = useMemo(() => ({ category, setRestore }), [category]);
-  const content = useRef<any>(null);
-  const [enter] = useState(() => new Animated.Value(0));
+  const content = useRef<ScrollView | null>(null);
+  const [enter] = useState(() => new Animated.Value(reduceMotion ? 1 : 0));
 
   useBack(() => {
-    onClose();
+    if (drawerOpen) setDrawerOpen(false);
+    else onClose();
   });
 
   useEffect(() => {
-    Animated.timing(enter, {
+    const animation = Animated.timing(enter, {
       toValue: 1,
-      duration: 220,
+      duration: reduceMotion ? 0 : 200,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
-    }).start();
-  }, [enter]);
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [enter, reduceMotion]);
+
+  const [previousInlineSidebar, setPreviousInlineSidebar] = useState(inlineSidebar);
+  if (previousInlineSidebar !== inlineSidebar) {
+    setPreviousInlineSidebar(inlineSidebar);
+    if (inlineSidebar) setDrawerOpen(false);
+  }
 
   const notify = useCallback((tone: Tone, title: string, detail?: string) => {
     setNotice({ id: Date.now(), tone, title, detail });
@@ -260,7 +374,8 @@ export default function ConsoleSettings({
   const input = useInputSettings();
 
   const select = (next: SettingsCategory) => {
-    setCategory(next);
+    onCategoryChange(next);
+    setDrawerOpen(false);
     content.current?.scrollTo?.({ y: 0, animated: false });
   };
 
@@ -270,7 +385,9 @@ export default function ConsoleSettings({
   let page: ReactNode;
   if (meta.section !== 'streaming') {
     page =
-      category === 'booster' ? (
+      category === 'mapping' ? (
+        <MappingLibrary embedded />
+      ) : category === 'booster' ? (
         <GameBoosterPage notify={notify} />
       ) : category === 'appearance' ? (
         <AppearancePage />
@@ -327,329 +444,101 @@ export default function ConsoleSettings({
   const saving = draft.saveState === 'saving' || input.syncState === 'saving';
   const failed = draft.saveState === 'error';
   const saved = !saving && !failed && (draft.saveState === 'saved' || input.dirty);
-  const navWidth = Math.min(s(280), Math.max(s(210), width * 0.28));
-
+  const mappingPage = category === 'mapping';
   return (
     <FocusLayer>
-      {/* Cài đặt phủ kín màn hình trên nền đục: blur thật chỉ blur màn chính đã bị che,
-          mà mỗi ô kính lại tốn một lượt blur toàn màn (xem GlassBlurProvider). */}
-      <GlassBlurProvider targetRef={null}>
-      <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            backgroundColor: appleColors.bg,
-            opacity: enter,
-            zIndex: 60,
-            elevation: 60,
-          },
-        ]}
-      >
-        {/* 1. Lớp hình nền trò chơi (nếu có) được làm mờ quang học */}
-        {backdropUrl ? (
-          <View style={StyleSheet.absoluteFill} pointerEvents="none">
-            <Img
-              source={{ uri: backdropUrl }}
-              style={[StyleSheet.absoluteFill, { opacity: 0.4 }]}
-              contentFit="cover"
-              // Ảnh nền mờ được blur một lần lúc giải mã thay cho kính blur mỗi frame.
-              blurRadius={Platform.OS === 'android' ? 12 : undefined}
-            />
-            <GlassBackdrop material="panel" />
-          </View>
-        ) : null}
-
-        {/* 2. Ánh sáng môi trường xanh console mát dịu (Console Ambient Blue Glow) */}
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
-          <LinearGradient
-            colors={[glass.ambient, alpha(colors.primary, 0.02), 'transparent']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0.75, y: 0.8 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <LinearGradient
-            colors={['transparent', glass.ambientAccent, 'transparent']}
-            start={{ x: 0.3, y: 0 }}
-            end={{ x: 1, y: 0.55 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
-
-        {/* 3. Scrim kính tối đồng bộ hoàn toàn với SidePanel */}
-        <View
-          style={[StyleSheet.absoluteFill, { backgroundColor: alpha(colors.shade, 0.85) }]}
-          pointerEvents="none"
-        />
-
-        {/* Ánh màu của theme trên lớp scrim (trong suốt ở theme Console) */}
-        <LinearGradient
-          colors={[glass.backdropTint, 'transparent']}
-          start={{ x: 0, y: 1 }}
-          end={{ x: 0.9, y: 0 }}
-          pointerEvents="none"
-          style={StyleSheet.absoluteFill}
-        />
-        <ThemeDecor />
-
-        {/* 4. Bố cục hai cột Master - Detail Liquid Glass.
-            Nền hai cột tràn tới mép màn hình; vùng an toàn (tai thỏ, thanh home trên
-            iPhone) chỉ đẩy nội dung vào trong, không để lộ dải nền quanh khung. */}
+      <Animated.View style={[StyleSheet.absoluteFill, {
+        backgroundColor: appleColors.bg, opacity: enter, zIndex: 60, elevation: 60,
+        transform: [{ translateX: enter.interpolate({ inputRange: [0, 1], outputRange: [reduceMotion ? 0 : 32, 0] }) }],
+      }]}>
         <View style={{ flex: 1, flexDirection: 'row' }}>
-          {/* CỘT TRÁI (MASTER / SIDEBAR): Liquid Glass Panel */}
-          <View
-            style={{
-              width: navWidth + insets.left,
-              paddingLeft: insets.left,
-              backgroundColor: appleColors.sidebarBg,
-              borderRightWidth: 1,
-              borderRightColor: appleColors.cardBorder,
-              overflow: 'hidden',
-            }}
-          >
-            <GlassBackdrop material="panel" />
-
-            {/* Vệt sáng viền phải (Specular right edge rim) */}
-            <LinearGradient
-              colors={material.panelEdge}
-              start={{ x: 1, y: 0 }}
-              end={{ x: 0, y: 0 }}
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                bottom: 0,
-                width: 1.5,
-                zIndex: 2,
-              }}
-            />
-
-            {/* Top Bar của Sidebar: Tiêu đề Cài đặt chuẩn Glass */}
-            <View
-              style={{
-                height: s(52) + insets.top,
-                paddingTop: insets.top,
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: s(16),
-                borderBottomWidth: StyleSheet.hairlineWidth,
-                borderBottomColor: 'rgba(255, 255, 255, 0.10)',
-                gap: s(8),
-              }}
-            >
-              <LinearGradient
-                colors={['rgba(255, 255, 255, 0.35)', 'transparent']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                pointerEvents="none"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 1,
-                }}
-              />
-              <T size={17} weight="bold" color="#FFFFFF" tracking={-0.02}>
-                Cài đặt
-              </T>
+          {inlineSidebar ? (
+            <View style={{ width: (mappingPage ? 200 : SETTINGS_LAYOUT.sidebarWidth) + insets.left,
+              paddingLeft: insets.left, backgroundColor: appleColors.sidebarBg,
+              borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: appleColors.cardBorder }}>
+              <SettingsSidebar category={category} onSelect={select} />
             </View>
-
-            {/* Danh sách nhóm cài đặt */}
-            <FocusScroll
-              style={{ flex: 1 }}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: s(10), paddingTop: s(10), paddingBottom: s(10) + insets.bottom }}
-            >
-              {SECTIONS.map((section, index) => (
-                <View key={section.id}>
-                  <T
-                    size={9.6}
-                    weight="semibold"
-                    color={appleColors.textSecondary}
-                    tracking={0.08}
-                    style={{ paddingHorizontal: s(10), marginTop: index > 0 ? s(14) : 0, marginBottom: s(4) }}
-                  >
-                    {section.label}
-                  </T>
-                  {CATEGORIES.filter((entry) => entry.section === section.id).map((entry) => (
-                    <NavItem
-                      key={entry.id}
-                      entry={entry}
-                      active={entry.id === category}
-                      onPress={() => select(entry.id)}
-                    />
-                  ))}
-                </View>
-              ))}
-            </FocusScroll>
-          </View>
-
-          {/* CỘT PHẢI (DETAIL): Liquid Glass Background & Panels */}
-          <View style={{ flex: 1, paddingRight: insets.right, backgroundColor: alpha(colors.bg, 0.40), overflow: 'hidden' }}>
-
-            {/* Top Bar của Detail */}
-            <View
-              style={{
-                height: s(52) + insets.top,
-                paddingTop: insets.top,
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingHorizontal: s(24),
-                borderBottomWidth: StyleSheet.hairlineWidth,
-                borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-              }}
-            >
-              <LinearGradient
-                colors={['rgba(255, 255, 255, 0.20)', 'rgba(255, 255, 255, 0.03)', 'transparent']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                pointerEvents="none"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 1,
-                }}
-              />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <T size={16} weight="bold" color="#FFFFFF" tracking={-0.015}>
-                  {meta.label}
+          ) : null}
+          <View style={{ flex: 1, minWidth: 0, paddingLeft: inlineSidebar ? 0 : insets.left,
+            paddingRight: insets.right, overflow: 'hidden', backgroundColor: mappingPage ? mappingColors.bg : undefined }}>
+            <View style={{ minHeight: 64 + insets.top, paddingTop: insets.top,
+              flexDirection: 'row', alignItems: 'center', paddingHorizontal: inlineSidebar ? 24 : 12,
+              gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: appleColors.cardBorder }}>
+              {!inlineSidebar ? (
+                <Press onPress={() => setDrawerOpen(true)} accessibilityLabel="Mở danh mục cài đặt"
+                  accessibilityState={{ expanded: drawerOpen }} style={styles.iconButton}>
+                  <Menu size={19} color={appleColors.textSecondary} />
+                </Press>
+              ) : null}
+              <View style={{ flex: 1, minWidth: 0, paddingVertical: 8 }}>
+                <T size={16} weight="bold" accessibilityRole="header" numberOfLines={1}>{meta.label}</T>
+                <T size={11} color={appleColors.textSecondary} numberOfLines={1} style={{ marginTop: 3 }}>
+                  {meta.detail}
                 </T>
-                {meta.detail ? (
-                  <T size={10.2} color={appleColors.textSecondary} numberOfLines={1} style={{ marginTop: s(1) }}>
-                    {meta.detail}
-                  </T>
-                ) : null}
               </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(12) }}>
-                <SaveStatus saving={saving} saved={saved} failed={failed} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                {!mappingPage ? <SaveStatus saving={saving} saved={saved} failed={failed} /> : null}
                 {restore?.category === category ? (
                   <SettingsRestoreButton key={category} action={restore} notify={notify} />
                 ) : null}
-                {/* Nút đóng tròn đồng bộ SidePanel / Thông tin game */}
-                <Press
-                  onPress={onClose}
-                  sound="back"
-                  pressScale={0.92}
-                  accessibilityLabel="Đóng cài đặt"
-                  style={{
-                    width: s(32),
-                    height: s(32),
-                    borderRadius: s(16),
-                    backgroundColor: glass.control,
-                    borderWidth: 1,
-                    borderColor: glass.controlBorder,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <GlassBackdrop material="control" radius={s(16)} />
-                  <X size={s(15)} color="rgba(255, 255, 255, 0.85)" strokeWidth={2.2} />
+                <Press onPress={onClose} sound="back" pressScale={0.96}
+                  accessibilityLabel="Đóng cài đặt" style={styles.iconButton}>
+                  <X size={18} color={appleColors.textSecondary} />
                 </Press>
               </View>
             </View>
-
-            {/* Nội dung danh mục chi tiết */}
-            <FocusScroll
-              ref={content}
-              style={{ flex: 1 }}
-              contentContainerStyle={{
-                paddingHorizontal: s(24),
-                paddingTop: s(8),
-                paddingBottom: s(36) + insets.bottom,
-              }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              <View key={category} style={{ maxWidth: s(680) }}>
-                <SettingsRestoreContext.Provider value={restoreContext}>
-                  {page}
-                </SettingsRestoreContext.Provider>
-              </View>
-            </FocusScroll>
+            <SettingsRestoreContext.Provider value={restoreContext}>
+              {mappingPage ? (
+                <SettingsPage key={category} fill>{page}</SettingsPage>
+              ) : (
+                <FocusScroll ref={content} style={{ flex: 1 }}
+                  contentContainerStyle={{ paddingHorizontal: inlineSidebar ? 24 : 16,
+                    paddingTop: 0, paddingBottom: 24 + insets.bottom }}
+                  showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                  <View style={{ width: '100%', maxWidth: 880, alignSelf: 'center' }}>
+                    <SettingsPage key={category}>{page}</SettingsPage>
+                  </View>
+                </FocusScroll>
+              )}
+            </SettingsRestoreContext.Provider>
           </View>
         </View>
 
-        {/* Thông báo dạng Apple Glass Toast */}
         {notice ? (
-          <View
-            style={[
-              styles.notice,
-              {
-                right: s(20) + insets.right,
-                bottom: s(16) + insets.bottom,
-                maxWidth: s(360),
-                padding: s(12),
-                borderRadius: s(14),
-                gap: s(10),
-                borderColor: notice.tone === 'error' ? 'rgba(248, 113, 113, 0.50)' : 'rgba(255, 255, 255, 0.18)',
-                backgroundColor: alpha(colors.panel, 0.92),
-                overflow: 'hidden',
-              },
-            ]}
-          >
-            <GlassBackdrop material="panel" intensity={42} radius={s(14)} />
-            <LinearGradient
-              colors={['rgba(255, 255, 255, 0.30)', 'transparent']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 1.5,
-              }}
-            />
+          <View accessibilityLiveRegion="polite" style={[styles.notice, {
+            left: inlineSidebar ? undefined : 16 + insets.left,
+            right: 16 + insets.right, bottom: 16 + insets.bottom,
+            maxWidth: 360, padding: 12, borderRadius: SETTINGS_LAYOUT.radius, gap: 8,
+            borderColor: notice.tone === 'error' ? 'rgba(248,113,113,0.4)' : appleColors.cardBorder,
+            backgroundColor: appleColors.sidebarBg,
+          }]}>
             <View style={{ flex: 1 }}>
-              <T size={12} weight="semibold" color={notice.tone === 'error' ? '#fca5a5' : '#FFFFFF'}>
+              <T size={12} weight="semibold" color={notice.tone === 'error' ? '#fca5a5' : appleColors.text}>
                 {notice.title}
               </T>
               {notice.detail ? (
-                <T size={10.4} color={appleColors.textSecondary} leading={1.35} style={{ marginTop: s(2) }}>
+                <T size={11} color={appleColors.textSecondary} leading={1.4} style={{ marginTop: 3 }}>
                   {notice.detail}
                 </T>
               ) : null}
             </View>
-            <Press
-              onPress={() => setNotice(null)}
-              accessibilityLabel="Đóng thông báo"
-              pressScale={0.92}
-              style={{
-                width: s(24),
-                height: s(24),
-                borderRadius: s(12),
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: 'rgba(255, 255, 255, 0.18)',
-              }}
-            >
-              <X size={s(13)} color="rgba(255, 255, 255, 0.8)" />
-            </Press>
+            <Press onPress={() => setNotice(null)} accessibilityLabel="Đóng thông báo"
+              style={styles.iconButton}><X size={16} color={appleColors.textSecondary} /></Press>
           </View>
         ) : null}
+        {!inlineSidebar && drawerOpen ? (
+          <SettingsDrawer category={category} onSelect={select} onClose={() => setDrawerOpen(false)} />
+        ) : null}
       </Animated.View>
-      </GlassBlurProvider>
     </FocusLayer>
   );
 }
 
 const styles = StyleSheet.create({
+  iconButton: {
+    width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+  },
   notice: {
-    position: 'absolute',
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    borderWidth: 1,
-    zIndex: 10,
-    shadowColor: '#000000',
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
+    position: 'absolute', flexDirection: 'row', alignItems: 'center', borderWidth: 1, zIndex: 10,
   },
 });

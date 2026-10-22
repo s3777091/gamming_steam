@@ -1,6 +1,4 @@
-// Trang Thiết bị / Tay cầm / Chuột / Bàn phím / Âm thanh theo ngôn ngữ thiết kế Apple.
-// Thẻ Inset Grouped bo tròn viền mỏng, biểu tượng squircle bo góc mềm,
-// công tắc xanh #34C759, thanh trượt xanh #007AFF, chữ đen nhãn phụ xám.
+// Device preferences share compact grouped rows and the current settings accent.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
@@ -10,7 +8,10 @@ import {
   BatteryLow,
   BatteryMedium,
   Bluetooth,
+  Eye,
+  EyeOff,
   Gamepad2,
+  SlidersHorizontal,
   Headphones,
   Plus,
   Vibrate,
@@ -44,6 +45,7 @@ import { ActionRow, ChoiceRow, Keycap, PillButton, rowStyle, SettingsGroup, Slid
 import { useSuspendCursor } from '@/features/gamepad/hooks';
 import { webCodeForKeyCode } from './keycodes';
 import { useSettingsRestore } from './SettingsRestore';
+import { useSettingsColors } from './SettingsSurface';
 import { HOST_SHORTCUT_OPTIONS, type InputSettingsState } from './useInputSettings';
 import type { Notify } from './useStreamSettingsDraft';
 import {
@@ -53,7 +55,7 @@ import {
 } from './visualizers';
 
 function Battery({ value }: { value: number }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const percent = Math.round(value * 100);
   const low = percent <= 20;
@@ -85,23 +87,22 @@ const DEVICE_COLORS: Record<string, keyof SettingsTokens> = {
 };
 
 function DeviceRow({ device }: { device: LocalDevice }) {
-  const { settings: appleColors, colors } = useTheme();
+  const { colors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const Icon = KIND_ICONS[device.kind];
   const bg = appleColors[DEVICE_COLORS[device.kind] ?? 'gray'];
   return (
-    <View style={rowStyle(s, { minHeight: s(50) })}>
+    <View style={rowStyle(s)}>
       <View
         style={{
-          width: s(28),
-          height: s(28),
-          borderRadius: s(7),
-          backgroundColor: bg,
+          width: s(24),
+          height: s(24),
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Icon size={s(15)} color="#FFFFFF" strokeWidth={2.2} />
+        <Icon size={s(17)} color={bg} strokeWidth={1.8} />
         <View
           style={{
             position: 'absolute',
@@ -130,7 +131,7 @@ function DeviceRow({ device }: { device: LocalDevice }) {
 }
 
 export function DevicesPage({ notify }: { notify: Notify }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const { devices, bluetooth, refresh } = useInputDevices();
   const [asking, setAsking] = useState(false);
@@ -225,7 +226,7 @@ const BUTTON_FLAGS: [number, string][] = [
 ];
 
 function Bar({ label, value, signed }: { label: string; value: number; signed?: boolean }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const ratio = signed ? (value + 1) / 2 : value;
   return (
@@ -245,7 +246,7 @@ function Bar({ label, value, signed }: { label: string; value: number; signed?: 
           backgroundColor: 'rgba(255, 255, 255, 0.08)',
           borderWidth: StyleSheet.hairlineWidth,
           borderColor: 'rgba(255, 255, 255, 0.12)',
-          overflow: 'hidden',
+          overflow: 'visible',
         }}
       >
         <View
@@ -272,7 +273,8 @@ function ControllerInspector({
   rightDeadzone?: number;
   triggerDeadzone?: number;
 }) {
-  const { settings: appleColors, colors } = useTheme();
+  const { colors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const [state, setState] = useState<NativeGamepadState | null>(null);
   const [viewMode, setViewMode] = useState<'2d' | 'classic'>('2d');
@@ -301,20 +303,93 @@ function ControllerInspector({
         <T size={10.5} color={appleColors.textSecondary}>
           {state ? 'Đang nhận tín hiệu trực tiếp từ tay cầm' : 'Bấm nút hoặc gạt cần trên tay cầm để xem phản hồi'}
         </T>
-        <View style={{ flexDirection: 'row', gap: s(6) }}>
-          <PillButton
-            tone={viewMode === '2d' ? 'accent' : 'default'}
-            onPress={() => setViewMode(viewMode === '2d' ? 'classic' : '2d')}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
+          {/* Bộ chọn chế độ xem Mô hình 3D / Bảng tín hiệu hiện đại */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: s(8),
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.10)',
+              padding: s(2),
+              gap: s(2),
+            }}
           >
-            {viewMode === '2d' ? 'Bảng tín hiệu' : 'Mô hình 2D'}
-          </PillButton>
-          {viewMode === '2d' ? (
-            <PillButton
-              tone={showCallouts ? 'accent' : 'default'}
-              onPress={() => setShowCallouts((v) => !v)}
+            <Press
+              onPress={() => setViewMode('2d')}
+              pressScale={0.96}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: s(4.5),
+                paddingHorizontal: s(9),
+                paddingVertical: s(4.5),
+                borderRadius: s(6),
+                backgroundColor: viewMode === '2d' ? alpha(colors.primary, 0.28) : 'transparent',
+                borderWidth: 1,
+                borderColor: viewMode === '2d' ? alpha(colors.accent, 0.45) : 'transparent',
+              }}
             >
-              {showCallouts ? 'Ẩn chú thích' : 'Hiện chú thích'}
-            </PillButton>
+              <Gamepad2 size={s(12)} color={viewMode === '2d' ? '#FFFFFF' : appleColors.textTertiary} />
+              <T size={10.2} weight="semibold" color={viewMode === '2d' ? '#FFFFFF' : appleColors.textSecondary}>
+                Mô hình 3D
+              </T>
+            </Press>
+
+            <Press
+              onPress={() => setViewMode('classic')}
+              pressScale={0.96}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: s(4.5),
+                paddingHorizontal: s(9),
+                paddingVertical: s(4.5),
+                borderRadius: s(6),
+                backgroundColor: viewMode === 'classic' ? alpha(colors.primary, 0.28) : 'transparent',
+                borderWidth: 1,
+                borderColor: viewMode === 'classic' ? alpha(colors.accent, 0.45) : 'transparent',
+              }}
+            >
+              <SlidersHorizontal size={s(12)} color={viewMode === 'classic' ? '#FFFFFF' : appleColors.textTertiary} />
+              <T size={10.2} weight="semibold" color={viewMode === 'classic' ? '#FFFFFF' : appleColors.textSecondary}>
+                Bảng tín hiệu
+              </T>
+            </Press>
+          </View>
+
+          {/* Nút bật/tắt chú thích Callouts */}
+          {viewMode === '2d' ? (
+            <Press
+              onPress={() => setShowCallouts((v) => !v)}
+              pressScale={0.96}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: s(4.5),
+                paddingHorizontal: s(9),
+                paddingVertical: s(6),
+                borderRadius: s(8),
+                backgroundColor: showCallouts ? 'rgba(10, 132, 255, 0.14)' : 'rgba(255, 255, 255, 0.05)',
+                borderWidth: 1,
+                borderColor: showCallouts ? 'rgba(10, 132, 255, 0.40)' : 'rgba(255, 255, 255, 0.10)',
+              }}
+            >
+              {showCallouts ? (
+                <Eye size={s(12)} color={appleColors.blue} />
+              ) : (
+                <EyeOff size={s(12)} color={appleColors.textTertiary} />
+              )}
+              <T
+                size={10.2}
+                weight="semibold"
+                color={showCallouts ? appleColors.blue : appleColors.textSecondary}
+              >
+                {showCallouts ? 'Ẩn chú thích' : 'Hiện chú thích'}
+              </T>
+            </Press>
           ) : null}
         </View>
       </View>
@@ -391,7 +466,7 @@ function ControllerInspector({
 }
 
 export function ControllerPage({ input }: { input: InputSettingsState }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { settings, update } = input;
   const { devices } = useInputDevices();
   const pads = devices.filter((device) => device.kind === 'controller');
@@ -522,7 +597,7 @@ export function ControllerPage({ input }: { input: InputSettingsState }) {
 // ---------------------------------------------------------------- chuột
 
 export function MousePage({ input }: { input: InputSettingsState }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const { settings, update } = input;
   const { devices } = useInputDevices();
@@ -599,7 +674,8 @@ function KeyCapture({
   placeholder: string;
   onCapture: (code: string) => void;
 }) {
-  const { colors, settings: appleColors } = useTheme();
+  const { colors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const [listening, setListening] = useState(false);
 
@@ -633,7 +709,7 @@ function KeyCapture({
         borderWidth: 1,
         borderColor: listening ? alpha(colors.accent, 0.45) : 'rgba(255, 255, 255, 0.18)',
         backgroundColor: listening ? alpha(colors.primary, 0.22) : 'rgba(255, 255, 255, 0.08)',
-        overflow: 'hidden',
+        overflow: 'visible',
       }}
     >
       <T
@@ -696,7 +772,8 @@ function ActionPicker({
 }
 
 export function KeyboardPage({ input, notify }: { input: InputSettingsState; notify: Notify }) {
-  const { settings: appleColors, colors } = useTheme();
+  const { colors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const { settings, update } = input;
   const { devices } = useInputDevices();
@@ -962,7 +1039,7 @@ export function KeyboardPage({ input, notify }: { input: InputSettingsState; not
 // ---------------------------------------------------------------- âm thanh
 
 export function AudioPage({ input }: { input: InputSettingsState }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const uiSounds = useUiSounds();
   const { settings, update } = input;
@@ -999,7 +1076,7 @@ export function AudioPage({ input }: { input: InputSettingsState }) {
       </SettingsGroup>
 
       <SettingsGroup title="Âm thanh truyền từ PC">
-        <View style={rowStyle(s, { minHeight: s(48) })}>
+        <View style={rowStyle(s)}>
           <View
             style={{
               width: s(28),

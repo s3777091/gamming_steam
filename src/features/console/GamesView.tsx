@@ -3,7 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject
 import { Animated, Easing, FlatList, Platform, StyleSheet, View, type ListRenderItemInfo, type ScrollViewProps } from 'react-native';
 import { FocusScroll, useSceneActive } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Download, Ellipsis, FileText, HardDrive, Monitor, Pause, Play, Trash2, Trophy } from 'lucide-react-native';
+import { Download, Ellipsis, FileText, HardDrive, Monitor, Pause, Play, Trash2, Trophy, type LucideIcon } from 'lucide-react-native';
 
 import { isSteamAppId } from '@/features/library/format';
 import type { PcGame } from '@/features/library/types';
@@ -138,8 +138,8 @@ function PrimaryAction({ library, download, uninstall, canControl, onPlay, onIns
   );
 }
 
-/** Nút (…) cạnh Play: mở bảng tùy chọn game phong cách Console. */
-function GameMoreButton({ active, onPress }: { active: boolean; onPress: () => void }) {
+/** Nút tròn kính cạnh Play: Thông tin game và (…) mở bảng tùy chọn game phong cách Console. */
+function GameIconButton({ icon: Icon, label, active = false, onPress }: { icon: LucideIcon; label: string; active?: boolean; onPress: () => void }) {
   const { glass } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
@@ -147,7 +147,7 @@ function GameMoreButton({ active, onPress }: { active: boolean; onPress: () => v
   return (
     <Press
       onPress={onPress}
-      accessibilityLabel="Tùy chọn game"
+      accessibilityLabel={label}
       style={[
         styles.more,
         {
@@ -159,7 +159,7 @@ function GameMoreButton({ active, onPress }: { active: boolean; onPress: () => v
         },
       ]}
     >
-      <Ellipsis size={s(16)} color={active ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.7)'} strokeWidth={2} />
+      <Icon size={s(16)} color={active ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.7)'} strokeWidth={2} />
     </Press>
   );
 }
@@ -266,6 +266,8 @@ export const GamesView = memo(function GamesView({ library, downloads, reachable
   reachable: boolean;
   menuOpen: boolean;
   onMenuOpenChange: (open: boolean) => void;
+
+
   onSelectGame: (id: string) => void;
   onPlay: () => void;
   /** Mở hộp thoại Steam đang chờ trả lời (chọn nơi cài đặt hoặc điều khoản). */
@@ -339,10 +341,15 @@ export const GamesView = memo(function GamesView({ library, downloads, reachable
               reachable={reachable}
             />
             {selected ? (
-              <GameMoreButton
+
+
+              <GameIconButton
+                icon={Ellipsis}
+                label="Tùy chọn game"
                 active={menuOpen}
                 onPress={() => onMenuOpenChange(!menuOpen)}
               />
+
             ) : null}
           </View>
         </View>

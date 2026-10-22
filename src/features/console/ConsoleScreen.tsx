@@ -7,12 +7,13 @@ import { BlurTargetView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { Trash2, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, StyleSheet, TextInput, View } from 'react-native';
+import { Animated, Platform, StyleSheet, TextInput, View } from 'react-native';
 
 import { useSignedInUser } from '@/features/auth';
 import { resetFocusToTab } from '@/features/gamepad/focus';
 import { useBack, useGamepadTabs, useGuide } from '@/features/gamepad/hooks';
 import { HomeControlCenter } from '@/features/control-center/HomeControlCenter';
+import { VirtualKeyboard } from '@/features/stream/VirtualKeyboard';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useCaptureMode } from '@/features/gamepad/captureMode';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
@@ -322,6 +323,8 @@ export default function ConsoleScreen() {
 
   const openStoreGame = useCallback((item: SteamStoreItem) => {
     searchInputRef.current?.blur();
+    setPanel(null);
+    setMenuOpen(false);
     setSelectedPromotion(null);
     setSelectedStoreItem(item);
   }, []);
@@ -342,7 +345,7 @@ export default function ConsoleScreen() {
     setDeviceMenuOpen(false);
   }, [activeTab]);
 
-  const anyOverlay = Boolean(settingsCategory || selectedStoreItem || selectedPromotion || panel || menuOpen || storeSearchOpen || powerOpen || remoteMenuOpen || deviceMenuOpen || uninstallTarget || purchase.visible);
+  const anyOverlay = Boolean(settingsCategory || selectedStoreItem || selectedPromotion || panel || menuOpen || storeSearchOpen || powerOpen || remoteMenuOpen || deviceMenuOpen || uninstallTarget || purchase.visible || controlCenterOpen);
 
   // Nút B / Back: đóng lớp trên cùng trước. Các panel tự đăng ký Back riêng; ở đây
   // chỉ cần xử lý những lớp do màn này sở hữu (menu, ô tìm kiếm).
@@ -373,6 +376,15 @@ export default function ConsoleScreen() {
     setPanel('profile');
     void profile.load();
   };
+
+  const openControlCenter = useCallback(() => {
+    setMenuOpen(false);
+    setRemoteMenuOpen(false);
+    setDeviceMenuOpen(false);
+    setPanel(null);
+    setStoreSearchOpen(false);
+    setControlCenterOpen(true);
+  }, []);
 
   const openNotifications = () => {
     setMenuOpen(false);
@@ -568,9 +580,23 @@ export default function ConsoleScreen() {
   const eraseStoreKey = useCallback(() => setStoreQuery((current) => Array.from(current).slice(0, -1).join('')), []);
   const submitStoreSearch = useCallback(() => { if (storeSearch.results[0]) openStoreGame(storeSearch.results[0]); }, [openStoreGame, storeSearch.results]);
 
+  const hasKeyboard = Platform.OS === 'web' || inputDevices.devices.some((d) => d.kind === 'keyboard');
+
   const storeContent = useMemo(() => (
     storeSearchOpen ? (
-      <StoreSearchPanel query={storeQuery} search={storeSearch} onOpenGame={openStoreGame} onKey={pressStoreKey} onErase={eraseStoreKey} onSubmit={submitStoreSearch} />
+      <StoreSearchPanel
+        query={storeQuery}
+        search={storeSearch}
+        hasKeyboard={hasKeyboard}
+        specials={store.data?.specials || []}
+        promotions={store.data?.promotions || []}
+        onOpenGame={openStoreGame}
+        onOpenPromotion={(promotion) => { setSelectedStoreItem(null); setSelectedPromotion(promotion); }}
+        onKey={pressStoreKey}
+        onErase={eraseStoreKey}
+        onSubmit={submitStoreSearch}
+        onFocusInput={() => searchInputRef.current?.focus()}
+      />
     ) : store.loading && !store.data ? (
       <StoreLoading />
     ) : store.error && !store.data ? (
@@ -591,7 +617,7 @@ export default function ConsoleScreen() {
         <T size={12} color="rgba(255,255,255,0.48)">Steam Store chưa có nội dung để hiển thị.</T>
       </View>
     )
-  ), [storeSearchOpen, storeQuery, storeSearch, store, storeFeatured, storePreview, openStoreGame, pressStoreKey, eraseStoreKey, submitStoreSearch]);
+  ), [storeSearchOpen, storeQuery, storeSearch, hasKeyboard, store, storeFeatured, storePreview, openStoreGame, pressStoreKey, eraseStoreKey, submitStoreSearch]);
 
   const gamesContent = useMemo(() => (
     library.loading && !library.games.length ? (
@@ -603,6 +629,8 @@ export default function ConsoleScreen() {
         reachable={library.reachable}
         menuOpen={menuOpen}
         onMenuOpenChange={setMenuOpen}
+
+
         onSelectGame={selectGame}
         onPlay={() => void play()}
         onOpenPrompt={openPrompt}
@@ -657,7 +685,7 @@ export default function ConsoleScreen() {
           }]}
           pointerEvents="box-none"
         >
-          <View style={{ height: s(48) }} />
+          <View style={{ height: s(44) }} />
           <ConsoleTabTransition
             activeTab={activeTab}
             renderTab={renderTab}
@@ -681,6 +709,7 @@ export default function ConsoleScreen() {
           onTabChange={switchTab}
           steamProfile={library.steamProfile}
           onOpenProfile={openProfile}
+          onOpenControlCenter={openControlCenter}
           onOpenSettings={openSettings}
           onOpenNotifications={openNotifications}
           unreadCount={notifications.unreadCount}
@@ -900,6 +929,18 @@ export default function ConsoleScreen() {
           onResume={resumeGame}
           onClose={() => setControlCenterOpen(false)}
         />
+
+        {!controlCenterOpen ? (
+          <VirtualKeyboard
+            onLocalText={(ch) => {
+              if (!storeSearchOpen && activeTab === 'store') setStoreSearchOpen(true);
+              pressStoreKey(ch);
+            }}
+            onLocalBackspace={eraseStoreKey}
+            onLocalSubmit={submitStoreSearch}
+            onLocalEscape={() => setStoreSearchOpen(false)}
+          />
+        ) : null}
       </View>
     </GlassBlurProvider>
   );

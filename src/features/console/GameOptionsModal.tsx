@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ChevronRight, Gamepad2, Info, Newspaper, ShoppingBag, Trash2, Trophy, type LucideIcon } from 'lucide-react-native';
 
 import { FocusLayer } from '@/features/gamepad/focus';
@@ -67,7 +67,7 @@ function ActionItem({
         borderWidth: StyleSheet.hairlineWidth,
         borderColor: glass.borderSubtle,
         opacity: disabled ? 0.5 : 1,
-        overflow: 'hidden',
+        overflow: 'visible',
       }}
     >
       {/* Specular top sheen */}
@@ -78,7 +78,7 @@ function ActionItem({
           left: 0,
           right: 0,
           height: StyleSheet.hairlineWidth,
-          backgroundColor: glass.borderSpecular,
+          backgroundColor: glass.borderSpecular, marginHorizontal: s(6),
         }}
         pointerEvents="none"
       />
@@ -178,6 +178,8 @@ export function GameOptionsModal({
   const cardMaxHeight = Math.min(s(440), height - s(24) - insets.top - insets.bottom);
   const artwork = game.artworkUrl || game.heroUrl;
 
+
+
   return (
     <FocusLayer>
       <View style={[StyleSheet.absoluteFill, styles.layer]}>
@@ -207,7 +209,7 @@ export function GameOptionsModal({
             },
           ]}
         >
-          <GlassBackdrop material="panel" radius={s(22)} />
+          <GlassBackdrop material="panel" radius={s(20)} />
 
           {/* Header với ảnh bìa nhỏ, tên game và nút đóng */}
           <PanelHeader title={game.title} subtitle="Tùy chọn trò chơi" onClose={() => closeWithAnimation()}
@@ -225,10 +227,10 @@ export function GameOptionsModal({
             style={{ flexShrink: 1 }}
             showsVerticalScrollIndicator={false}
             bounces={false}
-            contentContainerStyle={{ paddingTop: s(4), paddingBottom: s(12) }}
-          >
+            contentContainerStyle={{ paddingTop: s(4), paddingBottom: s(12) }}>
             <ActionItem
               icon={Info}
+              iconColor="#38bdf8"
               label="Thông tin game"
               autoFocus
               onPress={() => choose('info')}
@@ -239,6 +241,7 @@ export function GameOptionsModal({
                 icon={Newspaper}
                 iconColor={colors.accent}
                 label="Cập nhật & bản sửa lỗi"
+
                 onPress={() => choose('news')}
               />
             ) : null}
@@ -255,6 +258,7 @@ export function GameOptionsModal({
               <ActionItem
                 icon={ShoppingBag}
                 label="Cửa hàng Steam"
+
                 onPress={handleStore}
               />
             ) : null}
@@ -266,6 +270,7 @@ export function GameOptionsModal({
                   icon={Trash2}
                   label={uninstalling ? 'Đang gỡ cài đặt…' : 'Gỡ cài đặt'}
                   danger
+
                   disabled={uninstalling}
                   onPress={handleUninstall}
                 />
@@ -297,7 +302,8 @@ const useStyles = makeStyles(({ glass }) => ({
     shadowOpacity: 0.58,
     shadowRadius: 30,
     shadowOffset: { width: 0, height: 14 },
-    elevation: 20,
+    // Android vẽ bóng elevation xuyên qua nền kính bán trong suốt thành một viền đen quanh mép.
+    elevation: Platform.OS === 'android' ? 0 : 20,
   },
   avatar: {
     overflow: 'hidden',

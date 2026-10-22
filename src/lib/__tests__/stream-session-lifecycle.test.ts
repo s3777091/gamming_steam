@@ -55,7 +55,7 @@ function fixture() {
       useCallback: (callback: unknown) => callback,
       useRef: (current: unknown) => ({ current }),
     },
-    'react-native': { AppState: { addEventListener: () => ({ remove() {} }) } },
+    'react-native': { Platform: { OS: 'android' }, AppState: { addEventListener: () => ({ remove() {} }) } },
     'jetsona-input': { setStreamFrameRate() {}, startSpeakerRoute() {}, stopSpeakerRoute() {} },
     '@/lib/client-device': { ensureClientDeviceId: async () => 'device' },
     '@/lib/detect-region': { detectRegion: async () => 'vn' },

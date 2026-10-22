@@ -9,7 +9,7 @@ import { useUi } from '@/ui/scale';
 import { activateFocus, ensureFocusActive, moveFocus, scrollFocused, setFocusViewport, type Direction } from './focus';
 import { listenGuideButton } from './guideButton';
 import { navDirection, REPEAT_DELAY_MS, REPEAT_INTERVAL_MS, scrollVector } from './navigation';
-import { dispatchBack, dispatchGuide, dispatchTab, isCursorSuspended } from './registry';
+import { dispatchBack, dispatchGuide, dispatchTab, isCursorSuspended, setNavigatorEnabled } from './registry';
 
 const SCROLL_SPEED = 900; // px/s ở tốc độ tối đa của cần phải
 const MAX_FRAME_SECONDS = 1 / 20;
@@ -22,6 +22,7 @@ export default function GamepadNavigator({ enabled }: { enabled: boolean }) {
 
   useEffect(() => {
     if (!enabled) return;
+    setNavigatorEnabled(true);
 
     const directions = new Map<number, Direction | null>();
     let held: Direction | null = null;
@@ -96,6 +97,7 @@ export default function GamepadNavigator({ enabled }: { enabled: boolean }) {
     const offCombo = listenGuideButton(dispatchGuide);
 
     return () => {
+      setNavigatorEnabled(false);
       offState();
       offDevices();
       offButton();

@@ -3,21 +3,21 @@
 // Nội dung dài mở trong một hộp thoại ở giữa màn hình. Bản native của
 // components/StoreGameDetail.tsx + components/store-detail/*.
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { alpha, glassShadow, glassShadowSubtle, makeStyles, useTheme } from '@/theme';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { alpha, glassShadow, makeStyles, useTheme } from '@/theme';
 import { useMotion } from '@/ui/motion';
-import { Animated, Easing, Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, ScrollView } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, View, type NativeScrollEvent, type NativeSyntheticEvent, ScrollView, type StyleProp, type ViewStyle } from 'react-native';
 import { FocusScroll, FocusLayer } from '@/features/gamepad/focus';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  ArrowUpRight, Building2, Check, ChevronDown, ChevronLeft, ChevronRight, Download, Gamepad2, Gift, Loader, Monitor,
-  Play, ShoppingCart, SquarePen, ThumbsDown, ThumbsUp, Trophy, X,
+  ArrowUp, ArrowUpRight, Building2, Check, ChevronDown, ChevronLeft, ChevronRight, Download, Gamepad2, Gift, Loader, Monitor,
+  Play, ShoppingCart, Sparkles, SquarePen, ThumbsDown, ThumbsUp, Trophy, X,
 } from 'lucide-react-native';
 
 import { useBack, useGamepadTabs } from '@/features/gamepad/hooks';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
 import type { DetailSheet, DetailView, SteamStoreGameDetail, StoreDetailItem } from '@/features/library/detail-types';
-import { formatCompact, formatNumber, formatRelative } from '@/features/library/format';
+import { formatCompact, formatNumber, formatRelative, formatStorePrice } from '@/features/library/format';
 import { openExternal } from '@/lib/open-external';
 import { BlurView } from 'expo-blur';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
@@ -26,8 +26,10 @@ import { Press } from '@/ui/Press';
 import { Skeleton } from '@/ui/Skeleton';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
+import { ConsoleAction } from './ConsoleControls';
+import { CONSOLE } from './consoleVisuals';
 
-const PAGE_BG = '#0b121b';
+const PAGE_BG = CONSOLE.background;
 const DIVIDER = 'rgba(255,255,255,0.09)';
 
 function platformNames(platforms: SteamStoreGameDetail['platforms']): string {
@@ -48,7 +50,7 @@ function SectionHeading({ title, onOpen }: { title: string; onOpen?: () => void 
       {onOpen ? <ChevronRight size={s(17)} color="rgba(255,255,255,0.4)" strokeWidth={2.4} /> : null}
     </View>
   );
-  return onOpen ? <Press onPress={onOpen} pressScale={0.98} style={{ alignSelf: 'flex-start' }}>{content}</Press> : content;
+  return onOpen ? <Press focusVariant="quiet" onPress={onOpen} pressScale={0.98} style={{ alignSelf: 'flex-start', paddingHorizontal: s(8), paddingVertical: s(4), marginHorizontal: -s(8), marginVertical: -s(4), borderRadius: s(10) }}>{content}</Press> : content;
 }
 
 /** Đoạn văn cắt theo số dòng; chỉ hiện "thêm" khi chữ thật sự bị cắt. */
@@ -68,12 +70,12 @@ function ClampText({ text, lines, onMore }: { text: string; lines: number; onMor
         {text}
       </T>
       {clamped ? (
-        <Press onPress={onMore} style={{ position: 'absolute', right: 0, bottom: 0, paddingLeft: s(28) }}>
+        <Press focusVariant="quiet" onPress={onMore} focusRadius={s(8)} style={{ position: 'absolute', right: -s(6), bottom: -s(2), paddingLeft: s(12), paddingRight: s(6), paddingVertical: s(2), borderRadius: s(8) }}>
           <LinearGradient
             colors={[alpha(colors.panelSolid, 0), PAGE_BG]} locations={[0, 0.4]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={StyleSheet.absoluteFill}
           />
-          <T size={11.8} weight="semibold" color={colors.accent} leading={1.6}>thêm</T>
+          <T size={11.8} weight="semibold" color={CONSOLE.controllerA} leading={1.6}>thêm</T>
         </Press>
       ) : null}
     </View>
@@ -93,7 +95,7 @@ function StatCell({ label, value, caption, onPress }: { label: string; value: Re
       <T size={10} weight="medium" color="rgba(255,255,255,0.42)" numberOfLines={1} style={{ marginTop: s(2) }}>{caption}</T>
     </View>
   );
-  return onPress ? <Press onPress={onPress} pressScale={0.97}>{body}</Press> : body;
+  return onPress ? <Press focusVariant="quiet" onPress={onPress} pressScale={0.97} style={{ paddingVertical: s(4), borderRadius: s(12) }}>{body}</Press> : body;
 }
 
 function StatsRow({ view, onShowReviews }: { view: DetailView; onShowReviews: () => void }) {
@@ -124,7 +126,7 @@ function StatsRow({ view, onShowReviews }: { view: DetailView; onShowReviews: ()
   }
   return (
     <View style={{ marginHorizontal: s(20), marginTop: s(20), borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: DIVIDER, paddingTop: s(12) }}>
-      <FocusScroll horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -s(20) }} contentContainerStyle={{ paddingHorizontal: s(8) }}>
+      <FocusScroll horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -s(20), marginVertical: -s(8) }} contentContainerStyle={{ paddingHorizontal: s(12), paddingVertical: s(8) }}>
         {cells.map((cell, index) => (
           <View key={index} style={{ borderLeftWidth: index ? StyleSheet.hairlineWidth : 0, borderLeftColor: DIVIDER }}>{cell}</View>
         ))}
@@ -165,14 +167,14 @@ function Screenshots({ view }: { view: DetailView }) {
     <View style={{ marginTop: s(24), borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: DIVIDER, paddingTop: s(20) }}>
       <View style={{ paddingHorizontal: s(20) }}><SectionHeading title="Xem trước" /></View>
       <FocusScroll horizontal showsHorizontalScrollIndicator={false} snapToInterval={itemWidth + s(12)} decelerationRate="fast"
-        style={{ marginTop: s(12) }} contentContainerStyle={{ paddingHorizontal: s(20), gap: s(12) }}
+        style={{ marginTop: s(4), marginBottom: -s(8) }} contentContainerStyle={{ paddingHorizontal: s(20), paddingVertical: s(8), gap: s(12) }}
       >
         {detail.screenshots.map((shot, index) => (
-          <Press key={`${shot.id}-${shot.full}`} onPress={() => openSheet({ kind: 'screenshots', index })} pressScale={0.99}
+          <Press focusVariant="quiet" key={`${shot.id}-${shot.full}`} onPress={() => openSheet({ kind: 'screenshots', index })} pressScale={0.99}
             accessibilityLabel={`Xem ảnh ${index + 1} trong game`}
-            style={{ width: itemWidth, aspectRatio: 16 / 9, borderRadius: s(16), overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line, backgroundColor: colors.card }}
+            style={{ width: itemWidth, aspectRatio: 16 / 9, borderRadius: s(16), borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line, backgroundColor: colors.card }}
           >
-            <Img source={{ uri: shot.thumbnail }} style={{ width: '100%', height: '100%' }} contentFit="cover" recyclingKey={`${shot.id}`} />
+            <Img source={{ uri: shot.thumbnail }} style={{ width: '100%', height: '100%', borderRadius: s(16) }} contentFit="cover" recyclingKey={`${shot.id}`} />
           </Press>
         ))}
       </FocusScroll>
@@ -197,7 +199,6 @@ function Screenshots({ view }: { view: DetailView }) {
 }
 
 function About({ view }: { view: DetailView }) {
-  const { colors } = useTheme();
   const { s } = useUi();
   const { detail, openSheet } = view;
   const description = detail.about || detail.shortDescription || null;
@@ -205,13 +206,13 @@ function About({ view }: { view: DetailView }) {
     <>
       {description ? <View style={{ marginHorizontal: s(20), marginTop: s(16) }}><ClampText text={description} lines={3} onMore={() => openSheet({ kind: 'about' })} /></View> : null}
       {detail.developers[0] ? (
-        <Press
+        <Press focusVariant="quiet"
           onPress={() => void openExternal(`https://store.steampowered.com/search/?developer=${encodeURIComponent(detail.developers[0])}`)}
           pressScale={0.99}
-          style={{ marginHorizontal: s(20), marginTop: s(20), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(12) }}
+          style={{ marginHorizontal: s(10), marginTop: s(12), paddingHorizontal: s(10), paddingVertical: s(8), borderRadius: s(12), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(12) }}
         >
           <View style={{ flex: 1 }}>
-            <T size={12.2} weight="semibold" color={colors.accent} numberOfLines={1}>{detail.developers.join(', ')}</T>
+            <T size={12.2} weight="semibold" color={CONSOLE.controllerA} numberOfLines={1}>{detail.developers.join(', ')}</T>
             <T size={9.9} color="rgba(255,255,255,0.42)" style={{ marginTop: s(2) }}>Nhà phát triển</T>
           </View>
           <ChevronRight size={s(16)} color="rgba(255,255,255,0.32)" />
@@ -222,12 +223,11 @@ function About({ view }: { view: DetailView }) {
 }
 
 function ReviewVerdict({ recommended }: { recommended: boolean }) {
-  const { colors } = useTheme();
   const { s } = useUi();
   const Icon = recommended ? ThumbsUp : ThumbsDown;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8) }}>
-      <Icon size={s(16)} color={recommended ? colors.accent : '#ff8a80'} strokeWidth={2.2} />
+      <Icon size={s(16)} color={recommended ? CONSOLE.controllerA : '#ff8a80'} strokeWidth={2.2} />
       <T size={12.8} weight="bold">{recommended ? 'Đề xuất' : 'Không đề xuất'}</T>
     </View>
   );
@@ -238,7 +238,7 @@ function reviewMeta(review: SteamStoreGameDetail['reviews'][number]): string {
 }
 
 function Reviews({ view, onLayout }: { view: DetailView; onLayout: (y: number) => void }) {
-  const { glass, colors } = useTheme();
+  const { glass } = useTheme();
   const { s, width } = useUi();
   const { detail, summary, positivePercent, openSheet } = view;
   if (!summary && !detail.reviews.length) return null;
@@ -261,7 +261,7 @@ function Reviews({ view, onLayout }: { view: DetailView; onLayout: (y: number) =
             </View>
             <View style={{ width: '45%', maxWidth: s(224), paddingBottom: s(4) }}>
               <View style={{ height: s(6), borderRadius: s(3), overflow: 'hidden', backgroundColor: 'rgba(255,138,128,0.7)' }}>
-                <View style={{ width: `${positivePercent}%`, height: '100%', borderRadius: s(3), backgroundColor: colors.accent }} />
+                <View style={{ width: `${positivePercent}%`, height: '100%', borderRadius: s(3), backgroundColor: CONSOLE.controllerA }} />
               </View>
               <T size={10.5} weight="semibold" color="rgba(255,255,255,0.48)" style={{ marginTop: s(6), textAlign: 'right' }}>{formatCompact(summary.total)} đánh giá</T>
             </View>
@@ -273,10 +273,10 @@ function Reviews({ view, onLayout }: { view: DetailView; onLayout: (y: number) =
         <>
           <T size={13} weight="bold" color="rgba(255,255,255,0.92)" style={{ marginTop: s(20), paddingHorizontal: s(20) }}>Nhận xét hữu ích nhất</T>
           <FocusScroll horizontal showsHorizontalScrollIndicator={false} snapToInterval={cardWidth + s(12)} decelerationRate="fast"
-            style={{ marginTop: s(10) }} contentContainerStyle={{ paddingHorizontal: s(20), gap: s(12) }}
+            style={{ marginTop: s(2), marginBottom: -s(8) }} contentContainerStyle={{ paddingHorizontal: s(20), paddingVertical: s(10), gap: s(12) }}
           >
             {detail.reviews.map((review) => (
-              <Press key={review.id} onPress={() => openSheet({ kind: 'review', id: review.id })} pressScale={0.99}
+              <Press focusVariant="quiet" key={review.id} onPress={() => openSheet({ kind: 'review', id: review.id })} pressScale={0.99}
                 style={{ width: cardWidth, height: s(168), padding: s(16), borderRadius: s(16), borderWidth: 1, borderColor: glass.borderSubtle, backgroundColor: glass.surfaceUltraThin }}
               >
                 <ReviewVerdict recommended={review.recommended} />
@@ -288,7 +288,7 @@ function Reviews({ view, onLayout }: { view: DetailView; onLayout: (y: number) =
         </>
       ) : null}
 
-      <Press
+      <Press focusVariant="quiet"
         onPress={() => void openExternal(`${detail.storeUrl}#app_reviews_hash`)}
         pressScale={0.99}
         style={{ marginHorizontal: s(20), marginTop: s(16), height: s(44), borderRadius: s(16), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: s(8), backgroundColor: glass.surface }}
@@ -311,11 +311,10 @@ function InfoRow({ label, value, onOpen }: { label: string; value: string; onOpe
       </View>
     </View>
   );
-  return onOpen ? <Press onPress={onOpen} pressScale={0.995}>{body}</Press> : body;
+  return onOpen ? <Press focusVariant="quiet" onPress={onOpen} pressScale={0.995} style={{ paddingHorizontal: s(10), marginHorizontal: -s(10), borderRadius: s(12) }}>{body}</Press> : body;
 }
 
 function Info({ view }: { view: DetailView }) {
-  const { colors } = useTheme();
   const { s } = useUi();
   const { detail, genres, controllerSupport, languages, hasVietnamese, openSheet } = view;
   const platforms = platformNames(detail.platforms);
@@ -347,11 +346,11 @@ function Info({ view }: { view: DetailView }) {
       </View>
       <View style={{ marginTop: s(4) }}>
         {links.map((link) => (
-          <Press key={link.label} onPress={() => void openExternal(link.href)} pressScale={0.995}
-            style={{ minHeight: s(44), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(12), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)', paddingVertical: s(10) }}
+          <Press focusVariant="quiet" key={link.label} onPress={() => void openExternal(link.href)} pressScale={0.995}
+            style={{ minHeight: s(44), flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: s(12), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)', paddingVertical: s(10), paddingHorizontal: s(10), marginHorizontal: -s(10), borderRadius: s(12) }}
           >
-            <T size={11.8} weight="medium" color={colors.accent}>{link.label}</T>
-            <ArrowUpRight size={s(16)} color={colors.accent} strokeWidth={2} />
+            <T size={11.8} weight="medium" color={CONSOLE.controllerA}>{link.label}</T>
+            <ArrowUpRight size={s(16)} color={CONSOLE.controllerA} strokeWidth={2} />
           </Press>
         ))}
       </View>
@@ -364,7 +363,7 @@ function Info({ view }: { view: DetailView }) {
 function DetailModal({ title, subtitle, onClose, onBack, wide, children }: {
   title: string; subtitle?: string | null; onClose: () => void; onBack?: () => void; wide?: boolean; children: ReactNode;
 }) {
-  const { glass, colors } = useTheme();
+  const { glass } = useTheme();
   const { s, width, height } = useUi();
   useBack(() => { if (onBack) onBack(); else onClose(); });
   return (
@@ -377,16 +376,16 @@ function DetailModal({ title, subtitle, onClose, onBack, wide, children }: {
         <GlassBackdrop material="panel" intensity={36} radius={s(24)} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8), paddingLeft: s(12), paddingRight: s(10), paddingVertical: s(10), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: glass.border }}>
           {onBack ? (
-            <Press onPress={onBack} sound="back" accessibilityLabel="Quay lại" style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: glass.surfaceRaised, borderWidth: 1, borderColor: glass.borderSpecular }}>
-              <ChevronLeft size={s(18)} color={colors.text2} />
+            <Press focusVariant="quiet" onPress={onBack} sound="back" accessibilityLabel="Quay lại" style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: glass.surfaceRaised, borderWidth: 1, borderColor: glass.borderSpecular }}>
+              <ChevronLeft size={s(18)} color={CONSOLE.muted} />
             </Press>
           ) : null}
           <View style={{ flex: 1, minWidth: 0 }}>
             <T size={14} weight="bold" numberOfLines={1}>{title}</T>
             {subtitle ? <T size={10} color="rgba(255,255,255,0.44)" numberOfLines={1}>{subtitle}</T> : null}
           </View>
-          <Press onPress={onClose} sound="back" accessibilityLabel="Đóng" style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: glass.surfaceRaised, borderWidth: 1, borderColor: glass.borderSpecular }}>
-            <X size={s(16)} color={colors.text2} />
+          <Press focusVariant="quiet" onPress={onClose} sound="back" accessibilityLabel="Đóng" style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', backgroundColor: glass.surfaceRaised, borderWidth: 1, borderColor: glass.borderSpecular }}>
+            <X size={s(16)} color={CONSOLE.muted} />
           </Press>
         </View>
         <FocusScroll contentContainerStyle={{ padding: s(16) }} showsVerticalScrollIndicator={false}>{children}</FocusScroll>
@@ -412,7 +411,7 @@ function ScreenshotModal({
   onIndex: (index: number) => void;
   onClose: () => void;
 }) {
-  const { glass, colors } = useTheme();
+  const { glass } = useTheme();
   const { s, width, height } = useUi();
   const [fitMode, setFitMode] = useState<'cover' | 'contain'>('cover');
   const shots = view.detail.screenshots;
@@ -448,7 +447,7 @@ function ScreenshotModal({
           }}
         >
           <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: alpha(colors.bgDeep, 0.72) }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: alpha(CONSOLE.background, 0.72) }]} />
         </Pressable>
         <View
           style={{
@@ -458,7 +457,7 @@ function ScreenshotModal({
             overflow: 'hidden',
             borderWidth: 1,
             borderColor: glass.borderSpecular,
-            backgroundColor: colors.bgDeep,
+            backgroundColor: CONSOLE.background,
             ...glassShadow,
           }}
           onTouchStart={(e) => {
@@ -500,7 +499,7 @@ function ScreenshotModal({
           </Pressable>
 
           {/* Dấu (x) đóng ở góc như cũ đè lên ảnh */}
-          <Press
+          <Press focusVariant="quiet"
             onPress={onClose}
             sound="back"
             accessibilityLabel="Đóng xem trước"
@@ -524,7 +523,7 @@ function ScreenshotModal({
 
           {/* Nút lùi ảnh bên trái */}
           {index > 0 ? (
-            <Press
+            <Press focusVariant="quiet"
               onPress={() => onIndex(index - 1)}
               sound="navigate"
               accessibilityLabel="Ảnh trước"
@@ -550,7 +549,7 @@ function ScreenshotModal({
 
           {/* Nút tiến ảnh bên phải */}
           {index < shots.length - 1 ? (
-            <Press
+            <Press focusVariant="quiet"
               onPress={() => onIndex(index + 1)}
               sound="navigate"
               accessibilityLabel="Ảnh kế tiếp"
@@ -592,7 +591,7 @@ function ScreenshotModal({
               borderColor: glass.borderSpecular,
             }}
           >
-            <Press
+            <Press focusVariant="quiet"
               disabled={index === 0}
               onPress={() => onIndex(index - 1)}
               sound="navigate"
@@ -612,7 +611,7 @@ function ScreenshotModal({
             <T size={11} color="rgba(255, 255, 255, 0.9)" weight="semibold" tabular>
               {index + 1} / {shots.length}
             </T>
-            <Press
+            <Press focusVariant="quiet"
               disabled={index === shots.length - 1}
               onPress={() => onIndex(index + 1)}
               sound="navigate"
@@ -654,8 +653,8 @@ function SheetView({ sheet, view, onClose }: { sheet: DetailSheet; view: DetailV
         return (
           <DetailModal title="Tính năng mới" subtitle={name} onClose={onClose}>
             {detail.news.map((news, index) => (
-              <Press key={news.id} onPress={() => openSheet({ kind: 'news', index, fromList: true })} pressScale={0.99}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: s(12), paddingVertical: s(12), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' }}
+              <Press focusVariant="quiet" key={news.id} onPress={() => openSheet({ kind: 'news', index, fromList: true })} pressScale={0.99}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: s(12), paddingVertical: s(12), paddingHorizontal: s(10), marginHorizontal: -s(6), borderRadius: s(12), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.08)' }}
               >
                 <View style={{ flex: 1 }}>
                   <T size={12} weight="semibold" color="rgba(255,255,255,0.88)" numberOfLines={2}>{news.title}</T>
@@ -678,7 +677,7 @@ function SheetView({ sheet, view, onClose }: { sheet: DetailSheet; view: DetailV
         >
           <Para strong>{news.summary || 'Bài viết này không có nội dung tóm tắt.'}</Para>
           {news.url ? (
-            <Press onPress={() => void openExternal(news.url!)} style={{ marginTop: s(16), alignSelf: 'flex-start', height: s(36), paddingHorizontal: s(14), borderRadius: s(18), flexDirection: 'row', alignItems: 'center', gap: s(6), backgroundColor: 'rgba(255,255,255,0.09)' }}>
+            <Press focusVariant="quiet" onPress={() => void openExternal(news.url!)} style={{ marginTop: s(16), alignSelf: 'flex-start', height: s(36), paddingHorizontal: s(14), borderRadius: s(18), flexDirection: 'row', alignItems: 'center', gap: s(6), backgroundColor: 'rgba(255,255,255,0.09)' }}>
               <T size={10.9} weight="semibold" color="rgba(255,255,255,0.86)">Đọc trên Steam</T>
               <ArrowUpRight size={s(14)} color="rgba(255,255,255,0.86)" />
             </Press>
@@ -786,49 +785,15 @@ export type StoreBuyAction = {
 
 const BUY_ICONS = { buy: ShoppingCart, free: Gift, download: Download, play: Play, wait: Loader, owned: Check } as const;
 
-function BuyButton({ action, compact }: { action: StoreBuyAction; compact?: boolean }) {
-  const { colors } = useTheme();
+function BuyButton({ action, compact, style }: { action: StoreBuyAction; compact?: boolean; style?: StyleProp<ViewStyle> }) {
   const { s } = useUi();
   const Icon = BUY_ICONS[action.icon];
-  const filled = action.icon === 'play';
   return (
-    <Press
-      onPress={action.onPress}
-      disabled={action.disabled}
-      sound="confirm"
-      accessibilityLabel={action.label}
-      style={{
-        height: s(36),
-        paddingHorizontal: s(compact ? 14 : 18),
-        borderRadius: s(18),
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: s(7),
-        backgroundColor: colors.white,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.9)',
-        shadowColor: '#ffffff',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.16,
-        shadowRadius: 8,
-        elevation: 4,
-        overflow: 'hidden',
-        opacity: action.disabled ? 0.55 : 1,
-      }}
-    >
-      <LinearGradient
-        colors={['rgba(255,255,255,0.45)', 'rgba(255,255,255,0.05)', 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={[StyleSheet.absoluteFill, { height: '55%' }]}
-        pointerEvents="none"
-      />
-      <Icon size={s(compact ? 14 : 15)} color="#08111d" strokeWidth={2.3} fill={filled ? '#08111d' : 'none'} />
-      <T size={compact ? 10.2 : 11.2} weight="bold" color="#08111d" numberOfLines={1}>{compact && action.price ? `${action.label} · ${action.price}` : action.label}</T>
-    </Press>
+    <ConsoleAction onPress={action.onPress} disabled={action.disabled} compact={compact} autoFocus={!compact} style={style}
+      label={compact && action.price ? `${action.label} · ${action.price}` : action.label}
+      icon={<Icon size={s(compact ? 14 : 18)} color={CONSOLE.ink} strokeWidth={2} fill={action.icon === 'play' ? CONSOLE.ink : 'none'} />} />
   );
 }
-
 function DetailLoading() {
   const { s, width } = useUi();
   return (
@@ -871,7 +836,7 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyA
 
   useBack(() => { if (sheet) setSheet(null); else onClose(); });
   useEffect(() => {
-    const animation = Animated.timing(enter, { toValue: 1, duration: reduceMotion ? 0 : 260, easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false });
+    const animation = Animated.timing(enter, { toValue: 1, duration: reduceMotion ? 0 : 200, easing: Easing.out(Easing.cubic), useNativeDriver: true, isInteraction: false });
     animation.start();
     return () => animation.stop();
   }, [enter, reduceMotion]);
@@ -903,6 +868,20 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyA
   const coverSource = cover || detail?.headerImage || item.headerImage;
   const [failedLogo, setFailedLogo] = useState<string | null>(null);
 
+  const rawOriginal = detail?.price?.original ?? item.originalPrice ?? null;
+  const rawFinal = detail?.price?.final ?? item.finalPrice ?? null;
+  const currency = detail?.price?.currency ?? item.currency ?? 'VND';
+  const originalPriceFormatted = useMemo(() => {
+    if (rawOriginal && currency) {
+      return formatStorePrice({ finalPrice: rawOriginal, currency });
+    }
+    if (item.discounted && item.discountPercent > 0 && rawFinal && currency) {
+      const calculated = Math.round(rawFinal / (1 - item.discountPercent / 100));
+      return formatStorePrice({ finalPrice: calculated, currency });
+    }
+    return null;
+  }, [rawOriginal, rawFinal, currency, item.discounted, item.discountPercent]);
+
   return (
     <FocusLayer>
     <Animated.View
@@ -918,11 +897,11 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyA
           <LinearGradient colors={[alpha(colors.panelSolid, 0), PAGE_BG]} locations={[0.1, 1]} style={{ position: 'absolute', left: 0, right: 0, top: 0, height: s(272) }} />
 
           <View style={{ maxWidth: s(832), width: '100%', alignSelf: 'center', paddingBottom: s(40) + insets.bottom }}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: s(16), paddingHorizontal: s(20) + insets.left, paddingTop: s(64) }}>
-              <View style={{ width: s(116), aspectRatio: 2 / 3, borderRadius: s(18), overflow: 'hidden', borderWidth: 1, borderColor: colors.line, backgroundColor: '#152130' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: s(18), paddingHorizontal: s(20) + insets.left, paddingTop: s(64) }}>
+              <View style={{ width: s(120), aspectRatio: 2 / 3, borderRadius: s(18), overflow: 'hidden', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.16)', backgroundColor: '#152130', shadowColor: '#000000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.55, shadowRadius: 16, elevation: 10 }}>
                 <Img source={{ uri: coverSource }} style={{ width: '100%', height: '100%' }} contentFit="cover" onError={() => setCoverFailed(true)} />
               </View>
-              <View style={{ flex: 1, minWidth: 0, paddingBottom: s(2) }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 {logo && logo.url !== failedLogo ? (
                   <Img
                     source={{ uri: logo.url }}
@@ -934,24 +913,183 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyA
                 ) : (
                   <T size={26} weight="bold" tracking={-0.035} leading={1.05} numberOfLines={2}>{name}</T>
                 )}
-                {genres.length ? <T size={11.8} weight="medium" color="rgba(255,255,255,0.5)" numberOfLines={1} style={{ marginTop: s(6) }}>{genres.slice(0, 3).join(', ')}</T> : null}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10), marginTop: s(12), flexWrap: 'wrap' }}>
-                  <BuyButton action={effectiveBuyAction} />
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8) }}>
-                    {item.discounted ? (
-                      <View style={{ backgroundColor: colors.accent, borderRadius: s(8), paddingHorizontal: s(7), paddingVertical: s(3), borderWidth: 1, borderColor: 'rgba(255,255,255,0.25)', shadowColor: colors.accent, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 6, elevation: 2 }}>
-                        <T size={9.6} weight="bold" color={colors.onAccent} tabular>-{item.discountPercent}%</T>
+
+                {/* Metadata Badges */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6), marginTop: s(8), flexWrap: 'wrap' }}>
+                  {genres.slice(0, 2).map((genre) => (
+                    <View
+                      key={genre}
+                      style={{
+                        paddingHorizontal: s(8),
+                        paddingVertical: s(3),
+                        borderRadius: s(6),
+                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255, 255, 255, 0.12)',
+                      }}
+                    >
+                      <T size={10.5} weight="medium" color="rgba(255, 255, 255, 0.85)">
+                        {genre}
+                      </T>
+                    </View>
+                  ))}
+                  {(detail?.controllerSupport || item.controllerSupport) ? (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: s(4),
+                        paddingHorizontal: s(8),
+                        paddingVertical: s(3),
+                        borderRadius: s(6),
+                        backgroundColor: 'rgba(99, 102, 241, 0.14)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(165, 180, 252, 0.28)',
+                      }}
+                    >
+                      <Gamepad2 size={s(11)} color="#a5b4fc" strokeWidth={2} />
+                      <T size={10.5} weight="medium" color="#c7d2fe">
+                        {(detail?.controllerSupport || item.controllerSupport) === 'full' ? 'Hỗ trợ tay cầm' : 'Tay cầm một phần'}
+                      </T>
+                    </View>
+                  ) : null}
+                  {detail?.releaseDate ? (
+                    <View
+                      style={{
+                        paddingHorizontal: s(8),
+                        paddingVertical: s(3),
+                        borderRadius: s(6),
+                        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                        borderWidth: 1,
+                        borderColor: 'rgba(255, 255, 255, 0.08)',
+                      }}
+                    >
+                      <T size={10.5} weight="medium" color="rgba(255, 255, 255, 0.6)">
+                        {detail.releaseDate}
+                      </T>
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* Creative Console Deal Card */}
+                <View
+                  style={{
+                    marginTop: s(12),
+                    borderRadius: s(16),
+                    borderWidth: 1,
+                    borderColor: item.discounted ? 'rgba(105, 204, 140, 0.28)' : 'rgba(255, 255, 255, 0.12)',
+                    backgroundColor: 'rgba(12, 22, 17, 0.78)',
+                    overflow: 'hidden',
+                    maxWidth: s(500),
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 0.35,
+                    shadowRadius: 12,
+                    elevation: 5,
+                  }}
+                >
+                  {item.discounted ? (
+                    <LinearGradient
+                      colors={['rgba(105, 204, 140, 0.65)', 'rgba(52, 211, 153, 0.15)', 'transparent']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={{ height: 2, width: '100%' }}
+                    />
+                  ) : null}
+
+                  <View style={{ padding: s(12), gap: s(10) }}>
+                    {/* Top Tier: Price & Deal Showcase */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: s(8) }}>
+                      {item.discounted ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10) }}>
+                          {/* Glowing discount badge */}
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: s(3),
+                              backgroundColor: '#22c55e',
+                              borderRadius: s(7),
+                              paddingHorizontal: s(7),
+                              paddingVertical: s(3.5),
+                              borderWidth: 1,
+                              borderColor: 'rgba(255,255,255,0.35)',
+                              shadowColor: '#22c55e',
+                              shadowOffset: { width: 0, height: 2 },
+                              shadowOpacity: 0.45,
+                              shadowRadius: 6,
+                              elevation: 3,
+                            }}
+                          >
+                            <Sparkles size={s(10)} color="#ffffff" strokeWidth={2.5} />
+                            <T size={11} weight="bold" color="#ffffff" tabular>-{item.discountPercent}%</T>
+                          </View>
+
+                          {/* Strikethrough original price */}
+                          <View>
+                            <T size={8.8} weight="semibold" color="rgba(255, 255, 255, 0.42)" tracking={0.08}>
+                              GIÁ GỐC
+                            </T>
+                            {originalPriceFormatted ? (
+                              <T size={12} weight="medium" color="rgba(255, 255, 255, 0.45)" tabular style={{ textDecorationLine: 'line-through' }}>
+                                {originalPriceFormatted}
+                              </T>
+                            ) : null}
+                          </View>
+                        </View>
+                      ) : (
+                        <View>
+                          <T size={8.8} weight="semibold" color="rgba(255, 255, 255, 0.42)" tracking={0.08}>
+                            {isFree ? 'ƯU ĐÃI' : 'GIÁ CHÍNH THỨC'}
+                          </T>
+                          <T size={11} weight="medium" color="rgba(255, 255, 255, 0.7)">
+                            Bản quyền Steam
+                          </T>
+                        </View>
+                      )}
+
+                      {/* Final Price display */}
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <T size={8.8} weight="semibold" color={item.discounted ? '#86efac' : 'rgba(255, 255, 255, 0.42)'} tracking={0.08}>
+                          {item.discounted ? 'GIÁ ƯU ĐÃI' : 'GIÁ BÁN'}
+                        </T>
+                        <T size={20} weight="bold" color="#ffffff" tabular tracking={-0.02}>
+                          {priceLabel}
+                        </T>
                       </View>
-                    ) : null}
-                    <T size={11.8} weight="semibold" tabular color="rgba(255,255,255,0.8)">{priceLabel}</T>
+                    </View>
+
+                    {/* Subtle hairline separator */}
+                    <View style={{ height: 1, backgroundColor: 'rgba(255, 255, 255, 0.08)' }} />
+
+                    {/* Bottom Tier: Action Buttons */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10) }}>
+                      <View style={{ flex: 1 }}>
+                        <BuyButton action={effectiveBuyAction} style={{ width: '100%', maxWidth: '100%', alignSelf: 'stretch' }} />
+                      </View>
+
+                      <Press
+                        focusVariant="quiet"
+                        onPress={() => void openExternal(storeUrl)}
+                        accessibilityLabel="Mở trang Steam trên trình duyệt"
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: s(6),
+                          height: s(44),
+                          paddingHorizontal: s(16),
+                          borderRadius: s(12),
+                          backgroundColor: 'rgba(255, 255, 255, 0.07)',
+                          borderWidth: 1,
+                          borderColor: 'rgba(255, 255, 255, 0.14)',
+                        }}
+                      >
+                        <T size={12} weight="semibold" color="rgba(255, 255, 255, 0.88)">Steam</T>
+                        <ArrowUpRight size={s(15)} color="rgba(255, 255, 255, 0.88)" strokeWidth={2.2} />
+                      </Press>
+                    </View>
                   </View>
-                  <Press
-                    onPress={() => void openExternal(storeUrl)}
-                    accessibilityLabel="Mở trang Steam trên trình duyệt"
-                    style={[styles.navButton, { width: s(36), height: s(36), borderRadius: s(18) }]}
-                  >
-                    <ArrowUpRight size={s(15)} color="rgba(255,255,255,0.8)" strokeWidth={2} />
-                  </Press>
                 </View>
               </View>
             </View>
@@ -984,29 +1122,75 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyA
           position: 'absolute', left: 0, right: 0, top: 0, height: s(56) + insets.top, paddingTop: insets.top,
           paddingLeft: s(12) + insets.left, paddingRight: s(12) + insets.right,
           flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-          overflow: 'hidden',
+          overflow: 'visible',
         }}
       >
         {compact ? (
-          <>
-            <BlurView intensity={55} tint="dark" style={StyleSheet.absoluteFill} />
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: glass.surfaceRaised }]} />
-            <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: StyleSheet.hairlineWidth, backgroundColor: glass.borderSpecular }} />
-          </>
+          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+            <BlurView intensity={50} tint="dark" style={StyleSheet.absoluteFill} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: CONSOLE.navigation }]} />
+            <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: StyleSheet.hairlineWidth, backgroundColor: CONSOLE.border }} />
+          </View>
         ) : null}
-        <Press onPress={onClose} sound="back" accessibilityLabel="Quay lại cửa hàng" style={[styles.navButton, { width: s(36), height: s(36), borderRadius: s(18) }]}>
+
+        <Press focusVariant="quiet" onPress={onClose} sound="back" accessibilityLabel="Quay lại cửa hàng" style={[styles.navButton, { width: s(36), height: s(36), borderRadius: s(12) }]}>
           <ChevronLeft size={s(18)} color="rgba(255,255,255,0.86)" strokeWidth={2.2} />
         </Press>
+
         {compact ? (
-          <View style={{ width: s(27), height: s(40), borderRadius: s(8), overflow: 'hidden', borderWidth: 1, borderColor: glass.borderSpecular }}>
-            <Img source={{ uri: coverSource }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+          <View
+            pointerEvents="box-none"
+            style={[
+              StyleSheet.absoluteFill,
+              { top: insets.top, alignItems: 'center', justifyContent: 'center' },
+            ]}
+          >
+            <Press
+              focusVariant="quiet"
+              onPress={() => scroller.current?.scrollTo({ y: 0, animated: true })}
+              sound="navigate"
+              accessibilityLabel="Cuộn lên đầu trang"
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: s(7),
+                paddingHorizontal: s(8),
+                paddingVertical: s(4),
+                borderRadius: s(10),
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.1)',
+                maxWidth: s(260),
+              }}
+            >
+              <View style={{ width: s(18), height: s(26), borderRadius: s(4), overflow: 'hidden', borderWidth: 1, borderColor: glass.borderSpecular }}>
+                <Img source={{ uri: coverSource }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+              </View>
+              <T size={12} weight="semibold" color="rgba(255,255,255,0.9)" numberOfLines={1} style={{ flexShrink: 1 }}>
+                {name}
+              </T>
+            </Press>
           </View>
-        ) : <View />}
-        {compact ? <BuyButton action={effectiveBuyAction} compact /> : (
-          <Press
+        ) : null}
+
+        {compact ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8) }}>
+            <Press
+              focusVariant="quiet"
+              onPress={() => scroller.current?.scrollTo({ y: 0, animated: true })}
+              sound="navigate"
+              accessibilityLabel="Cuộn lên đầu trang"
+              style={[styles.navButton, { width: s(36), height: s(36), borderRadius: s(12) }]}
+            >
+              <ArrowUp size={s(16)} color="rgba(255,255,255,0.86)" strokeWidth={2.2} />
+            </Press>
+            <BuyButton action={effectiveBuyAction} compact style={{ alignSelf: 'center' }} />
+          </View>
+        ) : (
+          <Press focusVariant="quiet"
             onPress={() => void openExternal(storeUrl)}
             accessibilityLabel="Mở trang Steam trên trình duyệt"
-            style={[styles.navButton, { width: s(36), height: s(36), borderRadius: s(18) }]}
+            style={[styles.navButton, { width: s(36), height: s(36), borderRadius: s(12) }]}
           >
             <ArrowUpRight size={s(16)} color="rgba(255,255,255,0.86)" strokeWidth={2} />
           </Press>
@@ -1019,13 +1203,12 @@ export function StoreGameDetail({ item, detail, loading, error, priceLabel, buyA
   );
 }
 
-const useStyles = makeStyles(({ glass }) => ({
+const useStyles = makeStyles(() => ({
   navButton: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: glass.borderSpecular,
-    backgroundColor: glass.surfaceRaised,
-    ...glassShadowSubtle,
+    borderColor: CONSOLE.border,
+    backgroundColor: CONSOLE.control,
   },
 }));

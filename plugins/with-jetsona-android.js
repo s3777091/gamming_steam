@@ -1,7 +1,7 @@
 // Khai báo phần cứng mà app dùng nhưng không bắt buộc: máy không có Bluetooth
 // hay không có tay cầm vẫn cài được. Không cần sửa MainActivity — module
 // jetsona-input tự bọc Window.Callback của Activity để bắt phím/chuột/tay cầm.
-const { withAndroidManifest } = require('expo/config-plugins');
+const { withAndroidManifest, withAndroidStyles } = require('expo/config-plugins');
 
 const OPTIONAL_FEATURES = [
   'android.hardware.bluetooth',
@@ -12,7 +12,7 @@ const OPTIONAL_FEATURES = [
 ];
 
 module.exports = function withJetsonaAndroid(config) {
-  return withAndroidManifest(config, (mod) => {
+  config = withAndroidManifest(config, (mod) => {
     const manifest = mod.modResults.manifest;
     manifest['uses-feature'] ??= [];
     for (const name of OPTIONAL_FEATURES) {
@@ -33,4 +33,24 @@ module.exports = function withJetsonaAndroid(config) {
     }
     return mod;
   });
+
+  config = withAndroidStyles(config, (mod) => {
+    const styles = mod.modResults.resources?.style ?? [];
+    const appTheme = styles.find((s) => s.$?.name === 'AppTheme');
+    if (appTheme) {
+      appTheme.item ??= [];
+      const existing = appTheme.item.find((i) => i.$?.name === 'android:autofilledHighlight');
+      if (existing) {
+        existing._ = '@android:color/transparent';
+      } else {
+        appTheme.item.push({
+          $: { name: 'android:autofilledHighlight' },
+          _: '@android:color/transparent',
+        });
+      }
+    }
+    return mod;
+  });
+
+  return config;
 };

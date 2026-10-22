@@ -5,8 +5,10 @@ import { Moon, Play, Power, RotateCw } from 'lucide-react-native';
 import { FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
-import { alpha, makeStyles, useTheme } from '@/theme';
-import { GlassBackdrop } from '@/ui/GlassMaterial';
+import { makeStyles, useTheme } from '@/theme';
+import { MenuGlassBackdrop } from '@/ui/GlassMaterial';
+import { MENU_MOTION, useMenuGlass, menuGlassFrom } from '@/ui/menuGlass';
+import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -44,9 +46,11 @@ export function RemoteConnectionMenu({
   onSleep,
   onWake,
 }: RemoteConnectionMenuProps) {
-  const { glass, colors } = useTheme();
+  const MENU_GLASS = useMenuGlass();
+  const { colors } = useTheme();
   const styles = useStyles();
   const { s, width: screenWidth, insets } = useUi();
+  const { reduceMotion } = useMotion();
   const [anim] = useState(() => new Animated.Value(0));
   const closingRef = useRef(false);
   const [spinAnim] = useState(() => new Animated.Value(0));
@@ -72,14 +76,14 @@ export function RemoteConnectionMenu({
       anim.setValue(0);
       const animation = Animated.timing(anim, {
         toValue: 1,
-        duration: 220,
+        duration: reduceMotion ? 0 : MENU_MOTION.openMs,
         easing: Easing.bezier(0.16, 1, 0.3, 1),
         useNativeDriver: true,
       });
       animation.start();
       return () => animation.stop();
     }
-  }, [anim, open]);
+  }, [anim, open, reduceMotion]);
 
   const closeWithAnimation = useCallback((after?: () => void) => {
     if (closingRef.current) return;
@@ -87,7 +91,7 @@ export function RemoteConnectionMenu({
     anim.stopAnimation();
     Animated.timing(anim, {
       toValue: 0,
-      duration: 150,
+      duration: reduceMotion ? 0 : MENU_MOTION.closeMs,
       easing: Easing.bezier(0.4, 0, 1, 1),
       useNativeDriver: true,
     }).start(({ finished }) => {
@@ -100,7 +104,7 @@ export function RemoteConnectionMenu({
       onClose();
       after?.();
     });
-  }, [anim, onClose]);
+  }, [anim, onClose, reduceMotion]);
 
   useBack(() => {
     closeWithAnimation();
@@ -120,7 +124,7 @@ export function RemoteConnectionMenu({
     spinAnim.setValue(0);
     Animated.timing(spinAnim, {
       toValue: 1,
-      duration: 650,
+      duration: reduceMotion ? 0 : 650,
       easing: Easing.bezier(0.2, 0.8, 0.2, 1),
       useNativeDriver: true,
     }).start(() => {
@@ -177,7 +181,7 @@ export function RemoteConnectionMenu({
     <FocusLayer>
       <View style={[StyleSheet.absoluteFill, { zIndex: 60, elevation: 60 }]}>
         {/* Lớp nền trong suốt bắt chạm ngoài để đóng */}
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0, 0, 0, 0.32)', opacity: anim }]}>
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: MENU_GLASS.scrim, opacity: anim }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={() => closeWithAnimation()}
@@ -204,20 +208,20 @@ export function RemoteConnectionMenu({
                 {
                   translateY: anim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [-8, 0],
+                    outputRange: [reduceMotion ? 0 : -8, 0],
                   }),
                 },
                 {
                   scale: anim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0.975, 1],
+                    outputRange: [reduceMotion ? 1 : 0.975, 1],
                   }),
                 },
               ],
             },
           ]}
         >
-          <GlassBackdrop material="panel" intensity={34} radius={s(20)} />
+          <MenuGlassBackdrop radius={s(18)} />
 
           {/* Thanh trạng thái nhỏ gọn phía trên */}
           <View style={styles.topBar}>
@@ -248,7 +252,7 @@ export function RemoteConnectionMenu({
           {/* Dãy 3 icon chức năng chuẩn phong cách glass, đồng bộ giao diện */}
           <View style={[styles.actionRow, { gap: s(7), marginTop: s(8) }]}>
             {/* 1. Streaming */}
-            <Press
+            <Press focusVariant="quiet"
               autoFocus={open}
               onPress={handleStream}
               sound="confirm"
@@ -258,17 +262,18 @@ export function RemoteConnectionMenu({
                 {
                   height: s(36),
                   borderRadius: s(11),
-                  backgroundColor: alpha(colors.accent, 0.16),
-                  borderColor: alpha(colors.accent, 0.35),
+                  backgroundColor: 'transparent',
+                  borderColor: MENU_GLASS.border,
                 },
               ]}
               accessibilityLabel="Stream phát PC"
             >
-              <Play size={s(14)} color={colors.accent} fill={colors.accent} />
+              <MenuGlassBackdrop variant="control" radius={s(11)} />
+              <Play size={s(14)} color={MENU_GLASS.ink} fill={MENU_GLASS.ink} />
             </Press>
 
             {/* 2. Làm mới kết nối */}
-            <Press
+            <Press focusVariant="quiet"
               onPress={handleReload}
               sound="navigate"
               pressScale={0.93}
@@ -277,12 +282,13 @@ export function RemoteConnectionMenu({
                 {
                   height: s(36),
                   borderRadius: s(11),
-                  backgroundColor: glass.surface,
-                  borderColor: glass.controlBorder,
+                  backgroundColor: 'transparent',
+                  borderColor: MENU_GLASS.border,
                 },
               ]}
               accessibilityLabel="Làm mới kết nối remote"
             >
+              <MenuGlassBackdrop variant="control" radius={s(11)} />
               {refreshing ? (
                 <ActivityIndicator size="small" color={colors.text2} />
               ) : (
@@ -294,7 +300,7 @@ export function RemoteConnectionMenu({
 
             {/* 3. Đi ngủ (Sleep PC) / Đánh thức */}
             {isOnline ? (
-              <Press
+              <Press focusVariant="quiet"
                 onPress={() => void handleSleep()}
                 sound="confirm"
                 pressScale={0.93}
@@ -303,12 +309,13 @@ export function RemoteConnectionMenu({
                   {
                     height: s(36),
                     borderRadius: s(11),
-                    backgroundColor: glass.surfaceHighlight,
-                    borderColor: glass.borderAccent,
+                    backgroundColor: 'transparent',
+                    borderColor: MENU_GLASS.border,
                   },
                 ]}
                 accessibilityLabel="Ru PC ngủ & thoát"
               >
+                <MenuGlassBackdrop variant="control" radius={s(11)} />
                 {isSleeping ? (
                   <ActivityIndicator size="small" color={colors.accentSoft} />
                 ) : (
@@ -316,7 +323,7 @@ export function RemoteConnectionMenu({
                 )}
               </Press>
             ) : (
-              <Press
+              <Press focusVariant="quiet"
                 onPress={handleWake}
                 sound="confirm"
                 pressScale={0.93}
@@ -325,12 +332,13 @@ export function RemoteConnectionMenu({
                   {
                     height: s(36),
                     borderRadius: s(11),
-                    backgroundColor: 'rgba(74, 222, 128, 0.15)',
-                    borderColor: 'rgba(74, 222, 128, 0.32)',
+                    backgroundColor: 'transparent',
+                    borderColor: MENU_GLASS.border,
                   },
                 ]}
                 accessibilityLabel="Đánh thức PC"
               >
+                <MenuGlassBackdrop variant="control" radius={s(11)} />
                 <Power size={s(14)} color={colors.success} strokeWidth={2} />
               </Press>
             )}
@@ -345,14 +353,14 @@ const useStyles = makeStyles(({ glass }) => ({
   glassCard: {
     position: 'absolute',
     overflow: 'hidden',
-    borderWidth: 1.2,
-    borderColor: glass.panelBorder,
-    backgroundColor: glass.modal,
+    borderWidth: 1,
+    borderColor: menuGlassFrom(glass).border,
+    backgroundColor: 'transparent',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.45,
     shadowRadius: 24,
-    elevation: 24,
+    elevation: 0,
   },
   topBar: {
     flexDirection: 'row',
@@ -369,9 +377,9 @@ const useStyles = makeStyles(({ glass }) => ({
   closeBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: glass.surface,
+    backgroundColor: menuGlassFrom(glass).control,
     borderWidth: 1,
-    borderColor: glass.border,
+    borderColor: menuGlassFrom(glass).border,
   },
   actionRow: {
     flexDirection: 'row',

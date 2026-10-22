@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import Svg, { Circle } from 'react-native-svg';
 import { Bell, Gamepad2, Monitor, MonitorSmartphone, Settings } from 'lucide-react-native';
 
 import { batteryColor, batteryPercent, lowestControllerBattery } from '@/features/devices/battery';
@@ -7,6 +9,7 @@ import { DEVICE_KIND_ORDER, type LocalDevice } from '@/features/devices/useInput
 import { KIND_ICONS } from '@/features/devices/kindIcons';
 import { formatClock } from '@/features/library/format';
 import type { SteamProfile, StoreTab } from '@/features/library/types';
+import { playUiSound } from '@/features/sound/UiSoundProvider';
 import { alpha, AvatarFrame, HeaderAccent, makeStyles, SeasonalIcon, useTheme } from '@/theme';
 import { Img } from '@/ui/Img';
 import { GlassBackdrop } from '@/ui/GlassMaterial';
@@ -16,6 +19,10 @@ import { T } from '@/ui/Text';
 
 import { ProgressRing } from './DownloadViews';
 import { TAB_MOTION_EASING, TAB_MOTION_MS } from './tabMotion';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+const PROFILE_HOLD_DELAY_MS = 80;
+const PROFILE_HOLD_DURATION_MS = 460;
 
 const TABS: { id: StoreTab; label: string }[] = [
   { id: 'games', label: 'Games' },
@@ -265,18 +272,184 @@ function RemoteStatusButton({
   );
 }
 
-function SteamAccountButton({ profile, onPress }: { profile: SteamProfile | null; onPress: () => void }) {
+function SteamAccountButton({
+  profile,
+  onPress,
+  onLongPress,
+}: {
+  profile: SteamProfile | null;
+  onPress: () => void;
+  onLongPress?: () => void;
+}) {
   const { colors } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
+  const [holding, setHolding] = useState(false);
+  const [holdProgress] = useState(() => new Animated.Value(0));
+  const holdDelayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdAnim = useRef<Animated.CompositeAnimation | null>(null);
+  const longPressTriggered = useRef(false);
+
+  const clearHold = useCallback(() => {
+    if (holdDelayTimer.current) {
+      clearTimeout(holdDelayTimer.current);
+      holdDelayTimer.current = null;
+    }
+    if (holdAnim.current) {
+      holdAnim.current.stop();
+      holdAnim.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => {
+    clearHold();
+    holdProgress.stopAnimation();
+  }, [clearHold, holdProgress]);
+
+  const handlePressIn = useCallback(() => {
+    longPressTriggered.current = false;
+    clearHold();
+    if (!onLongPress) return;
+    holdDelayTimer.current = setTimeout(() => {
+      holdDelayTimer.current = null;
+      setHolding(true);
+      holdProgress.setValue(0);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      playUiSound('focus');
+      const anim = Animated.timing(holdProgress, {
+        toValue: 1,
+        duration: PROFILE_HOLD_DURATION_MS,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: false,
+      });
+      holdAnim.current = anim;
+      anim.start(({ finished }) => {
+        if (!finished) return;
+        holdAnim.current = null;
+        longPressTriggered.current = true;
+        setHolding(false);
+        holdProgress.setValue(0);
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+        playUiSound('transition');
+        onLongPress();
+      });
+    }, PROFILE_HOLD_DELAY_MS);
+  }, [clearHold, holdProgress, onLongPress]);
+
+  const handlePressOut = useCallback(() => {
+    clearHold();
+    if (longPressTriggered.current) return;
+    Animated.timing(holdProgress, {
+      toValue: 0,
+      duration: 120,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      if (finished) setHolding(false);
+    });
+  }, [clearHold, holdProgress]);
+
+  const handlePress = useCallback(() => {
+    if (longPressTriggered.current) {
+      longPressTriggered.current = false;
+      return;
+    }
+    playUiSound('select');
+    onPress();
+  }, [onPress]);
+
+  const ringSize = s(44);
+  const ringOffset = (s(32) - ringSize) / 2;
+  const stroke = s(2.5);
+  const radius = (ringSize - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = holdProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [circumference, 0],
+  });
+  const haloScale = holdProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.82, 1.14],
+  });
+  const haloOpacity = holdProgress.interpolate({
+    inputRange: [0, 0.15, 1],
+    outputRange: [0, 0.75, 1],
+  });
+
   return (
     <Press
-      onPress={onPress}
+      sound={false}
+      pressScale={0.9}
+      onPress={handlePress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       accessibilityLabel={profile?.personaName ? `Hồ sơ ${profile.personaName}` : 'Xem hồ sơ'}
-      style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center' }}
+      accessibilityHint={onLongPress ? 'Nhấn để xem hồ sơ, nhấn giữ để mở menu điều khiển' : undefined}
+      style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', overflow: 'visible' }}
     >
+      {holding ? (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: ringOffset,
+            top: ringOffset,
+            width: ringSize,
+            height: ringSize,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Animated.View
+            style={{
+              position: 'absolute',
+              width: ringSize,
+              height: ringSize,
+              borderRadius: ringSize / 2,
+              backgroundColor: alpha(colors.accent, 0.24),
+              borderWidth: 1,
+              borderColor: alpha(colors.accentSoft, 0.45),
+              opacity: haloOpacity,
+              transform: [{ scale: haloScale }],
+            }}
+          />
+          <Svg width={ringSize} height={ringSize} style={StyleSheet.absoluteFill}>
+            <Circle
+              cx={ringSize / 2}
+              cy={ringSize / 2}
+              r={radius}
+              stroke={alpha(colors.white, 0.2)}
+              strokeWidth={stroke}
+              fill="none"
+            />
+            <AnimatedCircle
+              cx={ringSize / 2}
+              cy={ringSize / 2}
+              r={radius}
+              stroke={colors.accentSoft}
+              strokeWidth={stroke}
+              strokeLinecap="round"
+              fill="none"
+              strokeDasharray={[circumference, circumference]}
+              strokeDashoffset={dashOffset}
+              rotation={-90}
+              origin={`${ringSize / 2}, ${ringSize / 2}`}
+            />
+          </Svg>
+        </View>
+      ) : null}
       <AvatarFrame size={s(32)}>
-        <View style={[styles.avatar, { width: s(32), height: s(32), borderRadius: s(16) }]}>
+        <View
+          style={[
+            styles.avatar,
+            {
+              width: s(32),
+              height: s(32),
+              borderRadius: s(16),
+              borderColor: holding ? colors.accentSoft : undefined,
+            },
+          ]}
+        >
           {profile?.avatarUrl ? (
             <Img source={{ uri: profile.avatarUrl }} style={{ width: '100%', height: '100%', borderRadius: s(16) }} contentFit="cover" />
           ) : (
@@ -520,6 +693,7 @@ export function LibraryHeader({
   search,
   steamProfile,
   onOpenProfile,
+  onOpenControlCenter,
   onOpenSettings,
   onOpenNotifications,
   unreadCount = 0,
@@ -544,6 +718,8 @@ export function LibraryHeader({
   search: ReactNode;
   steamProfile: SteamProfile | null;
   onOpenProfile: () => void;
+  /** Nhấn giữ ảnh hồ sơ để mở Control Center / Guide Menu trên màn chính. */
+  onOpenControlCenter?: () => void;
   onOpenSettings: (category: 'quality' | 'devices') => void;
   onOpenNotifications?: () => void;
   unreadCount?: number;
@@ -663,7 +839,7 @@ export function LibraryHeader({
           </Press>
         </SeasonalIcon>
         <View style={{ width: StyleSheet.hairlineWidth, height: s(20), backgroundColor: glass.controlActive }} />
-        <SteamAccountButton profile={steamProfile} onPress={onOpenProfile} />
+        <SteamAccountButton profile={steamProfile} onPress={onOpenProfile} onLongPress={onOpenControlCenter} />
       </View>
     </View>
   );

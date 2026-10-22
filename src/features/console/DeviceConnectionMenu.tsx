@@ -8,7 +8,9 @@ import { DEVICE_KIND_ORDER, KIND_LABEL, type LocalDevice } from '@/features/devi
 import { FocusLayer } from '@/features/gamepad/focus';
 import { useBack } from '@/features/gamepad/hooks';
 import { makeStyles, useTheme } from '@/theme';
-import { GlassBackdrop } from '@/ui/GlassMaterial';
+import { MenuGlassBackdrop } from '@/ui/GlassMaterial';
+import { MENU_MOTION, useMenuGlass, menuGlassFrom } from '@/ui/menuGlass';
+import { useMotion } from '@/ui/motion';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
@@ -51,7 +53,8 @@ function DeviceTile({
   autoFocus: boolean;
   onPress: () => void;
 }) {
-  const { glass, colors } = useTheme();
+  const MENU_GLASS = useMenuGlass();
+  const { colors } = useTheme();
   const styles = useStyles();
   const { s } = useUi();
   const Icon = KIND_ICONS[device.kind];
@@ -63,6 +66,7 @@ function DeviceTile({
       onPress={onPress}
       sound="navigate"
       pressScale={0.93}
+      focusVariant="quiet"
       accessibilityLabel={label}
       style={[
         styles.tile,
@@ -72,14 +76,15 @@ function DeviceTile({
           height,
           borderRadius: s(13),
           gap: s(4),
-          backgroundColor: device.kind === 'controller' ? glass.surfaceHighlight : glass.control,
-          borderColor: device.kind === 'controller' ? glass.borderAccent : glass.controlBorder,
+          backgroundColor: 'transparent',
+          borderColor: MENU_GLASS.border,
         },
       ]}
     >
+      <MenuGlassBackdrop variant="control" radius={s(13)} />
       <Icon
         size={s(17)}
-        color={percent !== null ? batteryColor(percent, colors) : device.kind === 'controller' ? colors.accentSoft : colors.text}
+        color={percent !== null ? batteryColor(percent, colors) : MENU_GLASS.ink}
         strokeWidth={1.9}
       />
       {percent !== null ? <BatteryGauge percent={percent} /> : null}
@@ -120,9 +125,11 @@ function getMenuDimensions(count: number, s: (v: number) => number) {
  * - Mỗi thiết bị là một icon; icon tay cầm tô màu theo mức pin, kèm thanh pin (không ghi số).
  */
 export function DeviceConnectionMenu({ open, anchorRef, devices, onClose, onOpenSettings }: DeviceConnectionMenuProps) {
+  const MENU_GLASS = useMenuGlass();
   const { colors } = useTheme();
   const styles = useStyles();
   const { s, width: screenWidth, insets } = useUi();
+  const { reduceMotion } = useMotion();
   const [anim] = useState(() => new Animated.Value(0));
   const closingRef = useRef(false);
   const [anchorPos, setAnchorPos] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
@@ -152,14 +159,14 @@ export function DeviceConnectionMenu({ open, anchorRef, devices, onClose, onOpen
       anim.setValue(0);
       const animation = Animated.timing(anim, {
         toValue: 1,
-        duration: 220,
+        duration: reduceMotion ? 0 : MENU_MOTION.openMs,
         easing: Easing.bezier(0.16, 1, 0.3, 1),
         useNativeDriver: true,
       });
       animation.start();
       return () => animation.stop();
     }
-  }, [anim, open]);
+  }, [anim, open, reduceMotion]);
 
   const closeWithAnimation = useCallback((after?: () => void) => {
     if (closingRef.current) return;
@@ -167,7 +174,7 @@ export function DeviceConnectionMenu({ open, anchorRef, devices, onClose, onOpen
     anim.stopAnimation();
     Animated.timing(anim, {
       toValue: 0,
-      duration: 150,
+      duration: reduceMotion ? 0 : MENU_MOTION.closeMs,
       easing: Easing.bezier(0.4, 0, 1, 1),
       useNativeDriver: true,
     }).start(({ finished }) => {
@@ -178,7 +185,7 @@ export function DeviceConnectionMenu({ open, anchorRef, devices, onClose, onOpen
       onClose();
       after?.();
     });
-  }, [anim, onClose]);
+  }, [anim, onClose, reduceMotion]);
 
   useBack(() => {
     closeWithAnimation();
@@ -209,7 +216,7 @@ export function DeviceConnectionMenu({ open, anchorRef, devices, onClose, onOpen
     <FocusLayer>
       <View style={[StyleSheet.absoluteFill, { zIndex: 60, elevation: 60 }]}>
         {/* Lớp nền trong suốt bắt chạm ngoài để đóng */}
-        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0, 0, 0, 0.32)', opacity: anim }]}>
+        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: MENU_GLASS.scrim, opacity: anim }]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => closeWithAnimation()} focusable={false} accessibilityLabel="Đóng menu thiết bị" />
         </Animated.View>
 
@@ -228,13 +235,13 @@ export function DeviceConnectionMenu({ open, anchorRef, devices, onClose, onOpen
               paddingBottom: s(10),
               opacity: anim,
               transform: [
-                { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-8, 0] }) },
-                { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.975, 1] }) },
+                { translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [reduceMotion ? 0 : -8, 0] }) },
+                { scale: anim.interpolate({ inputRange: [0, 1], outputRange: [reduceMotion ? 1 : 0.975, 1] }) },
               ],
             },
           ]}
         >
-          <GlassBackdrop material="panel" intensity={34} radius={s(20)} />
+          <MenuGlassBackdrop radius={s(18)} />
 
           {/* Thanh tiêu đề nhỏ gọn */}
           <View style={styles.topBar}>
@@ -245,12 +252,13 @@ export function DeviceConnectionMenu({ open, anchorRef, devices, onClose, onOpen
               onPress={openSettings}
               sound="navigate"
               autoFocus={sorted.length === 0}
-              focusVariant="card"
+              focusVariant="quiet"
               focusRadius={s(10)}
               pressScale={0.92}
               accessibilityLabel="Mở cài đặt thiết bị"
               style={[styles.closeBtn, { width: s(20), height: s(20), borderRadius: s(10) }]}
             >
+              <MenuGlassBackdrop variant="control" radius={s(10)} />
               <Settings size={s(11)} color={colors.text3} />
             </Press>
           </View>
@@ -284,14 +292,15 @@ const useStyles = makeStyles(({ glass }) => ({
   glassCard: {
     position: 'absolute',
     overflow: 'hidden',
-    borderWidth: 1.2,
-    borderColor: glass.panelBorder,
-    backgroundColor: glass.modal,
+    borderWidth: 1,
+    borderColor: menuGlassFrom(glass).border,
+    backgroundColor: 'transparent',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.45,
     shadowRadius: 24,
-    elevation: 24,
+    // The outer overlay owns stacking; an elevated translucent card can add a dark backing on Android.
+    elevation: 0,
   },
   topBar: {
     flexDirection: 'row',
@@ -302,9 +311,9 @@ const useStyles = makeStyles(({ glass }) => ({
   closeBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: glass.surface,
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: glass.border,
+    borderColor: menuGlassFrom(glass).border,
   },
   tileRow: {
     flexDirection: 'row',
@@ -320,15 +329,15 @@ const useStyles = makeStyles(({ glass }) => ({
   },
   gaugeShell: {
     borderWidth: 1,
-    borderColor: glass.controlBorderActive,
+    borderColor: menuGlassFrom(glass).borderActive,
     justifyContent: 'center',
   },
   empty: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: glass.surfaceThin,
+    backgroundColor: menuGlassFrom(glass).inset,
     borderWidth: 1,
-    borderColor: glass.borderSubtle,
+    borderColor: menuGlassFrom(glass).border,
   },
 }));

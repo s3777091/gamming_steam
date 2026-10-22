@@ -71,3 +71,14 @@ export function suspendCursor(): () => void {
 export function isCursorSuspended(): boolean {
   return suspendCount > 0;
 }
+
+// Màn stream tắt bộ điều hướng: tay cầm thuộc về PC, B không đi qua dispatchBack.
+let navigatorEnabled = false;
+
+export function setNavigatorEnabled(enabled: boolean): void {
+  navigatorEnabled = enabled;
+}
+
+export function isNavigatorEnabled(): boolean {
+  return navigatorEnabled;
+}

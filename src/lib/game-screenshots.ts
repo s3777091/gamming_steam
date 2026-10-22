@@ -79,11 +79,11 @@ export async function listGameScreenshots(signal?: AbortSignal): Promise<GameScr
 export const screenshotAuthHeaders = getApiAuthHeaders;
 
 /** Nguồn ảnh cho expo-image: route download cần đúng phiên Supabase của app. */
-export function screenshotImageSource(path: string, headers: Record<string, string>) {
+export function screenshotImageSource(path: string, headers: Record<string, string>, mode: 'cloud' | 'local' = 'local') {
   return {
-    uri: backendUrl(`/api/storage/download?mode=local&path=${encodeURIComponent(path)}`),
+    uri: backendUrl(`/api/storage/download?mode=${mode}&path=${encodeURIComponent(path)}`),
     headers,
     // Token đổi theo phiên; khoá cache theo file để không tải lại ảnh đã có.
-    cacheKey: `jetsona-screenshot:${path}`,
+    cacheKey: mode === 'local' ? `jetsona-screenshot:${path}` : `jetsona-storage-cloud:${path}`,
   };
 }

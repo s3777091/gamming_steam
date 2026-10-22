@@ -30,7 +30,7 @@ export function FocusRing({
   onHidden,
 }: {
   radius: number;
-  variant?: 'card' | 'glassCard' | 'row';
+  variant?: 'card' | 'glassCard' | 'row' | 'quiet';
   tint?: 'accent' | 'danger';
   isSmall?: boolean;
   visible?: boolean;
@@ -47,7 +47,7 @@ export function FocusRing({
   useEffect(() => {
     const animation = Animated.timing(appear, {
       toValue: visible ? 1 : 0,
-      duration: reduceMotion ? 0 : visible ? 180 : 130,
+      duration: reduceMotion ? 0 : variant === 'quiet' ? 150 : visible ? 180 : 130,
       easing: visible ? Easing.bezier(0.16, 1, 0.3, 1) : Easing.out(Easing.cubic),
       useNativeDriver: true,
       isInteraction: false,
@@ -56,10 +56,10 @@ export function FocusRing({
       if (finished && !visible) onHidden?.();
     });
     return () => animation.stop();
-  }, [appear, onHidden, reduceMotion, visible]);
+  }, [appear, onHidden, reduceMotion, variant, visible]);
 
   useEffect(() => {
-    if (!visible || !active || reduceMotion) return;
+    if (!visible || !active || reduceMotion || variant === 'quiet') return;
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(breathe, {
@@ -80,7 +80,17 @@ export function FocusRing({
     );
     loop.start();
     return () => loop.stop();
-  }, [active, breathe, reduceMotion, visible]);
+  }, [active, breathe, reduceMotion, variant, visible]);
+
+  if (variant === 'quiet') {
+    return (
+      <Animated.View pointerEvents="none" style={{
+        position: 'absolute', top: -s(3), right: -s(3), bottom: -s(3), left: -s(3),
+        borderRadius: radius + s(3), borderWidth: s(1.5),
+        borderColor: 'rgba(240, 255, 244, 0.92)', opacity: appear,
+      }} />
+    );
+  }
 
   const isDanger = tint === 'danger';
 

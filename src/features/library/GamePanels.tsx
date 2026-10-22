@@ -560,7 +560,7 @@ function GameInfoView({ game }: { game: PcGame }) {
             {cleanDescription.length > 220 ? (
               <Press
                 onPress={() => setDescExpanded(!descExpanded)}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: s(3) }}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: s(3), paddingHorizontal: s(8), paddingVertical: s(4), marginHorizontal: -s(8), marginVertical: -s(4), borderRadius: s(8) }}
               >
                 <T size={11} weight="medium" color={colors.accent}>
                   {descExpanded ? 'Thu gọn' : 'Xem thêm'}
@@ -617,7 +617,7 @@ function NewsArticleView({ item, onBack }: { item: SteamNewsItem; onBack: () => 
           flexDirection: 'row',
           alignItems: 'center',
           gap: s(6),
-          paddingVertical: s(6),
+          paddingVertical: s(6), paddingHorizontal: s(10), marginLeft: -s(10), borderRadius: s(10),
           alignSelf: 'flex-start',
         }}
       >

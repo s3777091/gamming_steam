@@ -17,6 +17,8 @@ type TouchpadContext = {
   allowStretch?: boolean;
   getClient: () => NativeMoonlightClient | null;
   getSettings: () => InputSettings;
+  onManualInput?: () => void;
+  onTouchPoint?: (point: { x: number; y: number }) => void;
 };
 
 /** Keeps an in-progress native gesture independent of React render attempts. */
@@ -51,6 +53,7 @@ export class StreamTouchpad {
     onStartShouldSetPanResponder: () => this.context.live,
     onMoveShouldSetPanResponder: () => this.context.live,
     onPanResponderGrant: (event, gesture) => {
+      this.context.onManualInput?.();
       const first = event.nativeEvent.touches[0];
       const x = first?.locationX ?? event.nativeEvent.locationX;
       const y = first?.locationY ?? event.nativeEvent.locationY;
@@ -109,6 +112,7 @@ export class StreamTouchpad {
       const button = state.twoFinger ? NativeMouseButton.RIGHT : NativeMouseButton.LEFT;
       client?.sendMouseButton(true, button);
       client?.sendMouseButton(false, button);
+      this.context.onTouchPoint?.({ x: state.lastX, y: state.lastY });
     },
     onPanResponderTerminate: this.release,
     onPanResponderTerminationRequest: () => true,

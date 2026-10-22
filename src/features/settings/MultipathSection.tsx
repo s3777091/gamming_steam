@@ -1,15 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Animated,
   Easing,
-  LayoutAnimation,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   TextInput,
-  UIManager,
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -30,18 +27,16 @@ import {
 } from 'lucide-react-native';
 
 import { useMultipathAi, type AvailableWifi } from '@/lib/multipath-ai';
-import { alpha, makeStyles, useTheme } from '@/theme';
+import { alpha, makeStyles } from '@/theme';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
+import { useMotion } from '@/ui/motion';
 import { useSettingsRestore } from './SettingsRestore';
+import { SettingsDisclosure } from './SettingsDisclosure';
+import { useSettingsColors } from './SettingsSurface';
 
 import { ActionRow, InfoRow, SettingsGroup, ToggleRow } from './controls';
-
-// Kích hoạt LayoutAnimation trên Android
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 function isWifiSecured(capabilities?: string): boolean {
   if (!capabilities) return false;
@@ -72,10 +67,11 @@ function isLikelyCaptivePortal(capabilities?: string, ssid?: string): boolean {
   );
 }
 
-export function MultipathSection() {
-  const { settings: appleColors } = useTheme();
+export function MultipathSection({ connectionHeader }: { connectionHeader?: ReactNode }) {
+  const appleColors = useSettingsColors();
   const styles = useStyles();
   const { s } = useUi();
+  const { reduceMotion, active } = useMotion();
   const {
     capabilities,
     status,
@@ -116,20 +112,22 @@ export function MultipathSection() {
   const [spinAnim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
-    if (scanning) {
-      Animated.loop(
+    if (scanning && !reduceMotion && active) {
+      const animation = Animated.loop(
         Animated.timing(spinAnim, {
           toValue: 1,
           duration: 900,
           easing: Easing.linear,
           useNativeDriver: true,
         })
-      ).start();
+      );
+      animation.start();
+      return () => animation.stop();
     } else {
       spinAnim.stopAnimation();
       spinAnim.setValue(0);
     }
-  }, [scanning, spinAnim]);
+  }, [active, reduceMotion, scanning, spinAnim]);
 
   const spinInterpolate = spinAnim.interpolate({
     inputRange: [0, 1],
@@ -182,162 +180,80 @@ export function MultipathSection() {
 
   return (
     <>
-      <SettingsGroup title="Đa đường truyền AI">
-        <ToggleRow
-          label="Phân tích chất lượng mạng"
-          detail="Đánh giá độ trễ và mất gói đo từ phiên chơi"
-          checked={aiEnabled}
-          onChange={(val) => void toggleAi(val)}
-        />
-
-        {/* Đường truyền chính */}
+      <SettingsGroup title="Kết nối hiện tại">
+        {connectionHeader}
         <InfoRow
-          label="Đường chính"
+          label="Đường truyền chính"
+          detail={primary.ssid}
           value={
-            <View style={{ alignItems: 'flex-end', gap: s(1) }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(4) }}>
-                <T size={10} weight="semibold" color={appleColors.blue}>
-                  {`[${primary.band ?? 'Chưa rõ băng tần'}]`}
-                </T>
-                <T size={12.4} weight="medium" color={appleColors.text}>
-                  {primary.ssid ?? 'Wi-Fi Hiện Tại'}
-                </T>
-              </View>
-              <T size={10} color={appleColors.textTertiary}>
-                {primary.rssi != null ? `Tín hiệu: ${primary.rssi} dBm` : 'Chưa có thông tin tín hiệu'}
+            <View style={{ alignItems: 'flex-end', gap: s(2) }}>
+              <T size={12.4} color={appleColors.text}>
+                {primary.band ? `Wi-Fi ${primary.band.replace('GHz', ' GHz')}` : primary.ssid ? 'Wi-Fi' : 'Chưa xác định'}
               </T>
+              {primary.rssi != null ? (
+                <T size={10.6} color={appleColors.textTertiary} tabular>{primary.rssi} dBm</T>
+              ) : null}
             </View>
           }
         />
-
-        <InfoRow
-          label={metricsLive ? 'Phiên stream hiện tại' : 'Phiên stream gần nhất'}
-          value={metrics
-            ? `RTT: ${metrics.rttMs == null ? '—' : `${metrics.rttMs.toFixed(0)} ms`} · Mất gói: ${metrics.lossPercent == null ? '—' : `${metrics.lossPercent.toFixed(1)}%`}`
-            : 'Chưa có dữ liệu'}
-        />
-        {aiEnabled ? (
-          <InfoRow label="Khuyến nghị" value={decision === 'poor' ? 'Nên giảm bitrate để ổn định đường truyền'
-            : decision === 'fair' ? 'Theo dõi đường truyền khi chơi'
-            : decision === 'good' ? 'Chất lượng đường truyền tốt' : 'Chờ số liệu từ phiên chơi'} />
-        ) : null}
-
-        {/* Đường truyền phụ */}
-        {capabilities.hasCellular ? (
-          <ToggleRow
-            label="Dự phòng 4G / 5G Cellular"
-            detail="Giữ kết nối di động sẵn sàng làm đường truyền dự phòng"
-            checked={autoCellular}
-            onChange={(val) => void toggleCellular(val)}
-          />
+        {status.secondary.type === 'wifi' && status.secondary.status === 'connected' ? (
+          <View>
+            <ActionRow icon={Wifi} iconBg={appleColors.accent} label="Đường truyền phụ"
+              detail={status.secondary.ssid ?? 'Wi-Fi phụ'}
+              trailing={<T size={11} color={appleColors.textSecondary}>Đã kết nối</T>}
+              onPress={() => setShowDisconnectConfirm((current) => !current)} />
+            <SettingsDisclosure open={showDisconnectConfirm}>
+              <ActionRow icon={X} tone="danger" label="Ngắt kết nối Wi-Fi phụ"
+                onPress={() => { void disconnectSecondary(); setShowDisconnectConfirm(false); }} />
+            </SettingsDisclosure>
+            {(captivePortalSsid || isLikelyCaptivePortal(undefined, status.secondary.ssid)) ? (
+              <ActionRow icon={Globe} tone="accent" label="Mở trang xác nhận"
+                detail="Mạng có thể yêu cầu đăng nhập web" onPress={openCaptivePortal} />
+            ) : null}
+          </View>
+        ) : capabilities.hasCellular ? (
+          <InfoRow label="Đường truyền phụ" value={status.secondary.status === 'connected'
+            ? '4G / 5G' : status.secondary.status === 'connecting' ? 'Đang kết nối…' : 'Chưa kết nối'} />
         ) : capabilities.isDualWifiSupported ? (
-          <>
-            {status.secondary.status === 'connected' ? (
-              /* Thẻ Wi-Fi phụ tinh gọn - Chạm vào để mở/thu gọn nút [X Ngắt kết nối] */
-              <View style={styles.secondaryCardContainer}>
-                <Press
-                  onPress={() => {
-                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setShowDisconnectConfirm((prev) => !prev);
-                  }}
-                  style={styles.secondaryInteractiveRow}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10), flex: 1 }}>
-                    <View style={styles.secondaryIconBadge}>
-                      <Wifi size={s(15)} color={appleColors.teal} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
-                        <T size={12.8} weight="semibold" color={appleColors.text} numberOfLines={1}>
-                          {status.secondary.ssid ?? 'Secondary Wi-Fi'}
-                        </T>
-                        <View style={styles.hbsBadge}>
-                          <T size={9} weight="bold" color={appleColors.teal}>
-                            5GHz HBS
-                          </T>
-                        </View>
-                      </View>
-                      <T size={10} color={appleColors.textTertiary}>
-                        Đã kết nối · chưa có số đo riêng của đường phụ
-                      </T>
-                    </View>
-                  </View>
-
-                  {/* Nút hành động hiện ra mượt mà khi chạm vào thẻ */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
-                    {showDisconnectConfirm ? (
-                      <Press
-                        onPress={() => {
-                          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                          void disconnectSecondary();
-                          setShowDisconnectConfirm(false);
-                        }}
-                        style={styles.disconnectPill}
-                      >
-                        <X size={s(12)} color="#ff453a" strokeWidth={2.4} />
-                        <T size={11} weight="semibold" color="#ff453a">
-                          disconnect
-                        </T>
-                      </Press>
-                    ) : (
-                      <View style={styles.activePill}>
-                        <View style={styles.activeDot} />
-                        <T size={10.5} weight="medium" color={appleColors.teal}>
-                          dual-connect
-                        </T>
-                      </View>
-                    )}
-                  </View>
-                </Press>
-
-                {/* Banner hỗ trợ đăng nhập Web Captive Portal nếu mạng yêu cầu */}
-                {(captivePortalSsid || status.secondary.ssid?.toLowerCase().includes('coffee') || status.secondary.ssid?.toLowerCase().includes('free')) && (
-                  <View style={styles.captivePortalBanner}>
-                    <Globe size={s(13)} color={appleColors.blue} />
-                    <T size={10.5} color={appleColors.blue} style={{ flex: 1 }}>
-                      Mạng có thể yêu cầu đăng nhập Web
-                    </T>
-                    <Press
-                      onPress={() => {
-                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        openCaptivePortal();
-                      }}
-                      style={styles.captivePortalAction}
-                    >
-                      <T size={10.5} weight="semibold" color="#fff">
-                        Mở trang xác nhận
-                      </T>
-                    </Press>
-                  </View>
-                )}
-              </View>
-            ) : (
-              <ActionRow
-                icon={Plus}
-                iconBg={appleColors.blue}
-                tone="accent"
-                label="Chọn Wi-Fi phụ"
-                detail="Kết nối song song đường truyền thứ 2 làm dự phòng"
-                onPress={handleOpenScan}
-              />
-            )}
-          </>
+          <ActionRow icon={Plus} tone="accent" label="Đường truyền phụ"
+            detail={status.secondary.status === 'connecting' ? 'Đang kết nối Wi-Fi phụ…' : 'Thêm Wi-Fi dự phòng'}
+            busy={status.secondary.status === 'connecting'} onPress={handleOpenScan}
+            trailing={<T size={11} color={appleColors.accent}>Chọn Wi-Fi</T>} />
         ) : (
-          <InfoRow
-            label="Đường truyền phụ"
-            value={Platform.OS === 'ios'
-              ? 'iOS tự chọn Wi-Fi hoặc di động; phiên stream dùng một đường truyền'
-              : 'Thiết bị chưa hỗ trợ đường truyền phụ'}
-          />
+          <InfoRow label="Đường truyền phụ" value="Không khả dụng" />
         )}
       </SettingsGroup>
 
+      <SettingsGroup title="Tối ưu kết nối">
+        <ToggleRow label="Phân tích chất lượng mạng"
+          detail="Phân tích độ trễ và mất gói khi chơi" checked={aiEnabled}
+          onChange={(value) => void toggleAi(value)} />
+        <InfoRow label={metricsLive ? 'Phiên stream hiện tại' : 'Phiên stream gần nhất'}
+          value={metrics ? (
+            <View style={{ alignItems: 'flex-end', gap: s(2) }}>
+              <T size={12} color={appleColors.textSecondary} tabular>
+                RTT: {metrics.rttMs == null ? 'Chưa có dữ liệu' : `${metrics.rttMs.toFixed(0)} ms`}
+              </T>
+              <T size={10.6} color={appleColors.textTertiary} tabular>
+                Mất gói: {metrics.lossPercent == null ? 'Chưa có dữ liệu' : `${metrics.lossPercent.toFixed(1)}%`}
+              </T>
+            </View>
+          ) : 'Chưa có dữ liệu'} />
+        <InfoRow label="Khuyến nghị" value={!aiEnabled ? 'Đã tắt phân tích'
+          : decision === 'poor' ? 'Nên giảm bitrate'
+          : decision === 'fair' ? 'Theo dõi đường truyền khi chơi'
+          : decision === 'good' ? 'Chất lượng đường truyền tốt' : 'Chưa có dữ liệu'} />
+        {capabilities.hasCellular ? (
+          <ToggleRow label="Dự phòng 4G / 5G"
+            detail="Giữ kết nối di động sẵn sàng làm dự phòng"
+            checked={autoCellular} onChange={(value) => void toggleCellular(value)} />
+        ) : null}
+      </SettingsGroup>
       {/* Modal chọn Wi-Fi phụ - Thiết kế Apple Glass tối giản */}
       <Modal
         visible={modalVisible}
         transparent
-        animationType="fade"
+        animationType={reduceMotion ? 'none' : 'fade'}
         onRequestClose={() => setModalVisible(false)}
       >
         <FocusLayer>
@@ -353,9 +269,6 @@ export function MultipathSection() {
             />
 
             <View style={styles.modalCard} focusable={false}>
-              {/* Specular highlight rim */}
-              <View style={styles.specularTop} pointerEvents="none" />
-
               {/* Header: Đã có dấu X tắt tab */}
               <View style={styles.modalHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10) }}>
@@ -451,7 +364,7 @@ export function MultipathSection() {
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8), flex: 1 }}>
                               <Wifi
                                 size={s(14)}
-                                color={isSelected ? appleColors.blue : is5G ? appleColors.teal : appleColors.textSecondary}
+                                color={isSelected ? appleColors.accent : appleColors.textSecondary}
                               />
                               <View style={{ flex: 1 }}>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(6) }}>
@@ -461,13 +374,13 @@ export function MultipathSection() {
                                   <View
                                     style={[
                                       styles.bandBadge,
-                                      is5G && { backgroundColor: 'rgba(64, 200, 224, 0.16)' },
+                                      is5G && { backgroundColor: appleColors.pressedBg },
                                     ]}
                                   >
                                     <T
                                       size={8.8}
                                       weight="semibold"
-                                      color={is5G ? appleColors.teal : appleColors.textTertiary}
+                                      color={appleColors.textTertiary}
                                     >
                                       {is5G ? '5 GHz' : '2.4 GHz'}
                                     </T>
@@ -573,7 +486,7 @@ export function MultipathSection() {
 
                     <Press
                       disabled={connecting}
-                      focusVariant="card"
+                      focusVariant="row"
                       focusRadius={s(8)}
                       pressScale={0.96}
                       onPress={() => void handleConnect()}
@@ -618,7 +531,7 @@ export function MultipathSection() {
                       {/* Icon con mắt bật/tắt mật khẩu */}
                       <Press
                         onPress={() => setShowPassword((prev) => !prev)}
-                        focusVariant="card"
+                        focusVariant="row"
                         focusRadius={s(14)}
                         pressScale={0.92}
                         style={styles.eyeBtn}
@@ -637,7 +550,7 @@ export function MultipathSection() {
                           (isManual && (!manualSsid.trim() || isManualConflict)) ||
                           (!isManual && !selectedWifi)
                         }
-                        focusVariant="card"
+                        focusVariant="row"
                         focusRadius={s(8)}
                         pressScale={0.96}
                         onPress={() => void handleConnect()}
@@ -671,7 +584,7 @@ export function MultipathSection() {
                       openCaptivePortal();
                     }}
                     focusVariant="row"
-                    style={styles.captivePortalLink}
+                    focusRadius={8} style={[styles.captivePortalLink, { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }]}
                   >
                     <Globe size={s(11)} color={appleColors.blue} />
                     <T size={10.2} color={appleColors.blue}>
@@ -687,76 +600,9 @@ export function MultipathSection() {
     );
   }
 
-const useStyles = makeStyles(({ colors, settings: appleColors }) => ({
-  secondaryCardContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  secondaryInteractiveRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  secondaryIconBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: 'rgba(64, 200, 224, 0.14)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  hbsBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-    backgroundColor: 'rgba(64, 200, 224, 0.16)',
-  },
-  activePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: 'rgba(64, 200, 224, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(64, 200, 224, 0.25)',
-  },
-  activeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: appleColors.teal,
-  },
-  disconnectPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 69, 58, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 69, 58, 0.35)',
-  },
-  captivePortalBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: alpha(colors.primary, 0.12),
-    borderWidth: 1,
-    borderColor: alpha(colors.primary, 0.22),
-  },
-  captivePortalAction: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    backgroundColor: appleColors.blue,
-  },
+const useStyles = makeStyles(({ colors, settings }) => {
+  const appleColors = { ...settings, blue: settings.orange };
+  return {
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.76)',
@@ -767,25 +613,12 @@ const useStyles = makeStyles(({ colors, settings: appleColors }) => ({
   modalCard: {
     width: '100%',
     maxWidth: 420,
-    borderRadius: 18,
-    backgroundColor: 'rgba(18, 26, 40, 0.96)',
+    borderRadius: 12,
+    backgroundColor: colors.panelSolid,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
+    borderColor: 'rgba(255, 255, 255, 0.07)',
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.4,
-    shadowRadius: 24,
-    elevation: 10,
     overflow: 'hidden',
-  },
-  specularTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255, 255, 255, 0.28)',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -797,14 +630,14 @@ const useStyles = makeStyles(({ colors, settings: appleColors }) => ({
     width: 32,
     height: 32,
     borderRadius: 9,
-    backgroundColor: alpha(colors.primary, 0.16),
+    backgroundColor: alpha(appleColors.blue, 0.10),
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 44,
+    height: 44,
+    borderRadius: 10,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -823,9 +656,9 @@ const useStyles = makeStyles(({ colors, settings: appleColors }) => ({
     paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 12,
-    backgroundColor: alpha(colors.primary, 0.12),
+    backgroundColor: alpha(appleColors.blue, 0.10),
     borderWidth: 1,
-    borderColor: alpha(colors.primary, 0.28),
+    borderColor: alpha(appleColors.blue, 0.18),
   },
   glassListContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.035)',
@@ -839,10 +672,10 @@ const useStyles = makeStyles(({ colors, settings: appleColors }) => ({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
-    height: 42,
+    minHeight: 48,
   },
   wifiRowSelected: {
-    backgroundColor: alpha(colors.primary, 0.16),
+    backgroundColor: alpha(appleColors.blue, 0.09),
   },
   rowSeparator: {
     height: StyleSheet.hairlineWidth,
@@ -943,4 +776,5 @@ const useStyles = makeStyles(({ colors, settings: appleColors }) => ({
     marginTop: 8,
     paddingHorizontal: 2,
   },
-}));
+  };
+});

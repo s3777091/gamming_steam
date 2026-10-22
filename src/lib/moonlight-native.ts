@@ -421,6 +421,11 @@ export class NativeMoonlightClient {
     return this.inputReady;
   }
 
+  /** Timed mapping actions must never enter the pre-connection packet queue. */
+  isPointerInputReady(): boolean {
+    return !this.stopped && this.inputReady && this.channels.get(CHANNEL.MOUSE_RELIABLE)?.readyState === 'open';
+  }
+
   setAudio(audio: { muted?: boolean; volume?: number }): void {
     if (typeof audio.muted === 'boolean') {
       this.audioMuted = audio.muted;

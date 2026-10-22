@@ -23,7 +23,9 @@ type Props = Omit<PressableProps, 'style' | 'children'> & {
   /** Bo góc của viền tiêu điểm khi bo góc nằm ở phần tử con chứ không ở `style`. */
   focusRadius?: number;
   /** Dùng mép kính mảnh cho thẻ ảnh thay vì vòng focus trắng đục mặc định. */
-  focusVariant?: 'auto' | 'card' | 'glassCard' | 'row';
+  focusVariant?: 'auto' | 'card' | 'glassCard' | 'row' | 'quiet';
+  /** Override focus growth when a child already animates its selected state. */
+  focusScale?: number;
   /** Gọi khi tay cầm chuyển tiêu điểm vào ô này (xem trước game, chọn tab...). */
   onFocused?: () => void;
   /** Slider: nhận D-pad trái/phải khi đang được chọn; trả true nếu đã xử lý. */
@@ -48,12 +50,13 @@ const PRESS_FLASH_MS = 110;
  * viền trắng + phóng nhẹ cho biết ô đang chọn, A kích hoạt `onPress`.
  */
 export function Press({
-  style, pressScale = 0.96, onPressIn, onPressOut, onPress, onLayout, focusable = true, autoFocus = false, requestFocus = false, focusRadius, focusVariant = 'auto', focusTint = 'accent', onAdjust, onFocused, sound = 'select', children, ...rest
+  style, pressScale = 0.96, onPressIn, onPressOut, onPress, onLayout, onFocus, onBlur, focusable = true, autoFocus = false, requestFocus = false, focusRadius, focusVariant = 'auto', focusScale: focusScaleOverride, focusTint = 'accent', onAdjust, onFocused, sound = 'select', children, ...rest
 }: Props) {
   const hostRef = useRef<View>(null);
   const { reduceMotion } = useMotion();
   const [box, setBox] = useState({ w: 120, h: 60 });
   const [ringShown, setRingShown] = useState(false);
+  const [nativeFocused, setNativeFocused] = useState(false);
   const hideRing = useCallback(() => setRingShown(false), []);
   const [scale] = useState(() => new Animated.Value(1));
   const [focusScale] = useState(() => new Animated.Value(1));
@@ -71,7 +74,7 @@ export function Press({
     onPress?.(event);
   }, [onPress, sound]);
 
-  const focused = useFocusable({
+  const gamepadFocused = useFocusable({
     ref: hostRef,
     enabled: focusable && Boolean(onPress),
     disabled: Boolean(rest.disabled),
@@ -87,10 +90,23 @@ export function Press({
       activate({ nativeEvent: {} } as GestureResponderEvent);
     },
   });
+  const focused = gamepadFocused || nativeFocused;
 
-  const isAutoRow = box.w >= 160 && box.w / Math.max(1, box.h) >= 2.6 && box.h <= 76;
+  const flatStyle = StyleSheet.flatten(style);
+  const padH = Number(flatStyle?.paddingHorizontal ?? flatStyle?.paddingLeft ?? flatStyle?.padding ?? 0);
+  const isWideStrip = box.w >= 160 && box.w / Math.max(1, box.h) >= 2.6 && box.h <= 88;
+  const isAutoRow =
+    isWideStrip &&
+    box.h <= 76 &&
+    flatStyle?.borderRadius === undefined &&
+    focusRadius === undefined &&
+    padH >= 10;
   const isRow = focusVariant === 'row' || (focusVariant === 'auto' && isAutoRow);
-  const focusGrow = isRow ? 1 : Math.min(1.045, Math.max(1.01, 1 + FOCUS_GROW_DP / Math.max(1, box.w)));
+  const focusGrow = focusScaleOverride ?? (isRow
+    ? 1
+    : isWideStrip
+      ? 1.008
+      : Math.min(1.045, Math.max(1.01, 1 + FOCUS_GROW_DP / Math.max(1, box.w))));
   useEffect(() => {
     if (reduceMotion) {
       focusScale.setValue(1);
@@ -99,7 +115,10 @@ export function Press({
     // Most buttons never receive gamepad focus; avoid starting an idle spring
     // for every button on mount and for every initial layout measurement.
     if (!focused && !wasFocused.current) return;
-    const animation = Animated.spring(focusScale, {
+    const animation = focusVariant === 'quiet' ? Animated.timing(focusScale, {
+      toValue: focused ? focusGrow : 1, duration: 150,
+      useNativeDriver: true, isInteraction: false,
+    }) : Animated.spring(focusScale, {
       toValue: focused ? focusGrow : 1,
       stiffness: 240,
       damping: 24,
@@ -109,7 +128,7 @@ export function Press({
     });
     animation.start();
     return () => animation.stop();
-  }, [focusGrow, focusScale, focused, reduceMotion]);
+  }, [focusGrow, focusScale, focusVariant, focused, reduceMotion]);
   useEffect(() => {
     const entered = focused && !wasFocused.current;
     wasFocused.current = focused;
@@ -126,7 +145,6 @@ export function Press({
   }, [focusScale, scale]);
 
   const ringVariant = focusVariant === 'auto' ? (isRow ? 'row' : 'card') : focusVariant;
-  const flatStyle = StyleSheet.flatten(style);
   const radius =
     focusRadius ??
     (flatStyle?.borderRadius !== undefined
@@ -134,7 +152,7 @@ export function Press({
       : isRow
         ? 0
         : 12);
-  const isCompact = (box.w > 0 && box.w <= 54 && box.h <= 54) || radius <= 18;
+  const isCompact = (box.h > 0 && box.h <= 88) || (box.w > 0 && box.w <= 88) || radius <= 18;
   const ring = focused || ringShown ? (
     <FocusRing
       radius={radius}
@@ -154,6 +172,8 @@ export function Press({
       ref={hostRef}
       accessibilityRole={rest.accessibilityRole ?? (onPress ? 'button' : undefined)}
       accessibilityState={{ ...rest.accessibilityState, disabled: Boolean(rest.disabled) }}
+      onFocus={(event) => { if (focusVariant === 'quiet') setNativeFocused(true); onFocus?.(event); }}
+      onBlur={(event) => { setNativeFocused(false); onBlur?.(event); }}
       onPress={activate}
       onLayout={(event) => {
         const { width, height } = event.nativeEvent.layout;

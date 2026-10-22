@@ -99,7 +99,7 @@ diff --git a/node_modules/react-native-webrtc/ios/RCTWebRTC/RTCVideoViewManager.
 diff --git a/node_modules/react-native-webrtc/ios/RCTWebRTC/WebRTCModule.m b/node_modules/react-native-webrtc/ios/RCTWebRTC/WebRTCModule.m
 --- a/node_modules/react-native-webrtc/ios/RCTWebRTC/WebRTCModule.m
 +++ b/node_modules/react-native-webrtc/ios/RCTWebRTC/WebRTCModule.m
-@@ -69,6 +69,17 @@
+@@ -69,6 +69,19 @@
          RCTLogInfo(@"Using video encoder factory: %@", NSStringFromClass([encoderFactory class]));
          RCTLogInfo(@"Using video decoder factory: %@", NSStringFromClass([decoderFactory class]));
 
@@ -108,9 +108,11 @@ diff --git a/node_modules/react-native-webrtc/ios/RCTWebRTC/WebRTCModule.m b/nod
 +        // its audio unit. The default VoiceChat route uses the quiet receiver,
 +        // and JS ontrack can run before that route is activated.
 +        RTCAudioSessionConfiguration *audioConfig = [RTCAudioSessionConfiguration webRTCConfiguration];
++        audioConfig.category = AVAudioSessionCategoryPlayAndRecord;
 +        audioConfig.mode = AVAudioSessionModeVideoChat;
 +        audioConfig.categoryOptions |= AVAudioSessionCategoryOptionDefaultToSpeaker |
-+                                       AVAudioSessionCategoryOptionAllowBluetoothA2DP;
++                                       AVAudioSessionCategoryOptionAllowBluetoothA2DP |
++                                       AVAudioSessionCategoryOptionMixWithOthers;
 +        [RTCAudioSessionConfiguration setWebRTCConfiguration:audioConfig];
 +#endif
 +

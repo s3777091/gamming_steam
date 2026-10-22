@@ -56,9 +56,9 @@ function ArticleDetailView({
         onPress={onBack}
         style={{
           flexDirection: 'row',
-          alignItems: 'center',
+          alignItems: 'center', overflow: 'visible',
           gap: s(6),
-          paddingVertical: s(6),
+          paddingVertical: s(6), paddingHorizontal: s(10), marginLeft: -s(10), borderRadius: s(10),
           alignSelf: 'flex-start',
         }}
       >
@@ -107,15 +107,15 @@ function DiscountNotificationCard({
   const finalPriceFormatted = formatStorePrice({ finalPrice: item.finalPrice, currency: item.currency });
 
   return (
-    <View style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(16), gap: s(8) }]}>
+    <View style={[styles.card, styles.notifCard, { padding: s(6), paddingRight: s(10), borderRadius: s(16), gap: s(6) }]}>
       {/* Specular top rim */}
-      <SurfaceSheen />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: s(16), overflow: 'hidden' }]}><SurfaceSheen /></View>
 
       <Press
         onPress={onPress}
         pressScale={0.98}
         accessibilityLabel={`Xem game giảm giá ${item.gameTitle}`}
-        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(12) }}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(12), padding: s(6), borderRadius: s(12) }}
       >
         <View style={[styles.imageBox, { width: s(96), height: s(54), borderRadius: s(9) }]}>
           <Img source={{ uri: item.imageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
@@ -185,15 +185,15 @@ function UpdateNotificationCard({
   const timeAgo = formatRelative(item.publishedAt);
 
   return (
-    <View style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(16), gap: s(8) }]}>
+    <View style={[styles.card, styles.notifCard, { padding: s(6), paddingRight: s(10), borderRadius: s(16), gap: s(6) }]}>
       {/* Specular top rim */}
-      <SurfaceSheen />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: s(16), overflow: 'hidden' }]}><SurfaceSheen /></View>
 
       <Press
         onPress={onPress}
         pressScale={0.98}
         accessibilityLabel={`Xem cập nhật ${item.gameTitle}: ${item.title}`}
-        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(12) }}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(12), padding: s(6), borderRadius: s(12) }}
       >
         <View style={[styles.imageBox, { width: s(96), height: s(54), borderRadius: s(9) }]}>
           <Img source={{ uri: item.gameImageUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
@@ -263,15 +263,15 @@ function UninstallNotificationCard({
   const timeAgo = formatRelative(item.createdAt ? new Date(item.createdAt).toISOString() : null);
 
   return (
-    <View style={[styles.card, styles.notifCard, { padding: s(12), borderRadius: s(16), gap: s(8) }]}>
+    <View style={[styles.card, styles.notifCard, { padding: s(6), paddingRight: s(10), borderRadius: s(16), gap: s(6) }]}>
       {/* Specular top rim */}
-      <SurfaceSheen />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: s(16), overflow: 'hidden' }]}><SurfaceSheen /></View>
 
       <Press
         onPress={onPress}
         pressScale={0.98}
         accessibilityLabel={`Xem trò chơi ${item.gameTitle}`}
-        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(12) }}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: s(12), padding: s(6), borderRadius: s(12) }}
       >
         <View style={[styles.imageBox, { width: s(96), height: s(54), borderRadius: s(9) }]}>
           {item.gameImageUrl ? (
@@ -492,7 +492,7 @@ export function NotificationsPanel({
                   <DiscountNotificationCard
                     key={item.id}
                     item={item}
-                    onPress={() => onOpenStoreGame(item.storeItem)}
+                    onPress={() => { onClose(); onOpenStoreGame(item.storeItem); }}
                     onDismiss={onClearNotification ? () => onClearNotification(item.id) : undefined}
                   />
                 );
@@ -558,7 +558,7 @@ const useStyles = makeStyles(({ colors, glass }) => ({
   },
   notifCard: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'center', overflow: 'visible',
   },
   imageBox: {
     overflow: 'hidden',
@@ -578,7 +578,7 @@ const useStyles = makeStyles(({ colors, glass }) => ({
   },
   pillBadge: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'center', overflow: 'visible',
     gap: 4,
     backgroundColor: alpha(colors.accent, 0.14),
     borderWidth: StyleSheet.hairlineWidth,
@@ -586,7 +586,7 @@ const useStyles = makeStyles(({ colors, glass }) => ({
   },
   pillBadgeNews: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'center', overflow: 'visible',
     gap: 4,
     backgroundColor: glass.surface,
     borderWidth: StyleSheet.hairlineWidth,
@@ -594,27 +594,27 @@ const useStyles = makeStyles(({ colors, glass }) => ({
   },
   pillBadgeUninstall: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'center', overflow: 'visible',
     gap: 4,
     backgroundColor: 'rgba(239,68,68,0.14)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(239,68,68,0.3)',
   },
   tabPill: {
-    alignItems: 'center',
+    alignItems: 'center', overflow: 'visible',
     justifyContent: 'center',
     borderWidth: 1,
   },
   clearButton: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'center', overflow: 'visible',
     justifyContent: 'center',
     backgroundColor: glass.surface,
     borderWidth: 1,
     borderColor: glass.border,
   },
   dismissBtn: {
-    alignItems: 'center',
+    alignItems: 'center', overflow: 'visible',
     justifyContent: 'center',
     backgroundColor: glass.surfaceThin,
     borderWidth: 1,

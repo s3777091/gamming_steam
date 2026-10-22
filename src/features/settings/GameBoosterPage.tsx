@@ -2,8 +2,7 @@
 // và gửi kèm lệnh Play; booster trên PC trả lại mọi thứ khi game thoát.
 
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View } from 'react-native';
 import { Check, Leaf, Minus, Rocket, Scale, WandSparkles, type LucideIcon } from 'lucide-react-native';
 
 import {
@@ -16,13 +15,14 @@ import {
   type GameBoostMode,
 } from '@/lib/game-booster';
 import { getGameBoostMode, setGameBoostMode, subscribeGameBoostMode } from '@/lib/game-booster-settings';
-import { type SettingsTokens, useTheme } from '@/theme';
+import { type SettingsTokens } from '@/theme';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 import { InfoRow, rowStyle, SettingsGroup } from './controls';
 import { useSettingsRestore } from './SettingsRestore';
+import { useSettingsColors } from './SettingsSurface';
 import type { Notify } from './useStreamSettingsDraft';
 
 const MODE_ICON: Record<GameBoostMode, { icon: LucideIcon; color: keyof SettingsTokens }> = {
@@ -33,50 +33,38 @@ const MODE_ICON: Record<GameBoostMode, { icon: LucideIcon; color: keyof Settings
 };
 
 function ModeIcon({ mode }: { mode: GameBoostMode }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const { icon: Icon, color } = MODE_ICON[mode];
   return (
     <View
       style={{
-        width: s(30),
-        height: s(30),
-        borderRadius: s(9),
+        width: s(24),
+        height: s(24),
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: appleColors[color],
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: 'rgba(255, 255, 255, 0.40)',
-        overflow: 'hidden',
       }}
     >
-      <LinearGradient
-        colors={['rgba(255, 255, 255, 0.35)', 'rgba(255, 255, 255, 0)']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 0.7 }}
-        pointerEvents="none"
-        style={StyleSheet.absoluteFill}
-      />
-      <Icon size={s(16)} color="#FFFFFF" strokeWidth={2.2} />
+      <Icon size={s(17)} color={appleColors[color]} strokeWidth={1.8} />
     </View>
   );
 }
 
 /** Một việc PC làm (hoặc giữ nguyên) ở mức đang chọn. */
 function ActionRow({ action, on }: { action: GameBoostAction; on: boolean }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   return (
-    <View style={rowStyle(s, { minHeight: s(38) })}>
+    <View style={rowStyle(s)}>
       {on ? (
-        <Check size={s(15)} color={appleColors.green} strokeWidth={2.6} />
+        <Check size={s(15)} color={appleColors.accent} strokeWidth={2.6} />
       ) : (
         <Minus size={s(15)} color={appleColors.textTertiary} strokeWidth={2.2} />
       )}
       <T size={12.6} color={on ? appleColors.text : appleColors.textTertiary} style={{ flex: 1 }} numberOfLines={1}>
         {GAME_BOOST_ACTION_LABEL[action]}
       </T>
-      <T size={10.4} color={on ? appleColors.green : appleColors.textTertiary}>
+      <T size={10.4} color={on ? appleColors.accent : appleColors.textTertiary}>
         {on ? 'Bật' : 'Giữ nguyên'}
       </T>
     </View>
@@ -84,7 +72,7 @@ function ActionRow({ action, on }: { action: GameBoostAction; on: boolean }) {
 }
 
 export function GameBoosterPage({ notify }: { notify: Notify }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const [mode, setMode] = useState<GameBoostMode | null>(null);
 

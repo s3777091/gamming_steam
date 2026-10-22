@@ -25,6 +25,7 @@ import { Img } from '@/ui/Img';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
+import { CONSOLE } from './consoleVisuals';
 
 const STEPS = ['Mở Steam trên máy tính', 'Thanh toán trên Steam', 'Tải về máy'] as const;
 
@@ -70,19 +71,19 @@ function Stepper({ state }: { state: PurchaseState }) {
         const active = index === current && state.phase !== 'owned';
         const failed = active && state.phase === 'failed';
         const ready = state.phase === 'owned' && index === 2;
-        const tone = failed ? colors.danger : done || active || ready ? colors.accent : 'rgba(255,255,255,0.22)';
+        const tone = failed ? colors.danger : done || active || ready ? CONSOLE.controllerA : 'rgba(255,255,255,0.22)';
         return (
           <View key={label} style={{ flex: 1, alignItems: 'center' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'stretch' }}>
-              <View style={{ flex: 1, height: 2, borderRadius: 1, backgroundColor: index === 0 ? 'transparent' : index <= current ? colors.accent : 'rgba(255,255,255,0.1)' }} />
-              <View style={[styles.dot, { width: s(22), height: s(22), borderRadius: s(11), borderColor: tone }, (done || ready) && { backgroundColor: colors.accent }]}>
+              <View style={{ flex: 1, height: 2, borderRadius: 1, backgroundColor: index === 0 ? 'transparent' : index <= current ? CONSOLE.controllerA : 'rgba(255,255,255,0.1)' }} />
+              <View style={[styles.dot, { width: s(22), height: s(22), borderRadius: s(11), borderColor: tone }, (done || ready) && { backgroundColor: CONSOLE.controllerA }]}>
                 {done ? <Check size={s(12)} color={colors.onAccent} strokeWidth={3} />
                   : ready ? <Download size={s(11)} color={colors.onAccent} strokeWidth={2.6} />
                     : failed ? <X size={s(11)} color={colors.danger} strokeWidth={3} />
-                      : active ? <Animated.View style={{ width: s(8), height: s(8), borderRadius: s(4), backgroundColor: colors.accent, opacity: pulse }} />
+                      : active ? <Animated.View style={{ width: s(8), height: s(8), borderRadius: s(4), backgroundColor: CONSOLE.controllerA, opacity: pulse }} />
                         : <T size={9} weight="bold" color="rgba(255,255,255,0.42)" tabular>{index + 1}</T>}
               </View>
-              <View style={{ flex: 1, height: 2, borderRadius: 1, backgroundColor: index === STEPS.length - 1 ? 'transparent' : index < current ? colors.accent : 'rgba(255,255,255,0.1)' }} />
+              <View style={{ flex: 1, height: 2, borderRadius: 1, backgroundColor: index === STEPS.length - 1 ? 'transparent' : index < current ? CONSOLE.controllerA : 'rgba(255,255,255,0.1)' }} />
             </View>
             <T
               size={9.2}
@@ -122,13 +123,13 @@ function PriceBlock({ offer }: { offer: PurchaseOffer }) {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(8), marginBottom: s(2) }}>
           <View
             style={{
-              backgroundColor: colors.accent,
+              backgroundColor: CONSOLE.controllerA,
               borderRadius: s(7),
               paddingHorizontal: s(6),
               paddingVertical: s(2),
               borderWidth: StyleSheet.hairlineWidth,
               borderColor: 'rgba(255,255,255,0.4)',
-              shadowColor: colors.accent,
+              shadowColor: CONSOLE.controllerA,
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.5,
               shadowRadius: 6,
@@ -181,10 +182,10 @@ function Button({
   const isPrimary = variant === 'primary';
   const isSuccess = variant === 'success';
 
-  const textColor = isSuccess ? '#ffffff' : isPrimary ? colors.panelSolid : colors.text;
+  const textColor = isSuccess ? '#ffffff' : isPrimary ? CONSOLE.ink : colors.text;
 
   const content = (
-    <Press
+    <Press focusVariant="quiet"
       onPress={onPress}
       disabled={disabled || busy}
       autoFocus={autoFocus}
@@ -193,11 +194,11 @@ function Button({
         styles.buttonBase,
         isSuccess ? styles.success : isPrimary ? styles.primary : styles.secondary,
         {
-          height: s(42),
+          height: s(44),
           width: '100%',
           paddingHorizontal: s(isPrimary || isSuccess ? 18 : 16),
-          borderRadius: s(21),
-          gap: s(7),
+          borderRadius: s(12),
+          gap: s(7), overflow: 'visible',
         },
         disabled && { opacity: 0.45 },
       ]}
@@ -210,7 +211,7 @@ function Button({
           left: 0,
           right: 0,
           height: StyleSheet.hairlineWidth,
-          backgroundColor: isPrimary ? 'rgba(255,255,255,0.6)' : isSuccess ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.18)',
+          backgroundColor: isPrimary ? 'rgba(255,255,255,0.6)' : isSuccess ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.18)', marginHorizontal: s(10),
         }}
         pointerEvents="none"
       />
@@ -220,7 +221,7 @@ function Button({
           style={[
             StyleSheet.absoluteFill,
             {
-              borderRadius: s(21),
+              borderRadius: s(12),
               borderWidth: 1.8,
               borderColor: colors.danger,
               backgroundColor: 'rgba(248,113,113,0.14)',
@@ -230,7 +231,7 @@ function Button({
         />
       ) : null}
       {busy ? (
-        <ActivityIndicator size="small" color={isSuccess ? '#ffffff' : isPrimary ? colors.panelSolid : colors.text2} />
+        <ActivityIndicator size="small" color={isSuccess ? '#ffffff' : isPrimary ? CONSOLE.ink : colors.text2} />
       ) : (
         icon
       )}
@@ -271,7 +272,7 @@ function StatusPanel({ tone, icon, title, body }: { tone: 'wait' | 'error' | 'su
     ? { border: 'rgba(248,113,113,0.28)', bg: 'rgba(127,29,29,0.28)' }
     : tone === 'success'
       ? { border: 'rgba(74,222,128,0.26)', bg: 'rgba(20,83,45,0.3)' }
-      : { border: alpha(colors.accent, 0.26), bg: alpha(colors.primary, 0.12) };
+      : { border: CONSOLE.navigationSelectedBorder, bg: CONSOLE.navigation };
   return (
     <View style={{ flexDirection: 'row', gap: s(12), padding: s(12), borderRadius: s(14), borderWidth: 1, borderColor: palette.border, backgroundColor: palette.bg }}>
       <View style={{ width: s(28), alignItems: 'center', paddingTop: s(1) }}>{icon}</View>
@@ -298,13 +299,12 @@ function SuccessMark() {
 }
 
 function WaitingMark() {
-  const { colors } = useTheme();
   const { s } = useUi();
   const pulse = usePulse(true);
   return (
     <View style={{ width: s(24), height: s(24), alignItems: 'center', justifyContent: 'center' }}>
-      <Animated.View style={{ position: 'absolute', width: s(24), height: s(24), borderRadius: s(12), backgroundColor: colors.accent, opacity: pulse.interpolate({ inputRange: [0.3, 1], outputRange: [0.08, 0.28] }) }} />
-      <View style={{ width: s(9), height: s(9), borderRadius: s(5), backgroundColor: colors.accent }} />
+      <Animated.View style={{ position: 'absolute', width: s(24), height: s(24), borderRadius: s(12), backgroundColor: CONSOLE.controllerA, opacity: pulse.interpolate({ inputRange: [0.3, 1], outputRange: [0.08, 0.28] }) }} />
+      <View style={{ width: s(9), height: s(9), borderRadius: s(5), backgroundColor: CONSOLE.controllerA }} />
     </View>
   );
 }
@@ -446,7 +446,7 @@ export function PurchaseSheet({
     case 'opening':
       status = (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: s(10), paddingVertical: s(10), borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.line }}>
-          <ShieldCheck size={s(18)} color={colors.accent} strokeWidth={2} />
+          <ShieldCheck size={s(18)} color={CONSOLE.controllerA} strokeWidth={2} />
           <View style={{ flex: 1 }}>
             <T size={11.2} weight="semibold" color={colors.text}>Thanh toán trên giao diện chính chủ của Steam</T>
             <T size={9.8} color={colors.text3} leading={1.4} style={{ marginTop: s(2) }}>
@@ -471,7 +471,7 @@ export function PurchaseSheet({
             autoFocus
             sound="confirm"
             label={phase === 'opening' ? 'Đang mở Steam…' : kind === 'unavailable' ? 'Chưa mở bán' : checkoutLabel}
-            icon={<Lock size={s(14)} color={colors.panelSolid} strokeWidth={2.4} />}
+            icon={<Lock size={s(14)} color={CONSOLE.ink} strokeWidth={2.4} />}
             busy={phase === 'opening'}
             disabled={kind === 'unavailable'}
             onPress={() => onCheckout('store')}
@@ -493,7 +493,7 @@ export function PurchaseSheet({
       actions = (
         <>
           <Button flex={1} variant="secondary" label="Ẩn" onPress={onClose} sound="back" />
-          <Button flex={1.4} variant="primary" autoFocus label="Mở màn hình máy tính" icon={<MonitorPlay size={s(15)} color={colors.panelSolid} strokeWidth={2.2} />} onPress={onOpenStream} />
+          <Button flex={1.4} variant="primary" autoFocus label="Mở màn hình máy tính" icon={<MonitorPlay size={s(15)} color={CONSOLE.ink} strokeWidth={2.2} />} onPress={onOpenStream} />
         </>
       );
       break;
@@ -501,7 +501,7 @@ export function PurchaseSheet({
       status = (
         <StatusPanel
           tone="wait"
-          icon={<RefreshCw size={s(18)} color={colors.accent} strokeWidth={2} />}
+          icon={<RefreshCw size={s(18)} color={CONSOLE.controllerA} strokeWidth={2} />}
           title="Chưa thấy giao dịch"
           body="Steam chưa báo game này vào thư viện. Nếu bạn vừa thanh toán xong, kiểm tra lại sau ít giây."
         />
@@ -510,7 +510,7 @@ export function PurchaseSheet({
         <>
           <Button flex={1} variant="secondary" label="Quay lại" onPress={onBack} sound="back" />
           <Button flex={1.3} variant="secondary" label="Màn hình máy tính" icon={<MonitorPlay size={s(15)} color={colors.text2} strokeWidth={2} />} onPress={onOpenStream} />
-          <Button flex={1.2} variant="primary" autoFocus label="Kiểm tra lại" icon={<RefreshCw size={s(14)} color={colors.panelSolid} strokeWidth={2.4} />} onPress={onRecheck} />
+          <Button flex={1.2} variant="primary" autoFocus label="Kiểm tra lại" icon={<RefreshCw size={s(14)} color={CONSOLE.ink} strokeWidth={2.4} />} onPress={onRecheck} />
         </>
       );
       break;
@@ -540,7 +540,7 @@ export function PurchaseSheet({
             errorGlowAnim={errorGlowAnim}
             label={retrying ? 'Đang thử lại…' : 'Thử lại'}
             busy={retrying}
-            icon={retrying ? undefined : <RefreshCw size={s(14)} color={colors.panelSolid} strokeWidth={2.4} />}
+            icon={retrying ? undefined : <RefreshCw size={s(14)} color={CONSOLE.ink} strokeWidth={2.4} />}
             onPress={handleRetry}
           />
         </>
@@ -607,7 +607,6 @@ export function PurchaseSheet({
             },
           ]}
         >
-          <GlassBackdrop material="panel" intensity={36} radius={s(24)} />
 
           {artWidth ? (
             <View style={{ width: artWidth, alignSelf: 'stretch', backgroundColor: '#152130', overflow: 'hidden' }}>
@@ -624,8 +623,8 @@ export function PurchaseSheet({
                   }}
                 />
               ) : null}
-              <LinearGradient colors={[alpha(colors.panel, 0), alpha(colors.panel, 0.15), colors.panel]} locations={[0, 0.6, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
-              <LinearGradient colors={[alpha(colors.panel, 0), alpha(colors.panel, 0.85)]} locations={[0.55, 1]} style={StyleSheet.absoluteFill} />
+              <LinearGradient colors={[alpha(CONSOLE.panel, 0), alpha(CONSOLE.panel, 0.15), CONSOLE.panel]} locations={[0, 0.6, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+              <LinearGradient colors={[alpha(CONSOLE.panel, 0), alpha(CONSOLE.panel, 0.85)]} locations={[0.55, 1]} style={StyleSheet.absoluteFill} />
               <View style={[styles.steamTag, { left: s(12), bottom: s(12), paddingHorizontal: s(8), paddingVertical: s(4), borderRadius: s(8), gap: s(5) }]}>
                 <ShieldCheck size={s(11)} color={colors.text2} strokeWidth={2.2} />
                 <T size={8.8} weight="semibold" color={colors.text2} tracking={0.04}>STEAM</T>
@@ -639,7 +638,7 @@ export function PurchaseSheet({
                 <T size={9.2} weight="semibold" color={colors.text3} tracking={0.08}>{phase === 'owned' ? 'ĐÃ SỞ HỮU' : kind === 'free' ? 'NHẬN MIỄN PHÍ' : 'MUA TRÒ CHƠI'}</T>
                 <T size={17} weight="bold" tracking={-0.02} numberOfLines={2} style={{ marginTop: s(3) }}>{offer.name}</T>
               </View>
-              <Press onPress={onClose} sound="back" accessibilityLabel="Đóng" style={[styles.close, { width: s(30), height: s(30), borderRadius: s(15) }]}>
+              <Press focusVariant="quiet" onPress={onClose} sound="back" accessibilityLabel="Đóng" style={[styles.close, { width: s(30), height: s(30), borderRadius: s(15) }]}>
                 <X size={s(14)} color="rgba(255,255,255,0.75)" />
               </Press>
             </View>
@@ -656,13 +655,13 @@ export function PurchaseSheet({
   );
 }
 
-const useStyles = makeStyles(({ colors, glass }) => ({
+const useStyles = makeStyles(({ colors }) => ({
   card: {
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: glass.panelBorder,
-    backgroundColor: glass.modal,
+    borderColor: CONSOLE.border,
+    backgroundColor: CONSOLE.panel,
     shadowColor: '#000',
     shadowOpacity: 0.45,
     shadowRadius: 32,
@@ -672,11 +671,11 @@ const useStyles = makeStyles(({ colors, glass }) => ({
   close: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: glass.control,
+    backgroundColor: CONSOLE.control,
     borderWidth: 1,
-    borderColor: glass.controlBorder,
+    borderColor: CONSOLE.border,
   },
-  dot: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, backgroundColor: colors.panel },
+  dot: { alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, backgroundColor: CONSOLE.panel },
   steamTag: { position: 'absolute', flexDirection: 'row', alignItems: 'center', backgroundColor: alpha(colors.bgDeep, 0.62), borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line },
   buttonBase: {
     flexDirection: 'row',
@@ -685,18 +684,14 @@ const useStyles = makeStyles(({ colors, glass }) => ({
     overflow: 'hidden',
   },
   primary: {
-    backgroundColor: colors.white,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.4)',
-    shadowColor: '#fff',
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: CONSOLE.action,
+    borderWidth: 1,
+    borderColor: CONSOLE.actionBorder,
   },
   secondary: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: CONSOLE.control,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
+    borderColor: CONSOLE.border,
   },
   success: {
     backgroundColor: '#16a34a',

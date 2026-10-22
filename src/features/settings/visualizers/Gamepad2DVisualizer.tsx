@@ -1,15 +1,18 @@
-// Trình trực quan hoá 2D tay cầm vật lý theo thời gian thực (Digital Twin Gamepad)
-// Phản hồi tức thì khi người dùng bấm nút, gạt cần analog, bóp cò trên tay cầm ngoài.
-// Hỗ trợ đổi bố cục linh hoạt: Xbox, PlayStation, Nintendo. Có chế độ chú thích (Callouts).
+// Trình trực quan hoá 3D Digital Twin tay cầm theo thời gian thực (Next-Gen 3D Gamepad Visualizer)
+// Phản hồi tức thì khi bấm nút, gạt cần analog, bóp cò trên tay cầm thật.
+// Thiết kế 3D đẳng cấp Console Pro với hiệu ứng chiều sâu, gradient đổ bóng, chất liệu cao su/kim loại,
+// analog stick di chuyển theo thời gian thực với dynamic cast shadow, và cò LT/RT đo lực bóp chân thực.
 
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, {
   Circle,
   Defs,
+  Ellipse,
   G,
   LinearGradient,
   Path,
+  RadialGradient,
   Rect,
   Stop,
   Text as SvgText,
@@ -50,10 +53,11 @@ export function Gamepad2DVisualizer({
   layout = 'xbox',
   leftDeadzone = 0.08,
   rightDeadzone = 0.08,
+  triggerDeadzone = 0.05,
   showCallouts = true,
   onButtonPress,
 }: Gamepad2DVisualizerProps) {
-  const { settings: appleColors } = useTheme();
+  const { settings: appleColors, colors } = useTheme();
   const buttons = state?.buttons ?? 0;
   const lx = Math.max(-1, Math.min(1, state?.lx ?? 0));
   const ly = Math.max(-1, Math.min(1, state?.ly ?? 0));
@@ -69,8 +73,8 @@ export function Gamepad2DVisualizer({
   const isY = (buttons & MASK_Y) !== 0;
   const isLB = (buttons & MASK_LB) !== 0;
   const isRB = (buttons & MASK_RB) !== 0;
-  const isLT = lt >= 0.5;
-  const isRT = rt >= 0.5;
+  const isLT = lt > triggerDeadzone;
+  const isRT = rt > triggerDeadzone;
   const isBack = (buttons & MASK_BACK) !== 0;
   const isStart = (buttons & MASK_START) !== 0;
   const isL3 = (buttons & MASK_L3) !== 0;
@@ -125,40 +129,193 @@ export function Gamepad2DVisualizer({
   const rStickDx = rx * maxStickTravel;
   const rStickDy = ry * maxStickTravel;
 
-  // Màu sắc nền & viền phong cách Console Blueprint tối tân
-  const colorActive = appleColors.blue;
-  const colorBorder = '#2A3649';
-  const colorMuted = '#485870';
-  const colorCalloutLine = 'rgba(100, 140, 180, 0.45)';
-  const colorCalloutText = '#8FA2BC';
+  // Dịch chuyển cò bóp LT / RT theo độ sâu (0..8px)
+  const ltPullOffset = lt * 8;
+  const rtPullOffset = rt * 8;
+
+  // Màu sắc chủ đạo & điểm nhấn
+  const colorActive = appleColors.blue ?? colors.primary;
+  const colorActiveGlow = '#38BDF8';
+  const colorCalloutLine = 'rgba(70, 130, 200, 0.42)';
+  const colorCalloutText = '#93A4BA';
 
   return (
     <View style={styles.container}>
-      {/* Sân khấu 2D SVG biểu diễn tay cầm thật */}
+      {/* Sân khấu 3D Vector biểu diễn tay cầm thật */}
       <View style={styles.svgWrapper}>
         <Svg viewBox="0 0 540 370" style={styles.svg}>
           <Defs>
-            {/* Gradient cho vỏ tay cầm */}
-            <LinearGradient id="shellGrad" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor="#1E2736" />
-              <Stop offset="100%" stopColor="#11161F" />
+            {/* 1. Đèn sân khấu tỏa sáng dịu phía sau */}
+            <RadialGradient id="stageBacklight" cx="50%" cy="48%" r="50%">
+              <Stop offset="0%" stopColor="#142036" stopOpacity="0.45" />
+              <Stop offset="65%" stopColor="#0B1019" stopOpacity="0.15" />
+              <Stop offset="100%" stopColor="#080C14" stopOpacity="0" />
+            </RadialGradient>
+
+            {/* 2. Đổ bóng sàn vật lý (Floor Ambient Occlusion) */}
+            <RadialGradient id="floorShadow" cx="50%" cy="50%" r="50%">
+              <Stop offset="0%" stopColor="#000000" stopOpacity="0.85" />
+              <Stop offset="60%" stopColor="#000000" stopOpacity="0.45" />
+              <Stop offset="100%" stopColor="#000000" stopOpacity="0" />
+            </RadialGradient>
+
+            {/* 3. Gradient vỏ thân máy chính (3D Chiseled Shell) */}
+            <LinearGradient id="chassisGrad" x1="0.15" y1="0" x2="0.85" y2="1">
+              <Stop offset="0%" stopColor="#283344" />
+              <Stop offset="25%" stopColor="#1C2432" />
+              <Stop offset="70%" stopColor="#121721" />
+              <Stop offset="100%" stopColor="#0B0F15" />
             </LinearGradient>
+
+            {/* Viền cạnh ánh sáng 3D (Rim highlight) */}
+            <LinearGradient id="rimHighlightGrad" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor="#546682" stopOpacity="0.65" />
+              <Stop offset="40%" stopColor="#2F3C4F" stopOpacity="0.35" />
+              <Stop offset="100%" stopColor="#121822" stopOpacity="0.1" />
+            </LinearGradient>
+
+            {/* 4. Cao su báng cầm vân nhám (Textured Rubber Grip) */}
+            <LinearGradient id="gripGrad" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0%" stopColor="#171F2C" />
+              <Stop offset="50%" stopColor="#0F141D" />
+              <Stop offset="100%" stopColor="#080B0F" />
+            </LinearGradient>
+
+            {/* 5. Tấm ốp bóng mặt trên (Piano-Black Top Fascia) */}
+            <LinearGradient id="fasciaPlateGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+              <Stop offset="0%" stopColor="#2C374A" />
+              <Stop offset="45%" stopColor="#18202D" />
+              <Stop offset="100%" stopColor="#0F131C" />
+            </LinearGradient>
+
+            {/* 6. Cò bóp 3D Triggers (LT & RT) */}
+            <LinearGradient id="triggerGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+              <Stop offset="0%" stopColor="#374457" />
+              <Stop offset="30%" stopColor="#222B3A" />
+              <Stop offset="100%" stopColor="#0F141D" />
+            </LinearGradient>
+            <LinearGradient id="triggerActiveGrad" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0%" stopColor="#38BDF8" />
+              <Stop offset="40%" stopColor="#0A84FF" />
+              <Stop offset="100%" stopColor="#0056B3" />
+            </LinearGradient>
+
+            {/* 7. Gù vai Bumpers (LB & RB) */}
+            <LinearGradient id="bumperGrad" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0%" stopColor="#2D384A" />
+              <Stop offset="60%" stopColor="#18202D" />
+              <Stop offset="100%" stopColor="#10141C" />
+            </LinearGradient>
+
+            {/* 8. Hốc cần gạt lõm sâu (Conical Thumbstick Sockets) */}
+            <RadialGradient id="stickWellGrad" cx="45%" cy="40%" r="55%">
+              <Stop offset="0%" stopColor="#070A0F" />
+              <Stop offset="75%" stopColor="#131A26" />
+              <Stop offset="100%" stopColor="#283447" />
+            </RadialGradient>
+
+            {/* Mũ cần gạt Analog 3D với viền nhám và lòng lõm */}
+            <RadialGradient id="stickCapGrad" cx="35%" cy="30%" r="65%">
+              <Stop offset="0%" stopColor="#38475E" />
+              <Stop offset="55%" stopColor="#202A3B" />
+              <Stop offset="90%" stopColor="#141B26" />
+              <Stop offset="100%" stopColor="#0C1017" />
+            </RadialGradient>
+
+            {/* Lòng lõm ngón tay cái */}
+            <RadialGradient id="stickCupGrad" cx="45%" cy="45%" r="55%">
+              <Stop offset="0%" stopColor="#0D121B" />
+              <Stop offset="70%" stopColor="#17202E" />
+              <Stop offset="100%" stopColor="#253246" />
+            </RadialGradient>
+
+            {/* 9. Đĩa kim loại phay xước cho D-Pad */}
+            <RadialGradient id="dpadDishGrad" cx="42%" cy="38%" r="60%">
+              <Stop offset="0%" stopColor="#0D121B" />
+              <Stop offset="80%" stopColor="#192333" />
+              <Stop offset="100%" stopColor="#2A384F" />
+            </RadialGradient>
+
+            {/* 10. Viên ngọc nút bấm 3D đa chiều (Gemstone Action Buttons) */}
+            <RadialGradient id="btnGemBase" cx="35%" cy="30%" r="65%">
+              <Stop offset="0%" stopColor="#35455E" />
+              <Stop offset="60%" stopColor="#1C2433" />
+              <Stop offset="100%" stopColor="#101520" />
+            </RadialGradient>
+
+            {/* Vòng kim loại Chrome Bezel */}
+            <LinearGradient id="chromeRing" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0%" stopColor="#7E94B0" />
+              <Stop offset="30%" stopColor="#435368" />
+              <Stop offset="70%" stopColor="#1A222F" />
+              <Stop offset="100%" stopColor="#4E607A" />
+            </LinearGradient>
+
+            {/* Quầng sáng Neon cho Guide / Nexus Button */}
+            <RadialGradient id="nexusGlow" cx="50%" cy="50%" r="50%">
+              <Stop offset="0%" stopColor="#38BDF8" stopOpacity="0.8" />
+              <Stop offset="45%" stopColor="#0284C7" stopOpacity="0.4" />
+              <Stop offset="100%" stopColor="#0369A1" stopOpacity="0" />
+            </RadialGradient>
           </Defs>
 
-          {/* 1. CÒ TRÁI LT & CÒ PHẢI RT (Triggers dạng nút click On/Off) */}
-          {/* LT trigger */}
-          <G onPress={() => onButtonPress?.('LT')}>
-            {/* Nền cò LT */}
+          {/* ============================================================== */}
+          {/* LỚP 0: QUẦNG SÁNG & ĐỔ BÓNG NỀN 3D (3D Ambient Floor)          */}
+          {/* ============================================================== */}
+          <Rect x="40" y="20" width="460" height="330" fill="url(#stageBacklight)" rx="24" />
+
+          {/* Bóng đổ tay cầm bên trái */}
+          <Ellipse cx="118" cy="334" rx="58" ry="22" fill="url(#floorShadow)" />
+          {/* Bóng đổ tay cầm bên phải */}
+          <Ellipse cx="422" cy="334" rx="58" ry="22" fill="url(#floorShadow)" />
+          {/* Bóng đổ gầm giữa */}
+          <Ellipse cx="270" cy="275" rx="145" ry="34" fill="url(#floorShadow)" />
+
+          {/* ============================================================== */}
+          {/* LỚP 1: CÒ BÓP TRÊN 3D (LT & RT Triggers - Có đo lực bóp analog) */}
+          {/* ============================================================== */}
+          {/* Cò trái LT */}
+          <G
+            onPress={() => onButtonPress?.('LT')}
+            transform={`translate(0, ${ltPullOffset})`}
+          >
+            {/* Lưỡi cò LT 3D */}
             <Path
-              d="M 115 58 C 115 32, 130 18, 175 18 C 185 18, 190 28, 190 58 Z"
-              fill={isLT ? colorActive : '#0F141C'}
-              stroke={isLT ? '#FFFFFF' : colorBorder}
-              strokeWidth={isLT ? 2.5 : 1.5}
+              d="M 112 62 C 112 28, 126 12, 168 12 C 182 12, 192 22, 192 62 Z"
+              fill={isLT ? 'url(#triggerActiveGrad)' : 'url(#triggerGrad)'}
+              stroke={isLT ? '#FFFFFF' : '#334257'}
+              strokeWidth={isLT ? 2 : 1.2}
+            />
+            {/* Vệt vát sáng cạnh trên cò */}
+            <Path
+              d="M 124 22 C 144 16, 172 16, 184 24"
+              stroke={isLT ? '#E0F2FE' : '#5E7494'}
+              strokeWidth="2"
+              fill="none"
+              strokeLinecap="round"
+              opacity={0.8}
+            />
+            {/* Thanh đo độ sâu analog (LT travel gauge) */}
+            <Rect
+              x="136"
+              y="48"
+              width="32"
+              height="3"
+              rx="1.5"
+              fill="rgba(255, 255, 255, 0.2)"
+            />
+            <Rect
+              x="136"
+              y="48"
+              width={32 * lt}
+              height="3"
+              rx="1.5"
+              fill={isLT ? '#FFFFFF' : colorActive}
             />
             <SvgText
               x="152"
-              y="44"
-              fill={isLT ? '#FFFFFF' : colorMuted}
+              y="38"
+              fill={isLT ? '#FFFFFF' : '#8FA2BC'}
               fontSize="11"
               fontWeight="bold"
               textAnchor="middle"
@@ -167,19 +324,48 @@ export function Gamepad2DVisualizer({
             </SvgText>
           </G>
 
-          {/* RT trigger */}
-          <G onPress={() => onButtonPress?.('RT')}>
-            {/* Nền cò RT */}
+          {/* Cò phải RT */}
+          <G
+            onPress={() => onButtonPress?.('RT')}
+            transform={`translate(0, ${rtPullOffset})`}
+          >
+            {/* Lưỡi cò RT 3D */}
             <Path
-              d="M 350 58 C 350 28, 355 18, 365 18 C 410 18, 425 32, 425 58 Z"
-              fill={isRT ? colorActive : '#0F141C'}
-              stroke={isRT ? '#FFFFFF' : colorBorder}
-              strokeWidth={isRT ? 2.5 : 1.5}
+              d="M 348 62 C 348 22, 358 12, 372 12 C 414 12, 428 28, 428 62 Z"
+              fill={isRT ? 'url(#triggerActiveGrad)' : 'url(#triggerGrad)'}
+              stroke={isRT ? '#FFFFFF' : '#334257'}
+              strokeWidth={isRT ? 2 : 1.2}
+            />
+            {/* Vệt vát sáng cạnh trên cò */}
+            <Path
+              d="M 356 24 C 368 16, 396 16, 416 22"
+              stroke={isRT ? '#E0F2FE' : '#5E7494'}
+              strokeWidth="2"
+              fill="none"
+              strokeLinecap="round"
+              opacity={0.8}
+            />
+            {/* Thanh đo độ sâu analog (RT travel gauge) */}
+            <Rect
+              x="372"
+              y="48"
+              width="32"
+              height="3"
+              rx="1.5"
+              fill="rgba(255, 255, 255, 0.2)"
+            />
+            <Rect
+              x="372"
+              y="48"
+              width={32 * rt}
+              height="3"
+              rx="1.5"
+              fill={isRT ? '#FFFFFF' : colorActive}
             />
             <SvgText
               x="388"
-              y="44"
-              fill={isRT ? '#FFFFFF' : colorMuted}
+              y="38"
+              fill={isRT ? '#FFFFFF' : '#8FA2BC'}
               fontSize="11"
               fontWeight="bold"
               textAnchor="middle"
@@ -188,20 +374,30 @@ export function Gamepad2DVisualizer({
             </SvgText>
           </G>
 
-          {/* 2. GÙ NÚT VAI LB & RB (Bumpers) */}
-          {/* LB */}
+          {/* ============================================================== */}
+          {/* LỚP 2: GÙ NÚT VAI BUMPERS (LB & RB) CÔNG THÁI HỌC               */}
+          {/* ============================================================== */}
+          {/* LB Bumper */}
           <G onPress={() => onButtonPress?.('LB')}>
             <Path
-              d="M 100 85 C 100 62, 120 54, 202 54 C 205 68, 205 76, 200 85 Z"
-              fill={isLB ? colorActive : '#17202C'}
-              stroke={isLB ? '#FFFFFF' : colorBorder}
+              d="M 98 86 C 96 66, 114 54, 196 54 C 201 64, 201 75, 198 86 Z"
+              fill={isLB ? colorActive : 'url(#bumperGrad)'}
+              stroke={isLB ? '#FFFFFF' : '#33445C'}
               strokeWidth={isLB ? 2 : 1.2}
+            />
+            {/* Mép phản chiếu kim loại mặt trước LB */}
+            <Path
+              d="M 106 68 C 128 58, 172 58, 192 64"
+              stroke={isLB ? '#BAE6FD' : 'rgba(255, 255, 255, 0.22)'}
+              strokeWidth="1.5"
+              fill="none"
+              strokeLinecap="round"
             />
             <SvgText
               x="150"
               y="74"
-              fill={isLB ? '#FFFFFF' : '#8E9EB5'}
-              fontSize="11"
+              fill={isLB ? '#FFFFFF' : '#94A3B8'}
+              fontSize="10.5"
               fontWeight="bold"
               textAnchor="middle"
             >
@@ -209,19 +405,27 @@ export function Gamepad2DVisualizer({
             </SvgText>
           </G>
 
-          {/* RB */}
+          {/* RB Bumper */}
           <G onPress={() => onButtonPress?.('RB')}>
             <Path
-              d="M 340 85 C 335 76, 335 68, 338 54 C 420 54, 440 62, 440 85 Z"
-              fill={isRB ? colorActive : '#17202C'}
-              stroke={isRB ? '#FFFFFF' : colorBorder}
+              d="M 342 86 C 339 75, 339 64, 344 54 C 426 54, 444 66, 442 86 Z"
+              fill={isRB ? colorActive : 'url(#bumperGrad)'}
+              stroke={isRB ? '#FFFFFF' : '#33445C'}
               strokeWidth={isRB ? 2 : 1.2}
+            />
+            {/* Mép phản chiếu kim loại mặt trước RB */}
+            <Path
+              d="M 348 64 C 368 58, 412 58, 434 68"
+              stroke={isRB ? '#BAE6FD' : 'rgba(255, 255, 255, 0.22)'}
+              strokeWidth="1.5"
+              fill="none"
+              strokeLinecap="round"
             />
             <SvgText
               x="390"
               y="74"
-              fill={isRB ? '#FFFFFF' : '#8E9EB5'}
-              fontSize="11"
+              fill={isRB ? '#FFFFFF' : '#94A3B8'}
+              fontSize="10.5"
               fontWeight="bold"
               textAnchor="middle"
             >
@@ -229,351 +433,488 @@ export function Gamepad2DVisualizer({
             </SvgText>
           </G>
 
-          {/* 3. THÂN TAY CẦM CHÍNH (Ergonomic Gamepad Body) */}
+          {/* ============================================================== */}
+          {/* LỚP 3: THÂN VỎ TAY CẦM CHÍNH 3D (Next-Gen Ergonomic Chassis)   */}
+          {/* ============================================================== */}
+          {/* Viền nổi khối ngoài cùng */}
           <Path
             d={`
-              M 205 60
-              C 230 56, 310 56, 335 60
-              C 415 60, 448 78, 470 125
-              C 490 170, 498 250, 482 315
-              C 475 342, 448 350, 425 330
-              C 390 300, 360 250, 345 230
-              C 305 255, 235 255, 195 230
-              C 180 250, 150 300, 115 330
-              C 92 350, 65 342, 58 315
-              C 42 250, 50 170, 70 125
-              C 92 78, 125 60, 205 60
+              M 200 64
+              C 230 60, 310 60, 340 64
+              C 418 64, 452 82, 474 130
+              C 496 178, 502 255, 484 318
+              C 476 345, 446 352, 424 330
+              C 388 296, 356 244, 340 226
+              C 300 250, 240 250, 200 226
+              C 184 244, 152 296, 116 330
+              C 94 352, 64 345, 56 318
+              C 38 255, 44 178, 66 130
+              C 88 82, 122 64, 200 64
               Z
             `}
-            fill="url(#shellGrad)"
-            stroke={colorBorder}
+            fill="url(#chassisGrad)"
+            stroke="url(#rimHighlightGrad)"
             strokeWidth="2"
           />
 
-          {/* Đường vân grip cao su hai bên tay cầm */}
+          {/* Báng cầm tay trái bọc đệm cao su (Left Grip Horn) */}
           <Path
-            d="M 75 140 C 58 200, 64 270, 85 315"
-            stroke={colorBorder}
-            strokeWidth="2"
+            d="M 68 132 C 46 180, 40 258, 58 316 C 66 340, 92 346, 114 326 C 100 292, 88 238, 86 180 C 86 160, 78 142, 68 132 Z"
+            fill="url(#gripGrad)"
+            opacity={0.88}
+          />
+          {/* Vân nhám công nghệ cao chống trượt bên trái */}
+          <Path
+            d="M 62 180 C 58 220, 62 265, 78 305"
+            stroke="#263447"
+            strokeWidth="3"
+            strokeDasharray="2,5"
             fill="none"
-            strokeDasharray="4,4"
-            opacity={0.4}
           />
           <Path
-            d="M 465 140 C 482 200, 476 270, 455 315"
-            stroke={colorBorder}
-            strokeWidth="2"
-            fill="none"
-            strokeDasharray="4,4"
-            opacity={0.4}
-          />
-
-          {/* Đường nhấn cong ở giữa thân dưới */}
-          <Path
-            d="M 210 240 C 240 255, 300 255, 330 240"
-            stroke="#263345"
-            strokeWidth="2"
+            d="M 70 170 C 66 210, 70 255, 88 295"
+            stroke="#1E2A3B"
+            strokeWidth="2.5"
+            strokeDasharray="2,5"
             fill="none"
           />
 
-          {/* 4. CẦN GẠT TRÁI (Left Thumbstick / L3) */}
+          {/* Báng cầm tay phải bọc đệm cao su (Right Grip Horn) */}
+          <Path
+            d="M 472 132 C 494 180, 500 258, 482 316 C 474 340, 448 346, 426 326 C 440 292, 452 238, 454 180 C 454 160, 462 142, 472 132 Z"
+            fill="url(#gripGrad)"
+            opacity={0.88}
+          />
+          {/* Vân nhám công nghệ cao chống trượt bên phải */}
+          <Path
+            d="M 478 180 C 482 220, 478 265, 462 305"
+            stroke="#263447"
+            strokeWidth="3"
+            strokeDasharray="2,5"
+            fill="none"
+          />
+          <Path
+            d="M 470 170 C 474 210, 470 255, 452 295"
+            stroke="#1E2A3B"
+            strokeWidth="2.5"
+            strokeDasharray="2,5"
+            fill="none"
+          />
+
+          {/* Tấm ốp bóng mặt trên bao quanh khu vực Nexus (Top Fascia Plate) */}
+          <Path
+            d={`
+              M 200 64
+              C 235 60, 305 60, 340 64
+              C 342 85, 330 115, 312 135
+              C 290 148, 250 148, 228 135
+              C 210 115, 198 85, 200 64
+              Z
+            `}
+            fill="url(#fasciaPlateGrad)"
+            stroke="#222C3A"
+            strokeWidth="1.2"
+          />
+
+          {/* Đường vát cong trung tâm tạo khối cơ bắp 3D */}
+          <Path
+            d="M 204 228 C 238 250, 302 250, 336 228"
+            stroke="#1C2635"
+            strokeWidth="2.5"
+            fill="none"
+          />
+
+          {/* ============================================================== */}
+          {/* LỚP 4: CẦN GẠT ANALOG TRÁI 3D (Left Stick / L3)               */}
+          {/* ============================================================== */}
           <G onPress={() => onButtonPress?.('L3')}>
-            {/* Đế hốc cần gạt */}
-            <Circle cx="160" cy="145" r="38" fill="#0C1017" stroke={colorBorder} strokeWidth="2" />
-            {/* Vòng ngưỡng vùng chết (Deadzone indicator) */}
+            {/* Hốc cầu lõm sâu trong vỏ (Spherical Socket Well) */}
+            <Circle cx="160" cy="145" r="39" fill="url(#stickWellGrad)" stroke="url(#chromeRing)" strokeWidth="2.5" />
+            <Circle cx="160" cy="145" r="37.5" fill="none" stroke="#05080C" strokeWidth="1.5" />
+
+            {/* Vòng ngưỡng vùng chết (Deadzone boundary) */}
             <Circle
               cx="160"
               cy="145"
-              r={38 * leftDeadzone}
+              r={39 * leftDeadzone}
               fill="none"
-              stroke="rgba(255, 150, 0, 0.45)"
-              strokeWidth="1"
-              strokeDasharray="2,2"
+              stroke="rgba(245, 158, 11, 0.45)"
+              strokeWidth="1.2"
+              strokeDasharray="3,3"
             />
-            {/* Trục chữ thập định hướng */}
-            <Path d="M 160 115 L 160 175 M 130 145 L 190 145" stroke="#1A2433" strokeWidth="1" />
-            {/* Mũ cần gạt di chuyển theo thời gian thực */}
-            <Circle
-              cx={160 + lStickDx}
-              cy={145 + lStickDy}
-              r="24"
-              fill={isL3 ? colorActive : '#222C3D'}
-              stroke={isL3 ? '#FFFFFF' : '#3D4F6B'}
-              strokeWidth={isL3 ? 2.5 : 2}
-            />
-            {/* Tâm lõm ngón tay cái */}
-            <Circle
-              cx={160 + lStickDx}
-              cy={145 + lStickDy}
-              r="17"
-              fill={isL3 ? '#0062CC' : '#171E2B'}
-              stroke="#2E3C52"
-              strokeWidth="1.5"
-            />
-            {/* Chấm tâm */}
-            <Circle
-              cx={160 + lStickDx}
-              cy={145 + lStickDy}
-              r="4"
-              fill={isL3 ? '#FFFFFF' : colorActive}
-            />
-            <SvgText
-              x={160 + lStickDx}
-              y={148 + lStickDy + 11}
-              fill={isL3 ? '#FFFFFF' : '#738BAE'}
-              fontSize="7.5"
-              fontWeight="bold"
-              textAnchor="middle"
-            >
-              L3
-            </SvgText>
-          </G>
 
-          {/* 5. CỤM PHÍM ĐIỀU HƯỚNG D-PAD */}
-          <G>
-            {/* Đế cụm thập hướng */}
-            <Circle cx="210" cy="225" r="35" fill="#0D121A" stroke={colorBorder} strokeWidth="1.5" />
+            {/* Đổ bóng 3D của trụ cần gạt di chuyển theo chiều ngược lại */}
+            <Ellipse
+              cx={160 - lStickDx * 0.3}
+              cy={147 - lStickDy * 0.3}
+              rx="24"
+              ry="21"
+              fill="#000000"
+              opacity={0.65}
+            />
 
-            {/* D-Pad Up */}
-            <G onPress={() => onButtonPress?.('D-Pad Up')}>
-              <Rect
-                x="200"
-                y="195"
-                width="20"
-                height="20"
-                rx="3"
-                fill={isUp ? colorActive : '#1E2838'}
-                stroke={isUp ? '#FFFFFF' : '#33445C'}
-                strokeWidth={isUp ? 2 : 1}
+            {/* Mũ cần gạt (Thumbstick Cap) di chuyển theo thời gian thực */}
+            <G transform={`translate(${lStickDx}, ${lStickDy}) scale(${isL3 ? 0.94 : 1})`} origin="160, 145">
+              {/* Vành cao su ngoài (Beveled Outer Grip Ring) */}
+              <Circle
+                cx="160"
+                cy="145"
+                r="24"
+                fill={isL3 ? colorActive : 'url(#stickCapGrad)'}
+                stroke={isL3 ? '#FFFFFF' : '#3C4B61'}
+                strokeWidth={isL3 ? 2.5 : 2}
               />
+              {/* Vòng gai nhám micro-knurling trên vành */}
+              <Circle
+                cx="160"
+                cy="145"
+                r="21.5"
+                fill="none"
+                stroke={isL3 ? '#93C5FD' : '#2C384B'}
+                strokeWidth="1.5"
+                strokeDasharray="2,3"
+              />
+
+              {/* 4 rãnh định hướng bám tay (Grip notches) */}
+              <Rect x="158.5" y="122.5" width="3" height="3" rx="1" fill="#4B5E78" />
+              <Rect x="158.5" y="164.5" width="3" height="3" rx="1" fill="#4B5E78" />
+              <Rect x="137.5" y="143.5" width="3" height="3" rx="1" fill="#4B5E78" />
+              <Rect x="179.5" y="143.5" width="3" height="3" rx="1" fill="#4B5E78" />
+
+              {/* Lòng bát lõm ngón tay cái (Concave thumb cup) */}
+              <Circle
+                cx="160"
+                cy="145"
+                r="16.5"
+                fill={isL3 ? '#005BBB' : 'url(#stickCupGrad)'}
+                stroke="#1B2433"
+                strokeWidth="1.5"
+              />
+
+              {/* Vệt sáng cong vát 3D (Specular crescent) */}
+              <Path
+                d="M 149 139 C 153 133, 167 133, 171 139"
+                stroke="rgba(255, 255, 255, 0.45)"
+                strokeWidth="1.8"
+                fill="none"
+                strokeLinecap="round"
+              />
+
+              {/* Chấm tâm & Nhãn L3 */}
+              <Circle cx="160" cy="144" r="3.5" fill={isL3 ? '#FFFFFF' : colorActive} />
               <SvgText
-                x="210"
-                y="209"
-                fill={isUp ? '#FFFFFF' : '#A0B2C6'}
-                fontSize="11"
+                x="160"
+                y="157"
+                fill={isL3 ? '#FFFFFF' : '#889BB5'}
+                fontSize="7.5"
                 fontWeight="bold"
                 textAnchor="middle"
               >
-                ▲
+                L3
               </SvgText>
+            </G>
+          </G>
+
+          {/* ============================================================== */}
+          {/* LỚP 5: CỤM PHÍM ĐIỀU HƯỚNG D-PAD 3D NGUYÊN KHỐI                */}
+          {/* ============================================================== */}
+          <G>
+            {/* Đĩa kim loại phay xước âm bên dưới */}
+            <Circle cx="210" cy="225" r="36" fill="url(#dpadDishGrad)" stroke="url(#chromeRing)" strokeWidth="2" />
+            <Circle cx="210" cy="225" r="34.5" fill="none" stroke="#080C12" strokeWidth="1.5" />
+
+            {/* D-Pad Up */}
+            <G onPress={() => onButtonPress?.('D-Pad Up')}>
+              <Path
+                d="M 200 220 L 200 196 C 200 193, 203 191, 206 191 L 214 191 C 217 191, 220 193, 220 196 L 220 220 Z"
+                fill={isUp ? colorActive : '#202A38'}
+                stroke={isUp ? '#FFFFFF' : '#33445C'}
+                strokeWidth={isUp ? 2 : 1.2}
+              />
+              {/* Mũi tên Up chạm khắc */}
+              <Path
+                d="M 210 197 L 205 204 L 215 204 Z"
+                fill={isUp ? '#FFFFFF' : '#8EA0B5'}
+              />
             </G>
 
             {/* D-Pad Down */}
             <G onPress={() => onButtonPress?.('D-Pad Down')}>
-              <Rect
-                x="200"
-                y="235"
-                width="20"
-                height="20"
-                rx="3"
-                fill={isDown ? colorActive : '#1E2838'}
+              <Path
+                d="M 200 230 L 200 254 C 200 257, 203 259, 206 259 L 214 259 C 217 259, 220 257, 220 254 L 220 230 Z"
+                fill={isDown ? colorActive : '#202A38'}
                 stroke={isDown ? '#FFFFFF' : '#33445C'}
-                strokeWidth={isDown ? 2 : 1}
+                strokeWidth={isDown ? 2 : 1.2}
               />
-              <SvgText
-                x="210"
-                y="249"
-                fill={isDown ? '#FFFFFF' : '#A0B2C6'}
-                fontSize="11"
-                fontWeight="bold"
-                textAnchor="middle"
-              >
-                ▼
-              </SvgText>
+              {/* Mũi tên Down chạm khắc */}
+              <Path
+                d="M 210 253 L 205 246 L 215 246 Z"
+                fill={isDown ? '#FFFFFF' : '#8EA0B5'}
+              />
             </G>
 
             {/* D-Pad Left */}
             <G onPress={() => onButtonPress?.('D-Pad Left')}>
-              <Rect
-                x="180"
-                y="215"
-                width="20"
-                height="20"
-                rx="3"
-                fill={isLeft ? colorActive : '#1E2838'}
+              <Path
+                d="M 205 215 L 181 215 C 178 215, 176 218, 176 221 L 176 229 C 176 232, 178 235, 181 235 L 205 235 Z"
+                fill={isLeft ? colorActive : '#202A38'}
                 stroke={isLeft ? '#FFFFFF' : '#33445C'}
-                strokeWidth={isLeft ? 2 : 1}
+                strokeWidth={isLeft ? 2 : 1.2}
               />
-              <SvgText
-                x="190"
-                y="229"
-                fill={isLeft ? '#FFFFFF' : '#A0B2C6'}
-                fontSize="11"
-                fontWeight="bold"
-                textAnchor="middle"
-              >
-                ◀
-              </SvgText>
+              {/* Mũi tên Left chạm khắc */}
+              <Path
+                d="M 182 225 L 189 220 L 189 230 Z"
+                fill={isLeft ? '#FFFFFF' : '#8EA0B5'}
+              />
             </G>
 
             {/* D-Pad Right */}
             <G onPress={() => onButtonPress?.('D-Pad Right')}>
-              <Rect
-                x="220"
-                y="215"
-                width="20"
-                height="20"
-                rx="3"
-                fill={isRight ? colorActive : '#1E2838'}
+              <Path
+                d="M 215 215 L 239 215 C 242 215, 244 218, 244 221 L 244 229 C 244 232, 242 235, 239 235 L 215 235 Z"
+                fill={isRight ? colorActive : '#202A38'}
                 stroke={isRight ? '#FFFFFF' : '#33445C'}
-                strokeWidth={isRight ? 2 : 1}
+                strokeWidth={isRight ? 2 : 1.2}
               />
-              <SvgText
-                x="230"
-                y="229"
-                fill={isRight ? '#FFFFFF' : '#A0B2C6'}
-                fontSize="11"
-                fontWeight="bold"
-                textAnchor="middle"
-              >
-                ▶
-              </SvgText>
+              {/* Mũi tên Right chạm khắc */}
+              <Path
+                d="M 238 225 L 231 220 L 231 230 Z"
+                fill={isRight ? '#FFFFFF' : '#8EA0B5'}
+              />
             </G>
 
-            {/* Tâm rốn giữa D-Pad */}
-            <Circle cx="210" cy="225" r="5" fill="#141B26" stroke="#25344A" strokeWidth="1" />
+            {/* Tâm pivot lõm chữ thập D-Pad */}
+            <Circle cx="210" cy="225" r="7" fill="#141C27" stroke="#2B394E" strokeWidth="1.5" />
           </G>
 
-          {/* 6. CẦN GẠT PHẢI (Right Thumbstick / R3) */}
+          {/* ============================================================== */}
+          {/* LỚP 6: CẦN GẠT ANALOG PHẢI 3D (Right Stick / R3)              */}
+          {/* ============================================================== */}
           <G onPress={() => onButtonPress?.('R3')}>
-            {/* Đế hốc cần gạt */}
-            <Circle cx="330" cy="225" r="38" fill="#0C1017" stroke={colorBorder} strokeWidth="2" />
-            {/* Vòng ngưỡng vùng chết (Deadzone indicator) */}
+            {/* Hốc cầu lõm sâu trong vỏ */}
+            <Circle cx="330" cy="225" r="39" fill="url(#stickWellGrad)" stroke="url(#chromeRing)" strokeWidth="2.5" />
+            <Circle cx="330" cy="225" r="37.5" fill="none" stroke="#05080C" strokeWidth="1.5" />
+
+            {/* Vòng ngưỡng vùng chết */}
             <Circle
               cx="330"
               cy="225"
-              r={38 * rightDeadzone}
+              r={39 * rightDeadzone}
               fill="none"
-              stroke="rgba(255, 150, 0, 0.45)"
-              strokeWidth="1"
-              strokeDasharray="2,2"
+              stroke="rgba(245, 158, 11, 0.45)"
+              strokeWidth="1.2"
+              strokeDasharray="3,3"
             />
-            {/* Trục chữ thập */}
-            <Path d="M 330 195 L 330 255 M 300 225 L 360 225" stroke="#1A2433" strokeWidth="1" />
-            {/* Mũ cần gạt di chuyển theo thời gian thực */}
-            <Circle
-              cx={330 + rStickDx}
-              cy={225 + rStickDy}
-              r="24"
-              fill={isR3 ? colorActive : '#222C3D'}
-              stroke={isR3 ? '#FFFFFF' : '#3D4F6B'}
-              strokeWidth={isR3 ? 2.5 : 2}
+
+            {/* Đổ bóng 3D của trụ cần gạt di chuyển theo chiều ngược lại */}
+            <Ellipse
+              cx={330 - rStickDx * 0.3}
+              cy={227 - rStickDy * 0.3}
+              rx="24"
+              ry="21"
+              fill="#000000"
+              opacity={0.65}
             />
-            {/* Lõm tâm */}
-            <Circle
-              cx={330 + rStickDx}
-              cy={225 + rStickDy}
-              r="17"
-              fill={isR3 ? '#0062CC' : '#171E2B'}
-              stroke="#2E3C52"
-              strokeWidth="1.5"
-            />
-            {/* Chấm tâm */}
-            <Circle
-              cx={330 + rStickDx}
-              cy={225 + rStickDy}
-              r="4"
-              fill={isR3 ? '#FFFFFF' : colorActive}
-            />
-            <SvgText
-              x={330 + rStickDx}
-              y={228 + rStickDy + 11}
-              fill={isR3 ? '#FFFFFF' : '#738BAE'}
-              fontSize="7.5"
-              fontWeight="bold"
-              textAnchor="middle"
-            >
-              R3
-            </SvgText>
+
+            {/* Mũ cần gạt (Thumbstick Cap) di chuyển theo thời gian thực */}
+            <G transform={`translate(${rStickDx}, ${rStickDy}) scale(${isR3 ? 0.94 : 1})`} origin="330, 225">
+              {/* Vành cao su ngoài */}
+              <Circle
+                cx="330"
+                cy="225"
+                r="24"
+                fill={isR3 ? colorActive : 'url(#stickCapGrad)'}
+                stroke={isR3 ? '#FFFFFF' : '#3C4B61'}
+                strokeWidth={isR3 ? 2.5 : 2}
+              />
+              {/* Vòng gai nhám */}
+              <Circle
+                cx="330"
+                cy="225"
+                r="21.5"
+                fill="none"
+                stroke={isR3 ? '#93C5FD' : '#2C384B'}
+                strokeWidth="1.5"
+                strokeDasharray="2,3"
+              />
+
+              {/* 4 rãnh định hướng bám tay */}
+              <Rect x="328.5" y="202.5" width="3" height="3" rx="1" fill="#4B5E78" />
+              <Rect x="328.5" y="244.5" width="3" height="3" rx="1" fill="#4B5E78" />
+              <Rect x="307.5" y="223.5" width="3" height="3" rx="1" fill="#4B5E78" />
+              <Rect x="349.5" y="223.5" width="3" height="3" rx="1" fill="#4B5E78" />
+
+              {/* Lòng bát lõm ngón tay cái */}
+              <Circle
+                cx="330"
+                cy="225"
+                r="16.5"
+                fill={isR3 ? '#005BBB' : 'url(#stickCupGrad)'}
+                stroke="#1B2433"
+                strokeWidth="1.5"
+              />
+
+              {/* Vệt sáng cong vát 3D */}
+              <Path
+                d="M 319 219 C 323 213, 337 213, 341 219"
+                stroke="rgba(255, 255, 255, 0.45)"
+                strokeWidth="1.8"
+                fill="none"
+                strokeLinecap="round"
+              />
+
+              {/* Chấm tâm & Nhãn R3 */}
+              <Circle cx="330" cy="224" r="3.5" fill={isR3 ? '#FFFFFF' : colorActive} />
+              <SvgText
+                x="330"
+                y="237"
+                fill={isR3 ? '#FFFFFF' : '#889BB5'}
+                fontSize="7.5"
+                fontWeight="bold"
+                textAnchor="middle"
+              >
+                R3
+              </SvgText>
+            </G>
           </G>
 
-          {/* 7. BỐN NÚT MẶT CHÍNH (Face Buttons: A, B, X, Y) */}
+          {/* ============================================================== */}
+          {/* LỚP 7: CỤM NÚT BẤM 3D PHA LÊ (Face Buttons: A, B, X, Y)        */}
+          {/* ============================================================== */}
           <G>
-            {/* Nền lõm hình kim cương */}
-            <Circle cx="380" cy="145" r="42" fill="#0D121B" stroke={colorBorder} strokeWidth="1.5" />
+            {/* Đĩa đệm hốc cụm nút kim cương */}
+            <Circle cx="380" cy="145" r="44" fill="#0C1118" stroke="#1D2635" strokeWidth="1.8" />
 
-            {/* NÚT Y (Trên) */}
-            <G onPress={() => onButtonPress?.('Y')}>
+            {/* NÚT Y (TRÊN) */}
+            <G
+              onPress={() => onButtonPress?.('Y')}
+              transform={`scale(${isY ? 0.92 : 1})`}
+              origin="380, 114"
+            >
               <Circle
                 cx="380"
                 cy="114"
-                r="13.5"
-                fill={isY ? faceColors.top : '#1A2330'}
-                stroke={isY ? '#FFFFFF' : '#33445C'}
-                strokeWidth={isY ? 2.5 : 1.2}
+                r="14"
+                fill={isY ? faceColors.top : 'url(#btnGemBase)'}
+                stroke={isY ? '#FFFFFF' : '#3E506B'}
+                strokeWidth={isY ? 2.5 : 1.5}
+              />
+              {/* Vệt bóng kính phản quang 3D */}
+              <Path
+                d="M 373 108 C 376 104, 384 104, 387 108"
+                stroke={isY ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)'}
+                strokeWidth="1.6"
+                fill="none"
+                strokeLinecap="round"
               />
               <SvgText
                 x="380"
                 y="119"
                 fill={isY ? '#000000' : faceColors.top}
                 fontSize="12.5"
-                fontWeight="bold"
+                fontWeight="900"
                 textAnchor="middle"
               >
                 {faceLabels.top}
               </SvgText>
             </G>
 
-            {/* NÚT A (Dưới) */}
-            <G onPress={() => onButtonPress?.('A')}>
+            {/* NÚT A (DƯỚI) */}
+            <G
+              onPress={() => onButtonPress?.('A')}
+              transform={`scale(${isA ? 0.92 : 1})`}
+              origin="380, 176"
+            >
               <Circle
                 cx="380"
                 cy="176"
-                r="13.5"
-                fill={isA ? faceColors.bottom : '#1A2330'}
-                stroke={isA ? '#FFFFFF' : '#33445C'}
-                strokeWidth={isA ? 2.5 : 1.2}
+                r="14"
+                fill={isA ? faceColors.bottom : 'url(#btnGemBase)'}
+                stroke={isA ? '#FFFFFF' : '#3E506B'}
+                strokeWidth={isA ? 2.5 : 1.5}
+              />
+              {/* Vệt bóng kính phản quang 3D */}
+              <Path
+                d="M 373 170 C 376 166, 384 166, 387 170"
+                stroke={isA ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)'}
+                strokeWidth="1.6"
+                fill="none"
+                strokeLinecap="round"
               />
               <SvgText
                 x="380"
                 y="181"
                 fill={isA ? '#000000' : faceColors.bottom}
                 fontSize="12.5"
-                fontWeight="bold"
+                fontWeight="900"
                 textAnchor="middle"
               >
                 {faceLabels.bottom}
               </SvgText>
             </G>
 
-            {/* NÚT X (Trái) */}
-            <G onPress={() => onButtonPress?.('X')}>
+            {/* NÚT X (TRÁI) */}
+            <G
+              onPress={() => onButtonPress?.('X')}
+              transform={`scale(${isX ? 0.92 : 1})`}
+              origin="349, 145"
+            >
               <Circle
                 cx="349"
                 cy="145"
-                r="13.5"
-                fill={isX ? faceColors.left : '#1A2330'}
-                stroke={isX ? '#FFFFFF' : '#33445C'}
-                strokeWidth={isX ? 2.5 : 1.2}
+                r="14"
+                fill={isX ? faceColors.left : 'url(#btnGemBase)'}
+                stroke={isX ? '#FFFFFF' : '#3E506B'}
+                strokeWidth={isX ? 2.5 : 1.5}
+              />
+              {/* Vệt bóng kính phản quang 3D */}
+              <Path
+                d="M 342 139 C 345 135, 353 135, 356 139"
+                stroke={isX ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)'}
+                strokeWidth="1.6"
+                fill="none"
+                strokeLinecap="round"
               />
               <SvgText
                 x="349"
                 y="150"
                 fill={isX ? '#000000' : faceColors.left}
                 fontSize="12.5"
-                fontWeight="bold"
+                fontWeight="900"
                 textAnchor="middle"
               >
                 {faceLabels.left}
               </SvgText>
             </G>
 
-            {/* NÚT B (Phải) */}
-            <G onPress={() => onButtonPress?.('B')}>
+            {/* NÚT B (PHẢI) */}
+            <G
+              onPress={() => onButtonPress?.('B')}
+              transform={`scale(${isB ? 0.92 : 1})`}
+              origin="411, 145"
+            >
               <Circle
                 cx="411"
                 cy="145"
-                r="13.5"
-                fill={isB ? faceColors.right : '#1A2330'}
-                stroke={isB ? '#FFFFFF' : '#33445C'}
-                strokeWidth={isB ? 2.5 : 1.2}
+                r="14"
+                fill={isB ? faceColors.right : 'url(#btnGemBase)'}
+                stroke={isB ? '#FFFFFF' : '#3E506B'}
+                strokeWidth={isB ? 2.5 : 1.5}
+              />
+              {/* Vệt bóng kính phản quang 3D */}
+              <Path
+                d="M 404 139 C 407 135, 415 135, 418 139"
+                stroke={isB ? '#FFFFFF' : 'rgba(255, 255, 255, 0.45)'}
+                strokeWidth="1.6"
+                fill="none"
+                strokeLinecap="round"
               />
               <SvgText
                 x="411"
                 y="150"
                 fill={isB ? '#000000' : faceColors.right}
                 fontSize="12.5"
-                fontWeight="bold"
+                fontWeight="900"
                 textAnchor="middle"
               >
                 {faceLabels.right}
@@ -581,52 +922,52 @@ export function Gamepad2DVisualizer({
             </G>
           </G>
 
-          {/* 8. NÚT ĐIỀU KHIỂN TRUNG TÂM (Guide, Back, Start) */}
-          {/* NÚT GUIDE / HOME Ở GIỮA */}
+          {/* ============================================================== */}
+          {/* LỚP 8: CỤM ĐIỀU KHIỂN TRUNG TÂM & NÚT NEXUS PHÁT SÁNG          */}
+          {/* ============================================================== */}
+          {/* NÚT GUIDE / HOME PHÁT QUANG ĐỈNH CAO */}
           <G onPress={() => onButtonPress?.('Guide')}>
-            <Circle
-              cx="270"
-              cy="115"
-              r="17"
-              fill="#101721"
-              stroke={colorBorder}
-              strokeWidth="2"
-            />
-            <Circle
-              cx="270"
-              cy="115"
-              r="13"
-              fill="#182333"
-              stroke="#344863"
-              strokeWidth="1.2"
-            />
-            {/* Logo tay cầm / Xbox ở giữa */}
+            {/* Quầng sáng Neon tỏa ra xung quanh */}
+            <Circle cx="270" cy="112" r="23" fill="url(#nexusGlow)" />
+            {/* Vành viền kim loại Chrome */}
+            <Circle cx="270" cy="112" r="16" fill="#131B26" stroke="url(#chromeRing)" strokeWidth="2" />
+            <Circle cx="270" cy="112" r="13" fill="#1A2433" stroke="#2B3A4F" strokeWidth="1" />
+
+            {/* Biểu tượng Nexus tỏa sáng */}
             <Path
-              d="M 264 110 C 266 114, 274 114, 276 110 M 262 119 C 267 114, 273 114, 278 119"
-              stroke={colorActive}
-              strokeWidth="2"
+              d="M 263 107 C 266 111, 274 111, 277 107 M 261 116 C 266 111, 274 111, 279 116"
+              stroke={colorActiveGlow}
+              strokeWidth="2.2"
               fill="none"
               strokeLinecap="round"
             />
           </G>
 
+          {/* DẢI 4 ĐÈN LED CHỈ THỊ NGƯỜI CHƠI (Player Indicator LEDs) */}
+          <G>
+            <Rect x="259" y="132" width="4" height="2.5" rx="1" fill="#38BDF8" />
+            <Rect x="265" y="132" width="4" height="2.5" rx="1" fill="#1E2A3A" />
+            <Rect x="271" y="132" width="4" height="2.5" rx="1" fill="#1E2A3A" />
+            <Rect x="277" y="132" width="4" height="2.5" rx="1" fill="#1E2A3A" />
+          </G>
+
           {/* NÚT BACK / VIEW / SELECT */}
           <G onPress={() => onButtonPress?.('Back')}>
             <Rect
-              x="226"
+              x="225"
               y="136"
-              width="22"
-              height="14"
-              rx="4"
-              fill={isBack ? colorActive : '#1B2433'}
-              stroke={isBack ? '#FFFFFF' : '#344863'}
-              strokeWidth={isBack ? 2 : 1}
+              width="23"
+              height="15"
+              rx="5"
+              fill={isBack ? colorActive : '#1E2838'}
+              stroke={isBack ? '#FFFFFF' : '#394A61'}
+              strokeWidth={isBack ? 2 : 1.2}
             />
             <SvgText
-              x="237"
-              y="147"
-              fill={isBack ? '#FFFFFF' : '#8E9EB5'}
-              fontSize="8.5"
+              x="236.5"
+              y="147.5"
+              fill={isBack ? '#FFFFFF' : '#94A3B8'}
+              fontSize="9"
               fontWeight="bold"
               textAnchor="middle"
             >
@@ -639,18 +980,18 @@ export function Gamepad2DVisualizer({
             <Rect
               x="292"
               y="136"
-              width="22"
-              height="14"
-              rx="4"
-              fill={isStart ? colorActive : '#1B2433'}
-              stroke={isStart ? '#FFFFFF' : '#344863'}
-              strokeWidth={isStart ? 2 : 1}
+              width="23"
+              height="15"
+              rx="5"
+              fill={isStart ? colorActive : '#1E2838'}
+              stroke={isStart ? '#FFFFFF' : '#394A61'}
+              strokeWidth={isStart ? 2 : 1.2}
             />
             <SvgText
-              x="303"
-              y="147"
-              fill={isStart ? '#FFFFFF' : '#8E9EB5'}
-              fontSize="8.5"
+              x="303.5"
+              y="147.5"
+              fill={isStart ? '#FFFFFF' : '#94A3B8'}
+              fontSize="9"
               fontWeight="bold"
               textAnchor="middle"
             >
@@ -658,68 +999,77 @@ export function Gamepad2DVisualizer({
             </SvgText>
           </G>
 
-          {/* 9. CHÚ THÍCH DẠNG CALLOUT CHỈ VÀO THIẾT BỊ (THEO HÌNH MẪU ẢNH 2) */}
+          {/* ============================================================== */}
+          {/* LỚP 9: CHÚ THÍCH DẠNG CALLOUT CHỈ VÀO THIẾT BỊ                 */}
+          {/* ============================================================== */}
           {showCallouts && (
-            <G opacity={0.92}>
-              {/* Callout Cần trái */}
-              <Path d="M 60 145 L 122 145" stroke={colorCalloutLine} strokeWidth="1" />
-              <Circle cx="122" cy="145" r="2.5" fill={colorCalloutText} />
-              <SvgText x="55" y="148" fill={colorCalloutText} fontSize="9" textAnchor="end">
+            <G opacity={0.95}>
+              {/* Callout Cần trái L3 */}
+              <Path d="M 50 145 L 120 145" stroke={colorCalloutLine} strokeWidth="1.2" />
+              <Circle cx="120" cy="145" r="2.5" fill={colorCalloutText} />
+              <SvgText x="44" y="148" fill={colorCalloutText} fontSize="9.5" fontWeight="600" textAnchor="end">
                 Cần trái / L3
               </SvgText>
 
               {/* Callout D-Pad */}
-              <Path d="M 75 225 L 175 225" stroke={colorCalloutLine} strokeWidth="1" />
-              <Circle cx="175" cy="225" r="2.5" fill={colorCalloutText} />
-              <SvgText x="70" y="228" fill={colorCalloutText} fontSize="9" textAnchor="end">
+              <Path d="M 65 225 L 174 225" stroke={colorCalloutLine} strokeWidth="1.2" />
+              <Circle cx="174" cy="225" r="2.5" fill={colorCalloutText} />
+              <SvgText x="59" y="228" fill={colorCalloutText} fontSize="9.5" fontWeight="600" textAnchor="end">
                 D-Pad
               </SvgText>
 
               {/* Callout Cò trái LT */}
-              <Path d="M 85 30 L 120 30 L 135 40" stroke={colorCalloutLine} strokeWidth="1" fill="none" />
-              <Circle cx="135" cy="40" r="2.5" fill={colorCalloutText} />
-              <SvgText x="80" y="33" fill={colorCalloutText} fontSize="9" textAnchor="end">
+              <Path d="M 85 28 L 122 28 L 138 38" stroke={colorCalloutLine} strokeWidth="1.2" fill="none" />
+              <Circle cx="138" cy="38" r="2.5" fill={colorCalloutText} />
+              <SvgText x="80" y="31" fill={colorCalloutText} fontSize="9.5" fontWeight="600" textAnchor="end">
                 Cò trái (LT)
               </SvgText>
 
               {/* Callout Cò phải RT */}
-              <Path d="M 455 30 L 420 30 L 405 40" stroke={colorCalloutLine} strokeWidth="1" fill="none" />
-              <Circle cx="405" cy="40" r="2.5" fill={colorCalloutText} />
-              <SvgText x="460" y="33" fill={colorCalloutText} fontSize="9" textAnchor="start">
+              <Path d="M 455 28 L 418 28 L 402 38" stroke={colorCalloutLine} strokeWidth="1.2" fill="none" />
+              <Circle cx="402" cy="38" r="2.5" fill={colorCalloutText} />
+              <SvgText x="460" y="31" fill={colorCalloutText} fontSize="9.5" fontWeight="600" textAnchor="start">
                 Cò phải (RT)
               </SvgText>
 
-              {/* Callout Cụm nút A/B/X/Y */}
-              <Path d="M 480 145 L 425 145" stroke={colorCalloutLine} strokeWidth="1" />
-              <Circle cx="425" cy="145" r="2.5" fill={colorCalloutText} />
-              <SvgText x="485" y="148" fill={colorCalloutText} fontSize="9" textAnchor="start">
+              {/* Callout Cụm nút hành động */}
+              <Path d="M 482 145 L 426 145" stroke={colorCalloutLine} strokeWidth="1.2" />
+              <Circle cx="426" cy="145" r="2.5" fill={colorCalloutText} />
+              <SvgText x="488" y="148" fill={colorCalloutText} fontSize="9.5" fontWeight="600" textAnchor="start">
                 Nút hành động
               </SvgText>
 
-              {/* Callout Cần phải */}
-              <Path d="M 465 225 L 368 225" stroke={colorCalloutLine} strokeWidth="1" />
-              <Circle cx="368" cy="225" r="2.5" fill={colorCalloutText} />
-              <SvgText x="470" y="228" fill={colorCalloutText} fontSize="9" textAnchor="start">
+              {/* Callout Cần phải R3 */}
+              <Path d="M 468 225 L 370 225" stroke={colorCalloutLine} strokeWidth="1.2" />
+              <Circle cx="370" cy="225" r="2.5" fill={colorCalloutText} />
+              <SvgText x="474" y="228" fill={colorCalloutText} fontSize="9.5" fontWeight="600" textAnchor="start">
                 Cần phải / R3
               </SvgText>
             </G>
           )}
         </Svg>
       </View>
-
     </View>
   );
 }
 
+// Xuất thêm alias Gamepad3DVisualizer
+export { Gamepad2DVisualizer as Gamepad3DVisualizer };
+
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#0A0E14',
-    borderRadius: 12,
+    backgroundColor: '#070A10',
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#1D2736',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
     overflow: 'hidden',
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
   },
   svgWrapper: {
     width: '100%',

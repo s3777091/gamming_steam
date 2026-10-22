@@ -6,13 +6,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Check } from 'lucide-react-native';
 
 import { playUiSound } from '@/features/sound/UiSoundProvider';
-import { useTheme, useThemeControl, type Theme, type ThemeId, type ThemeTransitionOrigin } from '@/theme';
+import { useThemeControl, type Theme, type ThemeId, type ThemeTransitionOrigin } from '@/theme';
 import { Press } from '@/ui/Press';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
 import { rowStyle, SettingsGroup, ToggleRow } from './controls';
 import { AppearancePreview } from './AppearancePreview';
+import { useSettingsColors } from './SettingsSurface';
 
 /** Ô xem trước: nền, dải màu chính và chấm màu nhấn của theme. */
 const ThemeSwatch = forwardRef<View, { theme: Theme }>(function ThemeSwatch({ theme }, ref) {
@@ -74,7 +75,7 @@ function ThemeRow({
   active: boolean;
   onSelect: (id: ThemeId, origin?: ThemeTransitionOrigin) => void;
 }) {
-  const { settings: appleColors } = useTheme();
+  const appleColors = useSettingsColors();
   const { s } = useUi();
   const swatch = useRef<View>(null);
 

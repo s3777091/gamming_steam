@@ -6,7 +6,7 @@
 
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Network from 'expo-network';
-import { useRouter } from 'expo-router';
+import { useIsFocused, useRouter } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { RTCView } from 'react-native-webrtc';
@@ -15,6 +15,7 @@ import { addListener, grabFrame } from 'jetsona-input';
 
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useSignedInUser } from '@/features/auth';
+import { useMappingRuntime } from '@/features/key-mapping/useMappingRuntime';
 import { useBack } from '@/features/gamepad/hooks';
 import { readPendingGameLaunch, type PendingGameLaunch } from '@/lib/game-launch';
 import { PC_ROUTES, pcFetch, pcPostJson } from '@/lib/pc-api';
@@ -44,6 +45,7 @@ import { useGameLaunchGate } from './useGameLaunchGate';
 import { createRumbleHandler, useInputBridge } from './useInputBridge';
 import { useStreamSession } from './useStreamSession';
 import { useWatchPartyHost } from './useWatchPartyHost';
+import { notifyVirtualKeyboardCursorTap, useVirtualKeyboardState, VirtualKeyboard } from './VirtualKeyboard';
 
 export default function StreamScreen() {
   const styles = useStyles();
@@ -94,6 +96,8 @@ export default function StreamScreen() {
     streamSettings, hostDisplay, loadingThemeId, client, clientRef, sessionId, inputSettingsRef, rumbleRef, persistSettings,
   } = session;
   const live = phase === 'live';
+  const focused = useIsFocused();
+  const [mappingGameId, setMappingGameId] = useState<string | null>(launch?.gameId ?? resume?.gameId ?? null);
   const gate = useGameLaunchGate(launch, live);
   const covering = live && gate.covering;
 
@@ -257,11 +261,22 @@ export default function StreamScreen() {
     }
   }, [exit, flashHint, persistHud, pullClipboard, reload, streamSettings?.hud_enabled]);
 
+  // Bàn phím ảo đang bung: tay cầm dùng để gõ, game trên PC tạm không nhận tay cầm.
+  // Thu gọn bàn phím thì tay cầm quay về game.
+  const keyboard = useVirtualKeyboardState();
+  const keyboardHoldsPad = live && !guideOpen && !covering && keyboard.open && !keyboard.minimized;
+
+  const mapping = useMappingRuntime({
+    client, ready: live && inputReady, paused: guideOpen || !focused || covering || keyboardHoldsPad,
+    gameId: mappingGameId, geometry: videoSize, onNotice: flashHint,
+  });
   const bridge = useInputBridge({
     client, inputReady, live,
     settingsRef: inputSettingsRef,
-    guideOpen,
-    onGuide: () => { if (guideOpen) closeGuide(); else openGuide(); },
+    guideOpen: guideOpen || !focused,
+    padHeld: keyboardHoldsPad,
+    mapping: mapping.engine,
+    onGuide: () => { if (focused) { if (guideOpen) closeGuide(); else openGuide(); } },
     onShortcut,
   });
   useLayoutEffect(() => {
@@ -273,12 +288,14 @@ export default function StreamScreen() {
   const [touchpad] = useState(() => new StreamTouchpad());
   useLayoutEffect(() => {
     touchpad.update({
-      live, videoSize, stage,
+      live: live && !guideOpen && focused, videoSize, stage,
       allowStretch: hostDisplay?.displayMode !== 'virtual',
       getClient: () => clientRef.current,
       getSettings: () => inputSettingsRef.current,
+      onManualInput: () => mapping.engine.cancel(),
+      onTouchPoint: (pt) => notifyVirtualKeyboardCursorTap(pt.y, stage.height),
     });
-  }, [clientRef, hostDisplay?.displayMode, inputSettingsRef, live, stage, touchpad, videoSize]);
+  }, [clientRef, focused, guideOpen, hostDisplay?.displayMode, inputSettingsRef, live, mapping.engine, stage, touchpad, videoSize]);
   useEffect(() => () => touchpad.release(), [touchpad]);
 
   const stretch = useMemo(() => hostDisplay?.displayMode === 'virtual'
@@ -373,13 +390,20 @@ export default function StreamScreen() {
       <StreamTelemetry client={client} enabled={live} />
       <StreamHud enabled={live && !covering && Boolean(streamSettings?.hud_enabled)} top={s(8) + Math.min(insets.top, 8)} left={insets.left + s(12)} />
 
+      {live && !guideOpen && !covering ? (
+        <VirtualKeyboard client={inputReady ? client : null} />
+      ) : null}
+
       <GuideMenu
-        open={live && guideOpen}
+        open={live && guideOpen && focused}
+        retainFrame={guideOpen}
         profile={controller}
         hasFrame={hasFrame}
         status={guideStatus}
         watchParty={watchParty}
         launch={launch}
+        mapping={mapping}
+        onRunningGameChange={setMappingGameId}
         onClose={() => closeGuide(true)}
         onHome={() => { closeGuide(false); exit(); }}
         onReload={reload}
@@ -424,4 +448,3 @@ const useStyles = makeStyles(({ glass }) => ({
     ...glassShadowSubtle,
   },
 }));
-
