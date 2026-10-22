@@ -5,6 +5,9 @@
 // Thiết bị và Tài khoản bung popover kiểu Apple ngay trên nút.
 //
 // Tay cầm điều khiển menu này bằng D-pad / A / B, cảm ứng / chuột dùng trực tiếp.
+// Dock và nút đóng góc trên dùng chỉ mục riêng (trái/phải trên dock, lên tới nút
+// đóng). Popover, ảnh chụp và hộp xác nhận là lớp tiêu điểm riêng (FocusLayer):
+// khi chúng mở, D-pad / A đi qua hệ tiêu điểm chung tới đúng các nút bên trong.
 
 import * as Clipboard from 'expo-clipboard';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -36,7 +39,7 @@ import { addListener, exportFrame, releaseFrame } from 'jetsona-input';
 
 import { useInputDevices } from '@/features/devices/useInputDevices';
 import { formatClock } from '@/features/library/format';
-import type { Direction } from '@/features/gamepad/focus';
+import { activateFocus, deactivateFocus, ensureFocusActive, FocusLayer, moveFocus, type Direction } from '@/features/gamepad/focus';
 import { navDirection, REPEAT_DELAY_MS, REPEAT_INTERVAL_MS } from '@/features/gamepad/navigation';
 import { useNotifications } from '@/features/library/useNotifications';
 import { playUiSound } from '@/features/sound/UiSoundProvider';
@@ -55,6 +58,7 @@ import { Press } from '@/ui/Press';
 import { MenuGlassBackdrop } from '@/ui/GlassMaterial';
 import { MENU_MOTION, useMenuGlass, menuGlassFrom } from '@/ui/menuGlass';
 import { useMotion } from '@/ui/motion';
+import { PanelIconButton } from '@/ui/PanelHeader';
 import { useUi } from '@/ui/scale';
 import { T } from '@/ui/Text';
 
@@ -130,7 +134,7 @@ export function GuideMenu({
   const MENU_GLASS = useMenuGlass();
   const { colors } = useTheme();
   const styles = useStyles();
-  const { s, insets } = useUi();
+  const { s, insets, width: screenWidth, height: screenHeight } = useUi();
   const { reduceMotion } = useMotion();
   const fade = useMemo(() => new Animated.Value(0), []);
   const { devices } = useInputDevices();
@@ -144,9 +148,13 @@ export function GuideMenu({
   const [guideFrame, setGuideFrame] = useState<{ open: boolean; uri: string | null }>({ open, uri: null });
   const [confirmExit, setConfirmExit] = useState(false);
   const [timeStr, setTimeStr] = useState(() => formatClock(new Date()));
+  // Tay cầm đang đứng ở nút đóng góc trên phải thay vì trên dock.
+  const [closeFocused, setCloseFocused] = useState(false);
+  const [mappingReload, setMappingReload] = useState(0);
   // A frame belongs to one opening; release its URI before the next opening paints.
   if (guideFrame.open !== open) {
     setGuideFrame({ open, uri: null });
+    setCloseFocused(false);
     if (open) setTimeStr(formatClock(new Date()));
   }
   const guideBackdrop = open && hasFrame && guideFrame.open === open ? guideFrame.uri : null;
@@ -422,6 +430,7 @@ export function GuideMenu({
 
   const onSelectDockAction = useCallback((action: DockAction, index: number) => {
     setDockFocus(index);
+    setCloseFocused(false);
     if (action.popover) {
       openPopover(action.popover);
       return;
@@ -433,6 +442,7 @@ export function GuideMenu({
   // Điều khiển bằng tay cầm (D-pad & nút bấm A/B)
   const stateRef = useRef({
     dockFocus,
+    closeFocused,
     dockActions,
     confirmExit,
     shot,
@@ -440,13 +450,11 @@ export function GuideMenu({
     closePopover,
     onSelectDockAction,
     onClose,
-    exitGame,
-    toggleStreaming,
-    takeScreenshot,
   });
   useEffect(() => {
     stateRef.current = {
       dockFocus,
+      closeFocused,
       dockActions,
       confirmExit,
       shot,
@@ -454,22 +462,27 @@ export function GuideMenu({
       closePopover,
       onSelectDockAction,
       onClose: handleClose,
-      exitGame,
-      toggleStreaming,
-      takeScreenshot,
     };
   });
 
+  // Tiêu điểm chung chỉ sống trong lúc menu mở: đóng menu thì ẩn nó, để lúc chơi
+  // không còn viền chọn nào hiện trên các nút của màn stream bên dưới.
   useEffect(() => {
     if (!open) return;
-    playUiSound('transition');
+    return () => deactivateFocus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     return addListener('onGamepadButton', (event) => {
       if (!event.down) return;
       const current = stateRef.current;
-      if (current.popover?.id === 'mapping') return;
+      const overlay = Boolean(current.shot || current.confirmExit || current.popover);
 
       // Nút B: Quay lại / Đóng menu
       if (event.button === 'b') {
+        // Panel Thiết lập nút tự lùi từ profile đang bật về danh sách rồi mới đóng.
+        if (current.popover?.id === 'mapping') return;
         playUiSound('back');
         if (current.shot) setShot(null);
         else if (current.confirmExit) setConfirmExit(false);
@@ -477,21 +490,23 @@ export function GuideMenu({
         else current.onClose();
         return;
       }
+      if (event.button !== 'a') return;
 
-      // Xác nhận thoát game
-      if (current.confirmExit) {
-        if (event.button === 'a') {
-          playUiSound('confirm');
-          current.exitGame();
-        }
+      // Popover / ảnh chụp / hộp xác nhận đang mở: A bấm nút đang chọn bên trong.
+      if (overlay) {
+        activateFocus();
         return;
       }
-
-      if (event.button === 'a') {
-        playUiSound('select');
-        const act = current.dockActions[current.dockFocus];
-        if (act) current.onSelectDockAction(act, current.dockFocus);
+      if (current.closeFocused) {
+        playUiSound('back');
+        current.onClose();
+        return;
       }
+      // Lớp vừa mở bằng tay cầm hiện tiêu điểm ngay trên nút mặc định của nó.
+      ensureFocusActive();
+      playUiSound('select');
+      const act = current.dockActions[current.dockFocus];
+      if (act) current.onSelectDockAction(act, current.dockFocus);
     });
   }, [open]);
 
@@ -505,15 +520,30 @@ export function GuideMenu({
 
     const step = (direction: Direction) => {
       const current = stateRef.current;
-      if (current.popover?.id === 'mapping' || current.confirmExit) return;
+      if (current.shot || current.confirmExit || current.popover) {
+        moveFocus(direction);
+        return;
+      }
+      // stateRef chỉ cập nhật sau render; ghi ngay để nhịp lặp kế tiếp đi tiếp từ ô mới.
+      if (current.closeFocused) {
+        if (direction !== 'down') return;
+        playUiSound('navigate');
+        current.closeFocused = false;
+        setCloseFocused(false);
+        return;
+      }
+      if (direction === 'up') {
+        playUiSound('navigate');
+        current.closeFocused = true;
+        setCloseFocused(true);
+        return;
+      }
       if (direction !== 'left' && direction !== 'right') return;
       const next = Math.min(current.dockActions.length - 1, Math.max(0, current.dockFocus + (direction === 'left' ? -1 : 1)));
       if (next === current.dockFocus) return;
       playUiSound('navigate');
-      // stateRef chỉ cập nhật sau render; ghi ngay để nhịp lặp kế tiếp đi tiếp từ ô mới.
       current.dockFocus = next;
       setDockFocus(next);
-      current.closePopover();
     };
     const hold = (next: Direction | null) => {
       if (next === held) return;
@@ -550,10 +580,16 @@ export function GuideMenu({
 
   if (!open) return null;
 
-  const focusedAction = dockActions[dockFocus];
+  const focusedAction = closeFocused ? null : dockActions[dockFocus];
+  // Ảnh chụp chính là khung hình đã giữ lúc mở menu: xem trước bằng bản 960px đã có
+  // sẵn làm nền. Data URI PNG 1920px quá nặng, expo-image vẽ ra khung đen.
+  const shotPreview = shot ? (guideBackdrop ?? `data:image/png;base64,${shot}`) : null;
+  const shotAspect = screenWidth / Math.max(1, screenHeight);
+  const shotHeight = Math.max(s(120), Math.min(screenHeight - insets.top - insets.bottom - s(150), (screenWidth - insets.left - insets.right - s(140)) / shotAspect));
 
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.root, { opacity: fade }]} accessibilityViewIsModal>
+      <FocusLayer>
       {guideBackdrop ? <Img source={guideBackdrop} style={StyleSheet.absoluteFill} contentFit="cover"
         blurRadius={s(14)} cachePolicy="none" transition={reduceMotion ? 0 : 120} accessible={false} /> : null}
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: MENU_GLASS.scrim }]} />
@@ -568,14 +604,19 @@ export function GuideMenu({
       {/* 1. GÓC TRÊN PHẢI: Nút đóng */}
       <View style={[styles.topBar, { top: insets.top + s(10), right: insets.right + s(24), gap: s(6) }]}>
         {/* Nút đóng menu */}
-        <Press focusVariant="quiet"
+        <Press focusVariant="quiet" focusable={false}
           onPress={handleClose}
           sound="back"
           accessibilityLabel="Đóng menu tiếp tục chơi"
-          style={[styles.closeBtn, { width: s(32), height: s(32), borderRadius: s(16) }]}
+          style={[styles.closeBtn, {
+            width: s(32), height: s(32), borderRadius: s(16),
+            borderWidth: closeFocused ? 1.5 : 1,
+            borderColor: closeFocused ? MENU_GLASS.borderActive : MENU_GLASS.border,
+            backgroundColor: closeFocused ? MENU_GLASS.controlActive : 'transparent',
+          }]}
         >
           <MenuGlassBackdrop variant="control" radius={s(16)} />
-          <X size={s(15)} color="rgba(255,255,255,0.65)" />
+          <X size={s(15)} color={closeFocused ? '#ffffff' : 'rgba(255,255,255,0.65)'} />
         </Press>
       </View>
 
@@ -598,7 +639,7 @@ export function GuideMenu({
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: s(4), alignItems: 'center' }}>
             {dockActions.map((action, index) => {
               const Icon = action.icon;
-              const isFocused = dockFocus === index;
+              const isFocused = dockFocus === index && !closeFocused;
               const hasBadge = action.badge !== null && action.badge !== undefined;
               const popoverOpen = Boolean(action.popover && popover?.id === action.popover);
               const lit = isFocused || popoverOpen;
@@ -613,7 +654,7 @@ export function GuideMenu({
                     else dockNodes.delete(action.id);
                   }}
                 >
-                  <Press focusVariant="quiet"
+                  <Press focusVariant="quiet" focusable={false}
                     disabled={Boolean(busy)}
                     onPress={() => onSelectDockAction(action, index)}
                     pressScale={0.92}
@@ -668,7 +709,7 @@ export function GuideMenu({
 
                     {hasBadge ? (
                       <View style={styles.dockBadge}>
-                        <T size={8.5} weight="bold" color="#ffffff" tabular>
+                        <T size={8} weight="bold" color="#ffffff" tabular>
                           {action.badge}
                         </T>
                       </View>
@@ -692,6 +733,7 @@ export function GuideMenu({
       {/* Popover kiểu Apple bung ra từ nút Thông báo / Thiết bị / Tài khoản */}
       <ControlPopover
         open={popover !== null}
+        trapFocus
         blur={guideBackdrop === null}
         anchor={popover?.anchor ?? null}
         title={popoverShown === 'mapping' ? 'Thiết lập nút' : popoverShown === 'devices' ? 'Thiết bị' : popoverShown === 'profile' ? 'Tài khoản' : 'Thông báo'}
@@ -701,11 +743,13 @@ export function GuideMenu({
           <Press focusVariant="quiet" onPress={() => void markAllAsRead()} hitSlop={8} style={{ paddingHorizontal: s(8), paddingVertical: s(4), borderRadius: s(10) }}>
             <T size={10} weight="semibold" color={colors.accentSoft}>Đánh dấu đã đọc</T>
           </Press>
+        ) : popoverShown === 'mapping' ? (
+          <PanelIconButton icon={RotateCw} label="Tải lại profile" appearance="glass" onPress={() => setMappingReload((n) => n + 1)} />
         ) : null}
         onClose={closePopover}
       >
         {popoverShown === 'mapping' ? (
-          <MappingProfilesPanel open={open && popover?.id === 'mapping'} gameId={activeGame?.id ?? null} mapping={mapping} onNotice={setToastMessage} onClose={closePopover} />
+          <MappingProfilesPanel open={open && popover?.id === 'mapping'} gameId={activeGame?.id ?? null} mapping={mapping} reloadToken={mappingReload} onNotice={setToastMessage} onClose={closePopover} />
         ) : popoverShown === 'devices' ? (
           <DevicesPanel devices={devices} />
         ) : popoverShown === 'profile' ? (
@@ -731,33 +775,28 @@ export function GuideMenu({
       ) : null}
 
       {/* MODAL XEM VÀ SAO CHÉP ẢNH CHỤP */}
-      {shot ? (
+      {shot && shotPreview ? (
         <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
-          <View style={[styles.modalCard, { maxWidth: s(600), borderRadius: s(22) }]}>
-            <MenuGlassBackdrop radius={s(22)} blur={guideBackdrop === null} />
-            <Img source={{ uri: `data:image/png;base64,${shot}` }} style={{ width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' }} contentFit="contain" />
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: s(14) }}>
-              <T size={11} color="rgba(255,255,255,0.6)">Ảnh đã chụp từ màn hình stream</T>
-              <View style={{ flexDirection: 'row', gap: s(8) }}>
-                <Press focusVariant="quiet" onPress={() => setShot(null)} sound="back" style={[styles.modalBtnSec, { height: s(36), borderRadius: s(12), paddingHorizontal: s(14) }]}>
-                  <T size={11} color="rgba(255,255,255,0.7)">Đóng</T>
-                </Press>
-                <Press focusVariant="quiet"
-                  onPress={() => void run('copy', async () => { await Clipboard.setImageAsync(shot); }, 'Đã chép ảnh vào clipboard.')}
-                  style={[styles.modalBtnPri, { height: s(36), borderRadius: s(12), paddingHorizontal: s(14) }]}
-                >
-                  <Copy size={s(13)} color="#ffffff" />
-                  <T size={11} weight="semibold" color="#ffffff">Sao chép</T>
-                </Press>
+          <FocusLayer>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: s(10) }}>
+              <View style={[styles.shotFrame, { width: shotHeight * shotAspect, height: shotHeight, borderRadius: s(18) }]}>
+                <Img source={shotPreview} style={StyleSheet.absoluteFill} contentFit="cover"
+                  cachePolicy="none" transition={0} accessibilityLabel="Ảnh vừa chụp" />
+              </View>
+              <View style={{ gap: s(8) }}>
+                <PanelIconButton icon={X} label="Đóng ảnh chụp" sound="back" appearance="glass" onPress={() => setShot(null)} />
+                <PanelIconButton icon={Copy} label="Sao chép ảnh" appearance="glass" autoFocus disabled={busy === 'copy'}
+                  onPress={() => void run('copy', async () => { await Clipboard.setImageAsync(shot); }, 'Đã chép ảnh vào clipboard.')} />
               </View>
             </View>
-          </View>
+          </FocusLayer>
         </View>
       ) : null}
 
       {/* MODAL XÁC NHẬN THOÁT GAME */}
       {confirmExit ? (
         <View style={[StyleSheet.absoluteFill, styles.modalOverlay]}>
+          <FocusLayer>
           <View style={[styles.modalCard, { maxWidth: s(380), alignItems: 'center', padding: s(22), borderRadius: s(22) }]}>
             <MenuGlassBackdrop radius={s(22)} blur={guideBackdrop === null} />
             <View style={[styles.dangerIconCircle, { width: s(48), height: s(48), borderRadius: s(24) }]}>
@@ -773,14 +812,17 @@ export function GuideMenu({
               <Press focusVariant="quiet" onPress={() => setConfirmExit(false)} style={[styles.modalBtnSec, { height: s(38), borderRadius: s(12), paddingHorizontal: s(16) }]}>
                 <T size={11.5} weight="semibold" color="rgba(255,255,255,0.7)">Hủy</T>
               </Press>
-              <Press focusVariant="quiet" onPress={exitGame} style={[styles.dangerBtnPri, { height: s(38), borderRadius: s(12), paddingHorizontal: s(16) }]}>
+              {/* A trên hộp này vẫn xác nhận thoát như trước: nút Thoát được chọn sẵn. */}
+              <Press focusVariant="quiet" autoFocus focusTint="danger" onPress={exitGame} sound="confirm" style={[styles.dangerBtnPri, { height: s(38), borderRadius: s(12), paddingHorizontal: s(16) }]}>
                 <LogOut size={s(13)} color="#ffffff" />
                 <T size={11.5} weight="bold" color="#ffffff">Thoát game</T>
               </Press>
             </View>
           </View>
+          </FocusLayer>
         </View>
       ) : null}
+      </FocusLayer>
     </Animated.View>
   );
 }
@@ -846,13 +888,14 @@ const useStyles = makeStyles(({ glass }) => ({
     borderWidth: 1,
     backgroundColor: menuGlassFrom(glass).control,
   },
+  // Nằm gọn trong ô nút: thò ra ngoài thì đè lên viền thanh dock (dock cắt overflow).
   dockBadge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    minWidth: 17,
-    height: 17,
-    borderRadius: 8.5,
+    top: 1,
+    right: 1,
+    minWidth: 15,
+    height: 15,
+    borderRadius: 7.5,
     backgroundColor: '#ef4444',
     borderWidth: 1.2,
     borderColor: menuGlassFrom(glass).borderActive,
@@ -898,21 +941,20 @@ const useStyles = makeStyles(({ glass }) => ({
     ...glassShadow,
     elevation: 0,
   },
+  shotFrame: {
+    overflow: 'hidden',
+    backgroundColor: '#000',
+    borderWidth: 1,
+    borderColor: menuGlassFrom(glass).border,
+    ...glassShadow,
+    elevation: 0,
+  },
   modalBtnSec: {
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: menuGlassFrom(glass).control,
     borderWidth: 1,
     borderColor: menuGlassFrom(glass).border,
-  },
-  modalBtnPri: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: menuGlassFrom(glass).controlActive,
-    borderWidth: 1,
-    borderColor: menuGlassFrom(glass).borderActive,
   },
   dangerIconCircle: {
     alignItems: 'center',

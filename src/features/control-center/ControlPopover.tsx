@@ -8,6 +8,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
+import { FocusLayer } from '@/features/gamepad/focus';
 import { useMotion } from '@/ui/motion';
 import { useUi } from '@/ui/scale';
 import { makeStyles } from '@/theme';
@@ -26,6 +27,7 @@ export function ControlPopover({
   action,
   width = 340,
   blur = true,
+  trapFocus = false,
   onClose,
   children,
 }: {
@@ -38,6 +40,11 @@ export function ControlPopover({
   width?: number;
   /** A frozen, already blurred stream frame needs no additional native blur. */
   blur?: boolean;
+  /**
+   * Popover là một lớp tiêu điểm riêng: D-pad chỉ đi giữa các nút bên trong nó.
+   * Dùng khi nơi chứa không tự bọc cả dock lẫn popover trong một FocusLayer.
+   */
+  trapFocus?: boolean;
   onClose: () => void;
   children: ReactNode;
 }) {
@@ -88,7 +95,7 @@ export function ControlPopover({
   const translateY = progress.interpolate({ inputRange: [0, 1], outputRange: [s(14), 0] });
   const opacity = progress.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0, 1, 1] });
 
-  return (
+  const layer = (
     <View style={[StyleSheet.absoluteFill, styles.layer]} pointerEvents={open ? 'box-none' : 'none'}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onClose} focusable={false} accessibilityLabel="Đóng" />
       <Animated.View
@@ -127,6 +134,7 @@ export function ControlPopover({
       </Animated.View>
     </View>
   );
+  return trapFocus ? <FocusLayer>{layer}</FocusLayer> : layer;
 }
 
 const useStyles = makeStyles(({ glass }) => ({

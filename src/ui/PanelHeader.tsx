@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { X, type LucideIcon } from 'lucide-react-native';
 
+import type { UiSound } from '@/features/sound/UiSoundProvider';
 import { useTheme } from '@/theme';
 import { GlassBackdrop, MenuGlassBackdrop } from './GlassMaterial';
 import { useMenuGlass } from './menuGlass';
@@ -38,13 +39,32 @@ export function PanelHeader({ title, subtitle, leading, icon: Icon, action, onCl
         {subtitle ? <T size={10.5} color={colors.text3} numberOfLines={1} style={{ marginTop: s(2) }}>{subtitle}</T> : null}
       </View>
       {action}
-      <Press onPress={onClose} sound="back" accessibilityLabel="Đóng"
-        focusVariant={neutral ? 'quiet' : 'auto'}
-        style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center',
-          backgroundColor: neutral ? 'transparent' : glass.control, borderWidth: 1, borderColor: neutral ? MENU_GLASS.border : glass.controlBorder }}>
-        {neutral ? <MenuGlassBackdrop variant="control" radius={s(16)} /> : <GlassBackdrop material="control" radius={s(16)} />}
-        <X size={s(15)} color={colors.text2} strokeWidth={1.8} />
-      </Press>
+      <PanelIconButton icon={X} label="Đóng" sound="back" appearance={appearance} onPress={onClose} />
     </View>
+  );
+}
+
+/** Nút tròn chỉ có icon, cùng khuôn với nút đóng của tiêu đề (tải lại, sao chép...). */
+export function PanelIconButton({ icon: Icon, label, onPress, appearance = 'theme', sound, disabled, autoFocus }: {
+  icon: LucideIcon;
+  label: string;
+  onPress: () => void;
+  appearance?: 'theme' | 'glass';
+  sound?: UiSound | false;
+  disabled?: boolean;
+  autoFocus?: boolean;
+}) {
+  const MENU_GLASS = useMenuGlass();
+  const { colors, glass } = useTheme();
+  const { s } = useUi();
+  const neutral = appearance === 'glass';
+  return (
+    <Press onPress={onPress} sound={sound} accessibilityLabel={label} disabled={disabled} autoFocus={autoFocus}
+      focusVariant={neutral ? 'quiet' : 'auto'}
+      style={{ width: s(32), height: s(32), borderRadius: s(16), alignItems: 'center', justifyContent: 'center', opacity: disabled ? 0.45 : 1,
+        backgroundColor: neutral ? 'transparent' : glass.control, borderWidth: 1, borderColor: neutral ? MENU_GLASS.border : glass.controlBorder }}>
+      {neutral ? <MenuGlassBackdrop variant="control" radius={s(16)} /> : <GlassBackdrop material="control" radius={s(16)} />}
+      <Icon size={s(15)} color={colors.text2} strokeWidth={1.8} />
+    </Press>
   );
 }

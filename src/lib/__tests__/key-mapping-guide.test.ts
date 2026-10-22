@@ -33,9 +33,10 @@ function fixture() {
     'react-native': { ScrollView: 'ScrollView', View: 'View' },
     'jetsona-input': { addListener: (event: string, fn: Function) => { callbacks.set(event, fn); return () => callbacks.delete(event); } },
     '@/features/auth': { useSignedInUser: () => ({ userId: OWNER }) },
+    '@/features/gamepad/focus': { FocusScroll: 'ScrollView' },
     '@/features/sound/UiSoundProvider': { playUiSound() {} },
     '@/lib/pc-api': { PC_ROUTES: { gameRuntime: '/games/runtime' }, pcFetchJson: async () => ({ games: [{ id: gameId, active: true }] }) },
-    '@/theme': { useTheme: () => ({ colors: { text3: '#888' } }) }, '@/ui/Text': { T: 'Text' },
+    '@/ui/Text': { T: 'Text' },
     './MappingUi': { MappingButton: 'Button', MappingStatus: 'Status', mappingStyles: { row: {} } },
     './service': { mappingRepository: () => ({ list: async () => { if (loadFails) throw new Error('Supabase unavailable'); return [p]; }, load: async () => p, screenshotUrl: async () => 'private-image' }) },
   };
@@ -43,10 +44,10 @@ function fixture() {
   const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, jsxFactory: 'React.createElement' } }).outputText;
   const exports: any = {};
   runInNewContext(output, { exports, React: react, console, Promise, require: (name: string) => { assert.ok(name in modules, name); return modules[name]; } });
-  let open = true; let tree: Node;
+  let open = true; let reloadToken = 0; let tree: Node;
   function render() {
     cursor = 0;
-    tree = exports.MappingProfilesPanel({ open, gameId, mapping, onNotice: (notice: string) => notices.push(notice), onClose: () => { open = false; } });
+    tree = exports.MappingProfilesPanel({ open, gameId, mapping, reloadToken, onNotice: (notice: string) => notices.push(notice), onClose: () => { open = false; } });
     for (const { index, effect } of pending.splice(0)) slots[index].cleanup = effect();
     return tree;
   }
@@ -55,7 +56,7 @@ function fixture() {
   const label = (button: Node) => button.children.filter(c => typeof c === 'string').join('');
   const click = (text: string) => { const node = buttons().find(b => label(b).includes(text)); assert.ok(node, text); assert.ok(!node.props.disabled, text); return node.props.onPress(); };
   const flush = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); render(); };
-  return { render, click, buttons, label, flush, engine, packets, notices, routes, press: (button: string) => callbacks.get('onGamepadButton')?.({ button, down: true }), mismatch: () => { gameId = 'another-game'; }, failLoad: () => { loadFails = true; }, errors: () => all(tree).filter(n => n.type === 'Status').map(n => n.props.error).filter(Boolean), cleanup: () => { engine.disable(); slots.forEach(slot => slot?.cleanup?.()); } };
+  return { render, click, buttons, label, flush, engine, packets, notices, routes, press: (button: string) => callbacks.get('onGamepadButton')?.({ button, down: true }), reload: () => { reloadToken += 1; render(); }, mismatch: () => { gameId = 'another-game'; }, failLoad: () => { loadFails = true; }, errors: () => all(tree).filter(n => n.type === 'Status').map(n => n.props.error).filter(Boolean), cleanup: () => { engine.disable(); slots.forEach(slot => slot?.cleanup?.()); } };
 }
 
 test('GuideMenu loads profiles, activates the selection, and offers exactly Disable/Edit for an active profile', async () => {
@@ -65,7 +66,7 @@ test('GuideMenu loads profiles, activates the selection, and offers exactly Disa
   f.click('My profile'); f.render();
   assert.deepEqual(f.buttons().map(f.label), ['Tắt mapping', 'Chỉnh sửa mapping']);
   f.engine.process(1, { ...neutral, buttons: 0x1000 });
-  f.press('a'); f.render();
+  f.click('Tắt mapping'); f.render();
   assert.equal(f.engine.activeProfile, null);
   assert.deepEqual(f.packets.at(-1), ['button', false, 1]);
   f.cleanup();
@@ -81,6 +82,6 @@ test('editing from the active popup stops execution and opens the saved profile 
 test('mismatched games and Supabase errors never produce a successful activation', async () => {
   const f = fixture(); f.render(); await f.flush(); f.mismatch(); f.click('My profile'); await f.flush();
   assert.equal(f.engine.activeProfile, null); assert.ok(f.notices.every(message => !message.includes('Đã kích hoạt')));
-  f.failLoad(); f.click('Tải lại'); await f.flush(); assert.deepEqual(f.errors(), ['Supabase unavailable']);
+  f.failLoad(); f.reload(); await f.flush(); assert.deepEqual(f.errors(), ['Supabase unavailable']);
   f.cleanup();
 });
