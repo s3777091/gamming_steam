@@ -73,5 +73,5 @@ test('Android declares image/selected-photo permissions and preserves the iOS us
   assert.ok(config.android.permissions.includes('android.permission.READ_MEDIA_IMAGES'));
   assert.ok(config.android.permissions.includes('android.permission.READ_MEDIA_VISUAL_USER_SELECTED'));
   const picker = config.plugins.find((entry: any) => Array.isArray(entry) && entry[0] === 'expo-image-picker');
-  assert.ok(picker[1].photosPermission); assert.equal(picker[1].cameraPermission, false); assert.equal(picker[1].microphonePermission, false);
+  assert.ok(picker[1].photosPermission); assert.equal(picker[1].cameraPermission, false); assert.equal(typeof picker[1].microphonePermission, 'string');
 });

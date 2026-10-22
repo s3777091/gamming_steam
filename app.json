@@ -52,6 +52,9 @@
         "android.permission.VIBRATE",
         "android.permission.WAKE_LOCK",
         "android.permission.BLUETOOTH_CONNECT"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -92,7 +95,7 @@
         {
           "photosPermission": "Jetsona cần chọn ảnh gameplay để thiết lập vị trí các nút điều khiển.",
           "cameraPermission": false,
-          "microphonePermission": false
+          "microphonePermission": "Bộ âm thanh của luồng stream mở đường âm thanh hai chiều. Jetsona không ghi âm và không gửi giọng nói của bạn."
         }
       ],
       [
